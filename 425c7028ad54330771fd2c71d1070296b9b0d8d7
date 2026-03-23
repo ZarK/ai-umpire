@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "425c7028ad54330771fd2c71d1070296b9b0d8d7",
+  "prompts": {
+    "6d74cb6f7d1649ed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d1bf9-8e6a-7141-a299-136d6e93fe19",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 0,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}
