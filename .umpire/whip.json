@@ -1,0 +1,63 @@
+{
+  "createdAt": "2026-03-23T18:50:51.663Z",
+  "tasks": [
+    {
+      "id": "review-last-20-prs",
+      "priority": "high",
+      "prompt": "Review the last 20 pull requests. Find open review threads or materially late review comments that were not resolved, then create GitHub issues for every actionable gap. Update .umpire/whip.json as you move the task from in_progress to completed.",
+      "status": "completed",
+      "title": "Audit the last 20 pull requests for unresolved review feedback"
+    },
+    {
+      "id": "validate-aiq-nine-stages",
+      "priority": "high",
+      "prompt": "Check whether the project uses the @tjalve/aiq npm package. If it does, create GitHub issues that validate all 9 AIQ stages in the current codebase and CI flow. Update .umpire/whip.json when you start and finish the task.",
+      "status": "pending",
+      "title": "Create validation issues for all 9 AIQ stages when @tjalve/aiq is in use"
+    },
+    {
+      "id": "review-duplication-and-tech-debt",
+      "priority": "medium",
+      "prompt": "Critically review code duplication, redundancy, and technical debt. Create GitHub issues for safe, scoped improvements that materially improve maintainability. Update .umpire/whip.json as you progress.",
+      "status": "pending",
+      "title": "Create improvement issues for duplication, redundancy, and tech debt"
+    },
+    {
+      "id": "audit-test-integrity",
+      "priority": "high",
+      "prompt": "Audit the test suite for cheating or fake coverage, especially mocked or non-real end-to-end tests that do not exercise the actual feature path. Create GitHub issues for every misleading test pattern you find and update .umpire/whip.json as you progress.",
+      "status": "pending",
+      "title": "Create issues for cheating, fake, or over-mocked tests, especially e2e tests"
+    },
+    {
+      "id": "review-performance-issues",
+      "priority": "medium",
+      "prompt": "Review the codebase for performance issues and worthwhile performance improvements. Create GitHub issues for concrete bottlenecks, wasteful work, and measurable optimization opportunities. Update .umpire/whip.json when you start and finish the task.",
+      "status": "pending",
+      "title": "Create performance issues and improvement opportunities"
+    },
+    {
+      "id": "review-memory-leaks",
+      "priority": "medium",
+      "prompt": "Inspect the codebase for memory leaks, resource leaks, and lifetime-management bugs. Create GitHub issues for every concrete leak risk or cleanup gap you find and update .umpire/whip.json as you progress.",
+      "status": "pending",
+      "title": "Create issues for memory leaks and resource cleanup problems"
+    },
+    {
+      "id": "review-error-handling",
+      "priority": "medium",
+      "prompt": "Review the codebase for inconsistent error handling, swallowed failures, and unclear failure paths. Create GitHub issues for each actionable inconsistency and update .umpire/whip.json when you start and finish the task.",
+      "status": "pending",
+      "title": "Create issues for inconsistent error handling"
+    },
+    {
+      "id": "review-logging-gaps",
+      "priority": "medium",
+      "prompt": "Review the codebase for inconsistent logging, missing operational logging, and logs that are too noisy or not actionable. Create GitHub issues for each meaningful logging gap and update .umpire/whip.json as you progress.",
+      "status": "pending",
+      "title": "Create issues for inconsistent or missing logging"
+    }
+  ],
+  "updatedAt": "2026-03-23T18:56:40.000Z",
+  "version": 1
+}
