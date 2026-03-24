@@ -1,0 +1,33 @@
+scripts/gh-update-labels.sh
+  b0284053cadaf293 47,51-52,56,62-63,67,73,77,83,87,91-92,96-97,101-102,106-107,113
+test/ai-umpire-continuation.test.ts
+  b0284053cadaf293 109,1135
+scripts/gh-issue-start.sh
+  b0284053cadaf293 37
+test/github-scripts.test.ts
+  b0284053cadaf293 1-142
+opencode/ai-umpire-continuation.ts
+  b0284053cadaf293 294
+scripts/gh-priority-order.sh
+  b0284053cadaf293 25-26,30-34,39-43,45-46,55-59,79-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.18",
+  "base_commit_sha": "bb7c218076807925b25e385220ccb96172726850",
+  "prompts": {
+    "b0284053cadaf293": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "f48adf55-2588-400c-9c64-337ae719538b",
+        "model": "unknown"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>",
+      "messages": [],
+      "total_additions": 195,
+      "total_deletions": 36,
+      "accepted_lines": 202,
+      "overriden_lines": 0
+    }
+  }
+}
