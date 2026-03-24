@@ -323,64 +323,112 @@ const INITIAL_WHIP_TASKS: WhipTask[] = [
   {
     id: "review-last-20-prs",
     priority: "high",
-    prompt:
-      "Review the last 20 pull requests. Find open review threads or materially late review comments that were not resolved, then create GitHub issues for every actionable gap.",
+    prompt: [
+      "Mission: Review the most recent 20 pull requests, or all available recent pull requests if the repository has fewer than 20, and find materially unresolved review feedback.",
+      "Inspect: The Conversation tab, review threads, requested changes, comments posted near or after merge, follow-up commits, re-requests for review, and comments marked resolved without a clear corresponding fix or tracked follow-up. Focus on correctness, security, UX, tests, maintainability, and operability gaps rather than taste-only debate.",
+      "Dedup: Before opening anything new, check whether the concern was later fixed in another pull request, tracked in an issue, or intentionally deferred with an explicit follow-up.",
+      "Issue bar: Create issues only for concrete unresolved gaps that still exist in the current repository. Group multiple review comments into one issue when they point to the same root cause or remediation unit.",
+      "Issue contents: Cite the pull request number, the relevant reviewer feedback, the current code path or workflow still affected, why the gap still matters now, and the smallest safe follow-up scope.",
+      "Do not file: Already-fixed comments, already-tracked follow-ups, subjective nits, or review remarks that do not imply a real repository problem.",
+    ].join("\n"),
     status: "pending",
     title: "Audit the last 20 pull requests for unresolved review feedback",
   },
   {
     id: "validate-aiq-nine-stages",
     priority: "high",
-    prompt:
-      "Check whether the project uses the @tjalve/aiq npm package. If it does, create GitHub issues that validate all 9 AIQ stages in the current codebase and CI flow.",
+    prompt: [
+      "Mission: Determine whether the repository uses the `@tjalve/aiq` package. If it is not in use, stop and create no issues.",
+      "Inspect: If `@tjalve/aiq` is in use, identify the repository's expected 9 AIQ stages from local package usage, configuration, scripts, CI workflows, docs, and source rather than guessing stage names. Audit whether each stage exists, is wired into the real workflow, produces real evidence or artifacts where expected, and cannot be trivially bypassed by stubs, dead configs, TODO placeholders, mocks, or manual-only steps.",
+      "Dedup: Before opening anything new, check for existing AIQ issues, CI notes, release gates, and recent pull requests that already cover the gap.",
+      "Issue bar: Create issues for any missing stage, partially implemented stage, unenforced stage, bypassable stage, misleading stage, or stage whose evidence is not connected to real repository behavior. Group findings by stage or root cause.",
+      "Issue contents: Name the affected AIQ stage, cite the evidence you found, explain the exact enforcement or coverage gap, identify the files and workflows involved, and define what valid closed-loop validation should prove.",
+      "Do not file: Stages that are clearly documented as intentionally out of scope for this repository and are not claimed elsewhere in the repo or CI flow.",
+    ].join("\n"),
     status: "pending",
     title: "Create validation issues for all 9 AIQ stages when @tjalve/aiq is in use",
   },
   {
     id: "review-duplication-and-tech-debt",
     priority: "medium",
-    prompt:
-      "Critically review code duplication, redundancy, and technical debt. Create GitHub issues for safe, scoped improvements that materially improve maintainability.",
+    prompt: [
+      "Mission: Critically review the codebase for duplication, redundancy, fragmented abstractions, and technical debt that materially harms maintainability.",
+      "Inspect: Copy-pasted business rules, duplicated validation or parsing, parallel implementations of the same behavior, repeated query/build logic, duplicated tests or fixtures that have drifted, dead abstractions, stale compatibility layers, TODO/FIXME clusters, and debt that causes bug fixes or feature changes to be repeated across multiple places.",
+      "Dedup: Before opening anything new, check whether the cleanup is already tracked, recently refactored, or intentionally kept separate for boundary, performance, or dependency reasons.",
+      "Issue bar: Create issues only for safe, scoped improvements with clear payoff. Prefer fewer strong issues over many weak ones, and group multiple occurrences into one issue when they share the same root cause or can be solved by the same cleanup.",
+      "Issue contents: Cite the duplicated or debt-heavy locations, explain why the pattern is harmful, describe the smallest reasonable refactor or deletion scope, and note any regression risks or guardrails.",
+      "Do not file: Tiny local repetition that is clearer than abstraction, framework or generated boilerplate, intentional boundary duplication, or vague 'could be cleaner' complaints without material value.",
+    ].join("\n"),
     status: "pending",
     title: "Create improvement issues for duplication, redundancy, and tech debt",
   },
   {
     id: "audit-test-integrity",
     priority: "high",
-    prompt:
-      "Audit the test suite for cheating or fake coverage, especially mocked or non-real end-to-end tests that do not exercise the actual feature path. Create GitHub issues for every misleading test pattern you find.",
+    prompt: [
+      "Mission: Audit the test suite for cheating, fake coverage, and misleading confidence, especially tests labeled or treated as end-to-end or integration tests that do not exercise the real feature path.",
+      "Inspect: Heavy mocking of the core behavior under test, tests asserting mock interactions instead of user-visible outcomes, fake end-to-end flows that bypass real auth, network, database, or runtime boundaries, snapshot-only coverage for important logic, fixtures or test flags that disable real checks, retries and waits that hide flakiness, coverage padding, and tests that can pass while production behavior is broken.",
+      "Dedup: Before opening anything new, check existing test-debt issues, CI discussions, flaky-test tickets, and recent fixes that already cover the problem.",
+      "Issue bar: Create issues only for concrete misleading patterns with real product or CI risk. Group suites into one issue when the problem is the same anti-pattern rather than many isolated tests.",
+      "Issue contents: Name the affected tests or suites, explain the false confidence they create, identify the real path that is not covered, state the risk that can escape to production, and define what a trustworthy replacement or supplement should verify.",
+      "Do not file: Honest unit or component tests that are clear about their scope and still leave the critical path covered elsewhere.",
+    ].join("\n"),
     status: "pending",
     title: "Create issues for cheating, fake, or over-mocked tests, especially e2e tests",
   },
   {
     id: "review-performance-issues",
     priority: "medium",
-    prompt:
-      "Review the codebase for performance issues and worthwhile performance improvements. Create GitHub issues for concrete bottlenecks, wasteful work, and measurable optimization opportunities.",
+    prompt: [
+      "Mission: Review the codebase for concrete performance issues and worthwhile optimization opportunities with measurable user, system, or CI impact.",
+      "Inspect: Hot paths in request and response flows, rendering loops, background jobs, build and test pipelines, data access, caching, batching, serialization, I/O, and concurrency control. Look for N+1 work, repeated full scans, quadratic behavior, unnecessary recomputation, avoidable large copies, blocking work on latency-sensitive paths, unbounded fan-out, missing backpressure, excessive polling, and chatty external calls.",
+      "Dedup: Before opening anything new, check existing performance issues, profiler notes, benchmarks, dashboards, and recent optimization pull requests.",
+      "Issue bar: Create issues only for meaningful bottlenecks or high-confidence waste with a believable mechanism and plausible measurement plan. Group multiple call sites into one issue when they share the same root cause.",
+      "Issue contents: Cite the suspected hot path, the trigger or scale dimension, the file locations involved, why the current behavior is inefficient, the likely impact, and how success should be measured.",
+      "Do not file: Micro-optimizations without practical payoff, or changes that mostly trade readability and simplicity for hypothetical speed.",
+    ].join("\n"),
     status: "pending",
     title: "Create performance issues and improvement opportunities",
   },
   {
     id: "review-memory-leaks",
     priority: "medium",
-    prompt:
-      "Inspect the codebase for memory leaks, resource leaks, and lifetime-management bugs. Create GitHub issues for every concrete leak risk or cleanup gap you find.",
+    prompt: [
+      "Mission: Inspect the codebase for memory leaks, resource leaks, and lifetime-management bugs that can accumulate over time or under repeated use.",
+      "Inspect: Event listeners, timers, intervals, subscriptions, observers, workers, child processes, sockets, streams, file handles, database connections, caches, in-memory queues, retained DOM objects, large closures, aborted tasks, retries, shutdown paths, unmount paths, and long-running processes where allocations or registrations can outlive their owner.",
+      "Dedup: Before opening anything new, check existing leak issues, production incident notes, long-run test results, and recent cleanup pull requests.",
+      "Issue bar: Create issues only for concrete leak risks or cleanup gaps with a realistic retention path or resource exhaustion story. Group related sites into one issue when they stem from the same lifecycle mistake.",
+      "Issue contents: Identify what is allocated or registered, what fails to be released, the trigger pattern, the likely impact, and how the leak or resource exhaustion could be validated, such as heap growth, descriptor growth, queue growth, or long-run reproduction.",
+      "Do not file: Speculative garbage-collection worries without a retained-reference story, or normal short-lived allocations for the workload.",
+    ].join("\n"),
     status: "pending",
     title: "Create issues for memory leaks and resource cleanup problems",
   },
   {
     id: "review-error-handling",
     priority: "medium",
-    prompt:
-      "Review the codebase for inconsistent error handling, swallowed failures, and unclear failure paths. Create GitHub issues for each actionable inconsistency.",
+    prompt: [
+      "Mission: Review the codebase for inconsistent error handling, swallowed failures, unclear failure paths, and contracts that make debugging or recovery harder than necessary.",
+      "Inspect: Broad catch-and-continue patterns, dropped causes, misleading success states, missing propagation across async boundaries, unhandled promise rejections, retries that hide failure, partial failure without rollback or cleanup, commands that exit successfully on failure, jobs that fail silently, and missing or inconsistent boundary validation where external input enters the system.",
+      "Dedup: Before opening anything new, check existing incident issues, bug reports, operational runbooks, and recent fixes that already track the problem.",
+      "Issue bar: Create issues only for actionable inconsistencies where real failures can be hidden, misclassified, or turned into confusing behavior for users, operators, or later code. Group findings by failure pattern or contract break, not by file alone.",
+      "Issue contents: Show the failing path, the current behavior, why it is unsafe or confusing, what the correct handling contract should be, and the smallest safe fix direction.",
+      "Do not file: Deliberate fail-fast behavior that is consistent and documented, or impossible states already ruled out by stronger upstream invariants.",
+    ].join("\n"),
     status: "pending",
     title: "Create issues for inconsistent error handling",
   },
   {
     id: "review-logging-gaps",
     priority: "medium",
-    prompt:
-      "Review the codebase for inconsistent logging, missing operational logging, and logs that are too noisy or not actionable. Create GitHub issues for each meaningful logging gap.",
+    prompt: [
+      "Mission: Review the codebase for inconsistent logging, missing operational logging, poor log semantics, and logs that are too noisy, too sparse, or not actionable.",
+      "Inspect: Startup and shutdown, deploy-time checks, request handling, background jobs, retries, queue processing, scheduled tasks, external API and database calls, auth and security-sensitive flows, and failure recovery paths. Look for missing start, failure, and state-transition logs, missing correlation IDs or structured fields, wrong severity levels, success-only logging, duplicate spam, and logs that leak secrets or sensitive user data.",
+      "Dedup: Before opening anything new, check existing observability issues, dashboards, alerts, logging standards, and recent pull requests that already address the gap.",
+      "Issue bar: Create issues only for meaningful observability gaps or harmful logging patterns. Group multiple locations into one issue when the same logging contract or schema should be applied consistently.",
+      "Issue contents: Cite the affected path or event, explain the current logging problem, why it hurts debugging or operations, and what concrete fields, levels, or events should exist instead.",
+      "Do not file: Absence of logs in trivial pure functions, or style-only logging differences with no operational consequence.",
+    ].join("\n"),
     status: "pending",
     title: "Create issues for inconsistent or missing logging",
   },
