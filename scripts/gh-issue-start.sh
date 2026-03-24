@@ -34,8 +34,7 @@ fi
 # Check if issue exists and get current state
 echo "🔍 Checking issue #$ISSUE_NUM..."
 
-issue_data=$(gh issue view "$ISSUE_NUM" --json number,title,state,labels,body 2>/dev/null)
-if [ $? -ne 0 ]; then
+if ! issue_data=$(gh issue view "$ISSUE_NUM" --json number,title,state,labels,body 2>/dev/null); then
     echo "❌ Issue #$ISSUE_NUM not found"
     exit 1
 fi

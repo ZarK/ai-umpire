@@ -22,24 +22,28 @@ issues_data=$(gh issue list --state open --limit 100 --json number,title,labels 
 get_priority_score() {
 	local priority="$1"
 	local status="$2"
+	local base_score
+	local status_modifier
 
 	# Base priority scores
 	case "$priority" in
-	"P1-Critical") echo 1000 ;;
-	"P2-High") echo 500 ;;
-	"P3-Medium") echo 100 ;;
-	"P4-Low") echo 10 ;;
-	*) echo 50 ;; # Default for unlabeled
+	"P1-Critical") base_score=1000 ;;
+	"P2-High") base_score=500 ;;
+	"P3-Medium") base_score=100 ;;
+	"P4-Low") base_score=10 ;;
+	*) base_score=50 ;; # Default for unlabeled
 	esac
 
 	# Status modifiers
 	case "$status" in
-	"S-Blocking") echo +200 ;;
-	"S-Ready") echo +50 ;;
-	"S-InProgress") echo +25 ;;
-	"S-Blocked") echo -100 ;;
-	*) echo +0 ;;
+	"S-Blocking") status_modifier=200 ;;
+	"S-Ready") status_modifier=50 ;;
+	"S-InProgress") status_modifier=25 ;;
+	"S-Blocked") status_modifier=-100 ;;
+	*) status_modifier=0 ;;
 	esac
+
+	echo $((base_score + status_modifier))
 }
 
 # Create prioritized list
@@ -48,9 +52,11 @@ next_issue=""
 blocked_issues=()
 
 # Process issues by priority order
-echo "$issues_data" | jq -r '.[] | "\(.priority // "P3-Medium")|\(.status // "S-Ready")|\(.component // "")|\(.number)|\(.title)"' |
-	sort -t'|' -k1,1 -k2,2r |
-	while IFS='|' read -r priority status component number title; do
+	while IFS=$'\t' read -r score priority status component number title; do
+		if [ "$component" = "__NONE__" ]; then
+			component=""
+		fi
+
 		# Build label display
 		labels="[$priority"
 		if [ "$component" != "" ]; then
@@ -70,7 +76,14 @@ echo "$issues_data" | jq -r '.[] | "\(.priority // "P3-Medium")|\(.status // "S-
 
 		echo "$issue_line"
 		((counter++))
-	done
+	done < <(
+		while IFS=$'\t' read -r priority status component number title; do
+			score=$(get_priority_score "$priority" "$status")
+			printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$score" "$priority" "$status" "$component" "$number" "$title"
+		done < <(
+			echo "$issues_data" | jq -r '.[] | [(.priority // "P3-Medium"), (.status // "S-Ready"), ((.component // "") | if . == "" then "__NONE__" else . end), (.number | tostring), .title] | @tsv'
+		) | sort -t$'\t' -k1,1nr -k2,2 -k3,3r -k5,5n
+	)
 
 echo ""
 

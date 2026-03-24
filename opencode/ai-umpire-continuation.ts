@@ -291,7 +291,7 @@ const WHIP_WORKFLOW_RULES = [
 ].join("\n");
 
 const ISSUE_PROMPT = [
-  "Contiue solving open issues from gh-priority-order.sh. You are a trusted autonomous professional developer with full authority. Search for information. Analyze the issue. Work to completion. Execute without pause.",
+  "Continue solving open issues from gh-priority-order.sh. You are a trusted autonomous professional developer with full authority. Search for information. Analyze the issue. Work to completion. Execute without pause.",
   "Rules:",
   ISSUE_WORKFLOW_RULES,
   ISSUE_CREATION_TEMPLATE,

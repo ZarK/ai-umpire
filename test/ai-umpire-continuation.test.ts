@@ -106,7 +106,7 @@ describe("AiUmpireContinuationPlugin", () => {
 
     expect(prompts).toHaveLength(1);
     expect(prompts[0]?.sessionID).toBe("ses_ready");
-    expect(prompts[0]?.text).toContain("Contiue solving open issues from gh-priority-order.sh.");
+    expect(prompts[0]?.text).toContain("Continue solving open issues from gh-priority-order.sh.");
     expect(prompts[0]?.text).toContain("./scripts/gh-ensure-labels.sh");
     expect(prompts[0]?.text).toContain("## GitHub Issue Creation Rules (ALWAYS FOLLOW)");
     expect(prompts[0]?.text).toContain("## Issue Todo Template (ALWAYS USE THIS STRUCTURE)");
@@ -1132,7 +1132,7 @@ describe("AiUmpireContinuationPlugin", () => {
       body: {
         agent: undefined,
         model: undefined,
-        parts: [{ text: expect.stringContaining("Contiue solving open issues"), type: "text" }],
+        parts: [{ text: expect.stringContaining("Continue solving open issues"), type: "text" }],
       },
       path: { id: "ses_root" },
       query: { directory: repoDir },
