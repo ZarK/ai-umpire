@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "defaults": {
+    "priorityKey": "medium",
+    "statusKey": "ready"
+  },
+  "priorities": [
+    {
+      "key": "critical",
+      "name": "P1-Critical",
+      "color": "b60205",
+      "description": "Critical priority, blocks other work",
+      "score": 1000,
+      "emoji": "\ud83d\udd34",
+      "createIssue": true
+    },
+    {
+      "key": "high",
+      "name": "P2-High",
+      "color": "d93f0b",
+      "description": "High priority, next release",
+      "score": 500,
+      "emoji": "\ud83d\udfe0",
+      "createIssue": true
+    },
+    {
+      "key": "medium",
+      "name": "P3-Medium",
+      "color": "fbca04",
+      "description": "Medium priority, upcoming work",
+      "score": 100,
+      "emoji": "\ud83d\udfe1",
+      "createIssue": true
+    },
+    {
+      "key": "low",
+      "name": "P4-Low",
+      "color": "0e8a16",
+      "description": "Low priority, future work",
+      "score": 10,
+      "emoji": "\ud83d\udfe2",
+      "createIssue": true
+    }
+  ],
+  "statuses": [
+    {
+      "key": "ready",
+      "name": "S-Ready",
+      "color": "0e8a16",
+      "description": "Ready to work on",
+      "scoreModifier": 50,
+      "emoji": "\ud83d\udfe2",
+      "createIssue": true
+    },
+    {
+      "key": "in_progress",
+      "name": "S-InProgress",
+      "color": "1d76db",
+      "description": "Currently being worked",
+      "scoreModifier": 25,
+      "emoji": "\ud83d\udd35",
+      "createIssue": false
+    },
+    {
+      "key": "blocked",
+      "name": "S-Blocked",
+      "color": "5319e7",
+      "description": "Blocked by open dependencies",
+      "scoreModifier": -100,
+      "emoji": "\ud83d\udfe3",
+      "createIssue": true
+    },
+    {
+      "key": "blocking",
+      "name": "S-Blocking",
+      "color": "b60205",
+      "description": "Blocks other work",
+      "scoreModifier": 200,
+      "emoji": "\ud83d\udfe3",
+      "createIssue": true
+    }
+  ],
+  "components": {
+    "prefix": "C-",
+    "labels": []
+  },
+  "transitions": {
+    "ready": {
+      "add": "ready",
+      "remove": ["blocked", "in_progress"],
+      "description": "Mark as ready to work on"
+    },
+    "start": {
+      "add": "in_progress",
+      "remove": ["ready", "blocked"],
+      "description": "Mark as in progress"
+    },
+    "block": {
+      "add": "blocked",
+      "remove": ["ready", "in_progress"],
+      "description": "Mark as blocked"
+    },
+    "unblock": {
+      "add": "ready",
+      "remove": ["blocked"],
+      "description": "Remove blocked status"
+    }
+  },
+  "issueCreation": {
+    "ensureLabelsCommand": "./scripts/gh-ensure-labels.sh",
+    "dependencyLine": "Blocked by: #<N>",
+    "sequenceGuidance": "If the repository already uses `Sequence:` metadata to steer queue order, include it. Otherwise omit it."
+  }
+}

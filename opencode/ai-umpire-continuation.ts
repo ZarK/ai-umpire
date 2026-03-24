@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -97,6 +98,61 @@ interface PriorityOrderSummary {
   nextIssue: number | null;
   readyIssues: number[];
   version: 1;
+}
+
+interface QueuePolicy {
+  components: {
+    labels: QueuePolicyComponent[];
+    prefix: string;
+  };
+  defaults: {
+    priorityKey: string;
+    statusKey: string;
+  };
+  issueCreation: {
+    dependencyLine: string;
+    ensureLabelsCommand: string;
+    sequenceGuidance: string;
+  };
+  priorities: QueuePolicyPriority[];
+  statuses: QueuePolicyStatus[];
+  transitions: Record<string, QueuePolicyTransition>;
+  version: 1;
+}
+
+interface QueuePolicyLabel {
+  color: string;
+  createIssue: boolean;
+  description: string;
+  emoji: string;
+  key: string;
+  name: string;
+}
+
+interface QueuePolicyPriority extends QueuePolicyLabel {
+  score: number;
+}
+
+interface QueuePolicyStatus extends QueuePolicyLabel {
+  scoreModifier: number;
+}
+
+interface QueuePolicyComponent {
+  color: string;
+  description: string;
+  name: string;
+}
+
+interface QueuePolicyTransition {
+  add: string;
+  description: string;
+  remove: string[];
+}
+
+interface QueueStatusNames {
+  blocked: string;
+  inProgress: string;
+  ready: string;
 }
 
 type ContinuationClient = {
@@ -258,33 +314,6 @@ const ISSUE_TODO_TEMPLATE = [
   "```",
 ].join("\n");
 
-const ISSUE_CREATION_TEMPLATE = [
-  "## GitHub Issue Creation Rules (ALWAYS FOLLOW)",
-  "* Before creating issues, ensure the core queue labels exist by running `./scripts/gh-ensure-labels.sh`.",
-  "* Every created issue must have exactly one priority label: `P1-Critical`, `P2-High`, `P3-Medium`, or `P4-Low`.",
-  "* Every created issue must have exactly one status label: `S-Ready`, `S-Blocked`, or `S-Blocking`. Do not create fresh issues directly as `S-InProgress`.",
-  "* Add one `C-*` component label only if the repository already has a stable component taxonomy. Do not copy component or epic labels from another repository.",
-  "* Keep dependencies explicit with one `Blocked by: #N` line per blocker in the issue body.",
-  "* If the repository already uses `Sequence:` metadata to steer queue order, include it. Otherwise omit it.",
-  "Use this issue body shape:",
-  "```markdown",
-  "## Problem",
-  "[what is wrong, missing, or risky]",
-  "",
-  "## Why It Matters",
-  "[user impact, correctness impact, maintainability impact, or operational risk]",
-  "",
-  "## Scope",
-  "- [ ] [concrete acceptance criterion or task]",
-  "- [ ] [concrete acceptance criterion or task]",
-  "",
-  "## Notes",
-  "- [optional evidence, constraints, or implementation hints]",
-  "",
-  "Blocked by: #<N>",
-  "```",
-].join("\n");
-
 const COMMON_WORKFLOW_RULES = [
   "* Never ask questions - make decisions according to project rules and continue",
   "* Think holistically - consider system-wide impact, not just the immediate issue",
@@ -292,26 +321,11 @@ const COMMON_WORKFLOW_RULES = [
   "* Never stage, commit, or push `.umpire/**` files. They are plugin-managed local state.",
 ].join("\n");
 
-const ISSUE_WORKFLOW_RULES = [
-  COMMON_WORKFLOW_RULES,
-  "* git commit, push, pr, merge to ship immediately when everything is done - no confirmations, no approvals needed",
-  "* @scripts/gh-priority-order.sh -> start next S-Ready issue -> implement -> UI audit -> Oracle -> test -> cubic -> e2e when relevant -> PR + 10 min review -> ship -> repeat.",
-].join("\n");
-
 const WHIP_WORKFLOW_RULES = [
   COMMON_WORKFLOW_RULES,
   "* Focus on backlog triage only: audit the repository, create GitHub issues, and report evidence.",
   "* Do not commit, push, open PRs, or merge as part of a `.umpire` backlog task.",
   "* The plugin manages `.umpire/whip.json` task state automatically. Do not edit `.umpire/**` yourself.",
-].join("\n");
-
-const ISSUE_PROMPT = [
-  "Continue solving open issues from gh-priority-order.sh. You are a trusted autonomous professional developer with full authority. Search for information. Analyze the issue. Work to completion. Execute without pause.",
-  "Rules:",
-  ISSUE_WORKFLOW_RULES,
-  ISSUE_CREATION_TEMPLATE,
-  ISSUE_TODO_TEMPLATE,
-  "Go.",
 ].join("\n");
 
 const PENDING_PROMPT_STALE_MS = 5 * 60_000;
@@ -449,6 +463,478 @@ const INITIAL_WHIP_TASKS: WhipTask[] = [
   },
 ];
 
+function loadQueuePolicy(repoRoot: string): QueuePolicy {
+  const queuePolicyPath = path.resolve(repoRoot, "queue-policy.json");
+  let raw: string;
+
+  try {
+    raw = readFileSync(queuePolicyPath, "utf8");
+  } catch (error) {
+    throw new Error(`Failed to read ${path.relative(repoRoot, queuePolicyPath) || queuePolicyPath}: ${formatError(error)}`);
+  }
+
+  return parseQueuePolicy(raw, path.relative(repoRoot, queuePolicyPath) || queuePolicyPath);
+}
+
+function parseQueuePolicy(raw: string, source: string): QueuePolicy {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch (error) {
+    throw new Error(`Invalid ${source}: ${formatError(error)}`);
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error(`Invalid ${source}: expected an object.`);
+  }
+
+  const policy = parsed as Record<string, unknown>;
+  if (policy.version !== 1) {
+    throw new Error(`Invalid ${source}: unsupported version.`);
+  }
+
+  const defaults = parseQueuePolicyDefaults(policy.defaults, source);
+  const priorities = parseQueuePolicyPriorities(policy.priorities, source);
+  const statuses = parseQueuePolicyStatuses(policy.statuses, source);
+  const components = parseQueuePolicyComponents(policy.components, source);
+  const transitions = parseQueuePolicyTransitions(policy.transitions, source);
+  const issueCreation = parseQueuePolicyIssueCreation(policy.issueCreation, source);
+
+  assertUniqueQueuePolicyKeys(priorities, source, "priority");
+  assertUniqueQueuePolicyKeys(statuses, source, "status");
+  assertUniqueQueuePolicyComponentNames(components.labels, source);
+  assertQueuePolicyReferences({
+    components,
+    defaults,
+    issueCreation,
+    priorities,
+    statuses,
+    transitions,
+    version: 1,
+  }, source);
+
+  return {
+    components,
+    defaults,
+    issueCreation,
+    priorities,
+    statuses,
+    transitions,
+    version: 1,
+  };
+}
+
+function parseQueuePolicyDefaults(raw: unknown, source: string): QueuePolicy["defaults"] {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error(`Invalid ${source} defaults.`);
+  }
+
+  const defaults = raw as Record<string, unknown>;
+  if (typeof defaults.priorityKey !== "string" || defaults.priorityKey.length === 0) {
+    throw new Error(`Invalid ${source} defaults.priorityKey.`);
+  }
+
+  if (typeof defaults.statusKey !== "string" || defaults.statusKey.length === 0) {
+    throw new Error(`Invalid ${source} defaults.statusKey.`);
+  }
+
+  return {
+    priorityKey: defaults.priorityKey,
+    statusKey: defaults.statusKey,
+  };
+}
+
+function parseQueuePolicyPriorities(raw: unknown, source: string): QueuePolicyPriority[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new Error(`Invalid ${source} priorities.`);
+  }
+
+  return raw.map((entry, index) => parseQueuePolicyPriority(entry, source, index));
+}
+
+function parseQueuePolicyPriority(raw: unknown, source: string, index: number): QueuePolicyPriority {
+  const label = parseQueuePolicyLabel(raw, source, `priorities[${index}]`);
+  const priority = raw as Record<string, unknown>;
+  if (typeof priority.score !== "number" || !Number.isFinite(priority.score)) {
+    throw new Error(`Invalid ${source} priorities[${index}].score.`);
+  }
+
+  return {
+    ...label,
+    score: priority.score,
+  };
+}
+
+function parseQueuePolicyStatuses(raw: unknown, source: string): QueuePolicyStatus[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new Error(`Invalid ${source} statuses.`);
+  }
+
+  return raw.map((entry, index) => parseQueuePolicyStatus(entry, source, index));
+}
+
+function parseQueuePolicyStatus(raw: unknown, source: string, index: number): QueuePolicyStatus {
+  const label = parseQueuePolicyLabel(raw, source, `statuses[${index}]`);
+  const status = raw as Record<string, unknown>;
+  if (typeof status.scoreModifier !== "number" || !Number.isFinite(status.scoreModifier)) {
+    throw new Error(`Invalid ${source} statuses[${index}].scoreModifier.`);
+  }
+
+  return {
+    ...label,
+    scoreModifier: status.scoreModifier,
+  };
+}
+
+function parseQueuePolicyLabel(raw: unknown, source: string, fieldPath: string): QueuePolicyLabel {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error(`Invalid ${source} ${fieldPath}.`);
+  }
+
+  const label = raw as Record<string, unknown>;
+  if (typeof label.key !== "string" || label.key.length === 0) {
+    throw new Error(`Invalid ${source} ${fieldPath}.key.`);
+  }
+
+  if (typeof label.name !== "string" || label.name.length === 0) {
+    throw new Error(`Invalid ${source} ${fieldPath}.name.`);
+  }
+
+  if (typeof label.color !== "string" || label.color.length === 0) {
+    throw new Error(`Invalid ${source} ${fieldPath}.color.`);
+  }
+
+  if (typeof label.description !== "string" || label.description.length === 0) {
+    throw new Error(`Invalid ${source} ${fieldPath}.description.`);
+  }
+
+  if (typeof label.emoji !== "string" || label.emoji.length === 0) {
+    throw new Error(`Invalid ${source} ${fieldPath}.emoji.`);
+  }
+
+  if (typeof label.createIssue !== "boolean") {
+    throw new Error(`Invalid ${source} ${fieldPath}.createIssue.`);
+  }
+
+  return {
+    color: label.color,
+    createIssue: label.createIssue,
+    description: label.description,
+    emoji: label.emoji,
+    key: label.key,
+    name: label.name,
+  };
+}
+
+function parseQueuePolicyComponents(raw: unknown, source: string): QueuePolicy["components"] {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error(`Invalid ${source} components.`);
+  }
+
+  const components = raw as Record<string, unknown>;
+  if (typeof components.prefix !== "string" || components.prefix.length === 0) {
+    throw new Error(`Invalid ${source} components.prefix.`);
+  }
+
+  if (!Array.isArray(components.labels)) {
+    throw new Error(`Invalid ${source} components.labels.`);
+  }
+
+  return {
+    labels: components.labels.map((entry, index) => parseQueuePolicyComponent(entry, source, index)),
+    prefix: components.prefix,
+  };
+}
+
+function parseQueuePolicyComponent(raw: unknown, source: string, index: number): QueuePolicyComponent {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error(`Invalid ${source} components.labels[${index}].`);
+  }
+
+  const component = raw as Record<string, unknown>;
+  if (typeof component.name !== "string" || component.name.length === 0) {
+    throw new Error(`Invalid ${source} components.labels[${index}].name.`);
+  }
+
+  if (typeof component.color !== "string" || component.color.length === 0) {
+    throw new Error(`Invalid ${source} components.labels[${index}].color.`);
+  }
+
+  if (typeof component.description !== "string" || component.description.length === 0) {
+    throw new Error(`Invalid ${source} components.labels[${index}].description.`);
+  }
+
+  return {
+    color: component.color,
+    description: component.description,
+    name: component.name,
+  };
+}
+
+function parseQueuePolicyTransitions(
+  raw: unknown,
+  source: string,
+): Record<string, QueuePolicyTransition> {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error(`Invalid ${source} transitions.`);
+  }
+
+  const transitions = Object.entries(raw as Record<string, unknown>);
+  if (transitions.length === 0) {
+    throw new Error(`Invalid ${source} transitions.`);
+  }
+
+  return Object.fromEntries(
+    transitions.map(([name, value]) => [name, parseQueuePolicyTransition(value, source, name)]),
+  );
+}
+
+function parseQueuePolicyTransition(
+  raw: unknown,
+  source: string,
+  transitionName: string,
+): QueuePolicyTransition {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error(`Invalid ${source} transitions.${transitionName}.`);
+  }
+
+  const transition = raw as Record<string, unknown>;
+  if (typeof transition.add !== "string" || transition.add.length === 0) {
+    throw new Error(`Invalid ${source} transitions.${transitionName}.add.`);
+  }
+
+  if (!Array.isArray(transition.remove) || transition.remove.some((entry) => typeof entry !== "string" || entry.length === 0)) {
+    throw new Error(`Invalid ${source} transitions.${transitionName}.remove.`);
+  }
+
+  if (typeof transition.description !== "string" || transition.description.length === 0) {
+    throw new Error(`Invalid ${source} transitions.${transitionName}.description.`);
+  }
+
+  return {
+    add: transition.add,
+    description: transition.description,
+    remove: transition.remove.slice(),
+  };
+}
+
+function parseQueuePolicyIssueCreation(
+  raw: unknown,
+  source: string,
+): QueuePolicy["issueCreation"] {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error(`Invalid ${source} issueCreation.`);
+  }
+
+  const issueCreation = raw as Record<string, unknown>;
+  if (typeof issueCreation.ensureLabelsCommand !== "string" || issueCreation.ensureLabelsCommand.length === 0) {
+    throw new Error(`Invalid ${source} issueCreation.ensureLabelsCommand.`);
+  }
+
+  if (typeof issueCreation.dependencyLine !== "string" || issueCreation.dependencyLine.length === 0) {
+    throw new Error(`Invalid ${source} issueCreation.dependencyLine.`);
+  }
+
+  if (typeof issueCreation.sequenceGuidance !== "string" || issueCreation.sequenceGuidance.length === 0) {
+    throw new Error(`Invalid ${source} issueCreation.sequenceGuidance.`);
+  }
+
+  return {
+    dependencyLine: issueCreation.dependencyLine,
+    ensureLabelsCommand: issueCreation.ensureLabelsCommand,
+    sequenceGuidance: issueCreation.sequenceGuidance,
+  };
+}
+
+function assertUniqueQueuePolicyKeys(
+  labels: ReadonlyArray<QueuePolicyLabel>,
+  source: string,
+  labelType: string,
+): void {
+  const keys = new Set<string>();
+  const names = new Set<string>();
+
+  for (const label of labels) {
+    if (keys.has(label.key)) {
+      throw new Error(`Invalid ${source}: duplicate ${labelType} key ${label.key}.`);
+    }
+
+    if (names.has(label.name)) {
+      throw new Error(`Invalid ${source}: duplicate ${labelType} name ${label.name}.`);
+    }
+
+    keys.add(label.key);
+    names.add(label.name);
+  }
+}
+
+function assertUniqueQueuePolicyComponentNames(
+  components: ReadonlyArray<QueuePolicyComponent>,
+  source: string,
+): void {
+  const names = new Set<string>();
+
+  for (const component of components) {
+    if (names.has(component.name)) {
+      throw new Error(`Invalid ${source}: duplicate component name ${component.name}.`);
+    }
+
+    names.add(component.name);
+  }
+}
+
+function assertQueuePolicyReferences(policy: QueuePolicy, source: string): void {
+  const priorityKeys = new Set(policy.priorities.map((priority) => priority.key));
+  const statusKeys = new Set(policy.statuses.map((status) => status.key));
+  const requiredStatusKeys = ["ready", "in_progress", "blocked", "blocking"];
+  const requiredTransitionKeys = ["ready", "start", "block", "unblock"];
+
+  if (!policy.priorities.some((priority) => priority.createIssue)) {
+    throw new Error(`Invalid ${source}: at least one priority must be enabled for issue creation.`);
+  }
+
+  if (!policy.statuses.some((status) => status.createIssue)) {
+    throw new Error(`Invalid ${source}: at least one status must be enabled for issue creation.`);
+  }
+
+  if (!priorityKeys.has(policy.defaults.priorityKey)) {
+    throw new Error(`Invalid ${source}: defaults.priorityKey must reference a defined priority.`);
+  }
+
+  if (!statusKeys.has(policy.defaults.statusKey)) {
+    throw new Error(`Invalid ${source}: defaults.statusKey must reference a defined status.`);
+  }
+
+  for (const statusKey of requiredStatusKeys) {
+    if (!statusKeys.has(statusKey)) {
+      throw new Error(`Invalid ${source}: missing required status key ${statusKey}.`);
+    }
+  }
+
+  for (const transitionKey of requiredTransitionKeys) {
+    if (!(transitionKey in policy.transitions)) {
+      throw new Error(`Invalid ${source}: missing required transition ${transitionKey}.`);
+    }
+  }
+
+  for (const component of policy.components.labels) {
+    if (!component.name.startsWith(policy.components.prefix)) {
+      throw new Error(`Invalid ${source}: component ${component.name} must start with ${policy.components.prefix}.`);
+    }
+  }
+
+  for (const [transitionName, transition] of Object.entries(policy.transitions)) {
+    if (!statusKeys.has(transition.add)) {
+      throw new Error(`Invalid ${source}: transitions.${transitionName}.add must reference a defined status.`);
+    }
+
+    for (const removedStatus of transition.remove) {
+      if (!statusKeys.has(removedStatus)) {
+        throw new Error(`Invalid ${source}: transitions.${transitionName}.remove must reference defined statuses.`);
+      }
+    }
+  }
+}
+
+function resolveQueueStatusNames(policy: QueuePolicy): QueueStatusNames {
+  return {
+    blocked: getQueueStatusName(policy, "blocked"),
+    inProgress: getQueueStatusName(policy, "in_progress"),
+    ready: getQueueStatusName(policy, "ready"),
+  };
+}
+
+function getQueueStatusName(policy: QueuePolicy, key: string): string {
+  const status = policy.statuses.find((candidate) => candidate.key === key);
+  if (status === undefined) {
+    throw new Error(`Invalid queue-policy.json: missing status key ${key}.`);
+  }
+
+  return status.name;
+}
+
+function findQueueStatusName(policy: QueuePolicy, key: string): string | undefined {
+  return policy.statuses.find((candidate) => candidate.key === key)?.name;
+}
+
+function buildIssuePrompt(issueCreationTemplate: string, queueStatusNames: QueueStatusNames): string {
+  return [
+    "Continue solving open issues from gh-priority-order.sh. You are a trusted autonomous professional developer with full authority. Search for information. Analyze the issue. Work to completion. Execute without pause.",
+    "Rules:",
+    buildIssueWorkflowRules(queueStatusNames),
+    issueCreationTemplate,
+    ISSUE_TODO_TEMPLATE,
+    "Go.",
+  ].join("\n");
+}
+
+function buildIssueWorkflowRules(queueStatusNames: QueueStatusNames): string {
+  return [
+    COMMON_WORKFLOW_RULES,
+    "* git commit, push, pr, merge to ship immediately when everything is done - no confirmations, no approvals needed",
+    `* @scripts/gh-priority-order.sh -> start next ${queueStatusNames.ready} issue -> implement -> UI audit -> Oracle -> test -> cubic -> e2e when relevant -> PR + 10 min review -> ship -> repeat.`,
+  ].join("\n");
+}
+
+function buildIssueCreationTemplate(policy: QueuePolicy): string {
+  const priorityLabels = policy.priorities
+    .filter((priority) => priority.createIssue)
+    .map((priority) => priority.name);
+  const statusLabels = policy.statuses
+    .filter((status) => status.createIssue)
+    .map((status) => status.name);
+  const componentLabels = policy.components.labels.map((component) => component.name);
+  const inProgressStatus = findQueueStatusName(policy, "in_progress");
+  const componentPrefixPattern = `${policy.components.prefix}*`;
+
+  return [
+    "## GitHub Issue Creation Rules (ALWAYS FOLLOW)",
+    `* Before creating issues, ensure the core queue labels exist by running \`${policy.issueCreation.ensureLabelsCommand}\`.`,
+    `* Every created issue must have exactly one priority label: ${formatCodeList(priorityLabels)}.`,
+    `* Every created issue must have exactly one status label: ${formatCodeList(statusLabels)}.${inProgressStatus === undefined ? "" : ` Do not create fresh issues directly as \`${inProgressStatus}\`.`}`,
+    componentLabels.length === 0
+      ? `* Add one \`${componentPrefixPattern}\` component label only if the repository already has a stable component taxonomy. Do not copy component or epic labels from another repository.`
+      : `* Add one \`${componentPrefixPattern}\` component label only from the configured repository taxonomy: ${formatCodeList(componentLabels)}.`,
+    `* Keep dependencies explicit with one \`${policy.issueCreation.dependencyLine}\` line per blocker in the issue body.`,
+    `* ${policy.issueCreation.sequenceGuidance}`,
+    "Use this issue body shape:",
+    "```markdown",
+    "## Problem",
+    "[what is wrong, missing, or risky]",
+    "",
+    "## Why It Matters",
+    "[user impact, correctness impact, maintainability impact, or operational risk]",
+    "",
+    "## Scope",
+    "- [ ] [concrete acceptance criterion or task]",
+    "- [ ] [concrete acceptance criterion or task]",
+    "",
+    "## Notes",
+    "- [optional evidence, constraints, or implementation hints]",
+    "",
+    policy.issueCreation.dependencyLine,
+    "```",
+  ].join("\n");
+}
+
+function formatCodeList(values: readonly string[]): string {
+  const formatted = values.map((value) => `\`${value}\``);
+  if (formatted.length === 0) {
+    return "";
+  }
+
+  if (formatted.length === 1) {
+    return formatted[0] ?? "";
+  }
+
+  if (formatted.length === 2) {
+    return `${formatted[0]} or ${formatted[1]}`;
+  }
+
+  return `${formatted.slice(0, -1).join(", ")}, or ${formatted[formatted.length - 1]}`;
+}
+
 const managedStateRootReady = new Map<string, Promise<void>>();
 
 export class ContinuationController {
@@ -460,6 +946,10 @@ export class ContinuationController {
 
   private readonly cwd: string;
 
+  private readonly issueCreationTemplate: string;
+
+  private readonly issuePrompt: string;
+
   private eventChain: Promise<void> = Promise.resolve();
 
   private readonly idleDelayMs: number;
@@ -470,6 +960,8 @@ export class ContinuationController {
 
   private readonly priorityOrderScript: string;
 
+  private readonly queueStatusNames: QueueStatusNames;
+
   private readonly sessionStates = new Map<string, SessionState>();
 
   private readonly whipPath: string;
@@ -477,9 +969,13 @@ export class ContinuationController {
   constructor(context: PluginContext, logger: ContinuationLogger) {
     this.client = context.client;
     this.cwd = path.resolve(context.worktree ?? context.directory);
+    const queuePolicy = loadQueuePolicy(this.cwd);
     this.logger = logger;
     this.continuationLockPath = path.resolve(this.cwd, DEFAULT_CONTINUATION_LOCK_PATH);
     this.continuationStatePath = path.resolve(this.cwd, DEFAULT_CONTINUATION_STATE_PATH);
+    this.issueCreationTemplate = buildIssueCreationTemplate(queuePolicy);
+    this.queueStatusNames = resolveQueueStatusNames(queuePolicy);
+    this.issuePrompt = buildIssuePrompt(this.issueCreationTemplate, this.queueStatusNames);
     this.idleDelayMs = Math.max(0, context.idleDelayMs ?? DEFAULT_INTERACTIVE_IDLE_DELAY_MS);
     this.priorityOrderScript = path.resolve(this.cwd, "scripts", "gh-priority-order.sh");
     this.whipPath = path.resolve(this.cwd, DEFAULT_WHIP_PATH);
@@ -1196,7 +1692,7 @@ export class ContinuationController {
       stdout: truncateForLog(priorityOrder.stdout),
     });
 
-    const readyIssues = parsePriorityOrderSummary(priorityOrder.stdout).readyIssues;
+    const readyIssues = parsePriorityOrderSummary(priorityOrder.stdout, this.queueStatusNames).readyIssues;
     if (readyIssues.length > 0) {
       this.logger.debug("Selected continuation prompt from ready issues.", {
         readyIssues,
@@ -1204,7 +1700,7 @@ export class ContinuationController {
       return {
         fingerprint: `issues:${readyIssues.join(",")}`,
         kind: "issue",
-        prompt: ISSUE_PROMPT,
+        prompt: this.issuePrompt,
       };
     }
 
@@ -1222,7 +1718,7 @@ export class ContinuationController {
     return {
       fingerprint: `whip:${nextTask.id}`,
       kind: "whip",
-      prompt: buildWhipTaskPrompt(nextTask),
+      prompt: buildWhipTaskPrompt(nextTask, this.issueCreationTemplate),
       whipTaskID: nextTask.id,
     };
   }
@@ -1440,7 +1936,7 @@ async function runCommand(
   }
 }
 
-function parsePriorityOrderSummary(output: string): PriorityOrderSummary {
+function parsePriorityOrderSummary(output: string, queueStatusNames: QueueStatusNames): PriorityOrderSummary {
   let parsed: unknown;
 
   try {
@@ -1476,7 +1972,7 @@ function parsePriorityOrderSummary(output: string): PriorityOrderSummary {
     version: 1,
   };
 
-  assertPriorityOrderSummaryConsistency(parsedSummary);
+  assertPriorityOrderSummaryConsistency(parsedSummary, queueStatusNames);
   return parsedSummary;
 }
 
@@ -1565,28 +2061,33 @@ function parsePriorityOrderOptionalIssueNumber(raw: unknown, fieldName: string):
   return raw;
 }
 
-function assertPriorityOrderSummaryConsistency(summary: PriorityOrderSummary): void {
-  const expectedReadyIssues = summary.issues.filter((issue) => issue.status === "S-Ready").map((issue) => issue.number);
+function assertPriorityOrderSummaryConsistency(
+  summary: PriorityOrderSummary,
+  queueStatusNames: QueueStatusNames,
+): void {
+  const expectedReadyIssues = summary.issues
+    .filter((issue) => issue.status === queueStatusNames.ready)
+    .map((issue) => issue.number);
   if (!areNumberArraysEqual(summary.readyIssues, expectedReadyIssues)) {
     throw new Error("Invalid priority order summary readyIssues.");
   }
 
   const expectedBlockedIssues = summary.issues
-    .filter((issue) => issue.status === "S-Blocked")
+    .filter((issue) => issue.status === queueStatusNames.blocked)
     .map((issue) => issue.number);
   if (!areNumberArraysEqual(summary.blockedIssues, expectedBlockedIssues)) {
     throw new Error("Invalid priority order summary blockedIssues.");
   }
 
   const expectedInProgress = summary.issues
-    .filter((issue) => issue.status === "S-InProgress")
+    .filter((issue) => issue.status === queueStatusNames.inProgress)
     .map((issue) => issue.number);
   if (!areNumberArraysEqual(summary.inProgress, expectedInProgress)) {
     throw new Error("Invalid priority order summary inProgress.");
   }
 
   const expectedNextIssue = summary.issues.find(
-    (issue) => issue.status !== "S-InProgress" && issue.status !== "S-Blocked",
+    (issue) => issue.status !== queueStatusNames.inProgress && issue.status !== queueStatusNames.blocked,
   )?.number ?? null;
   if (summary.nextIssue !== expectedNextIssue) {
     throw new Error("Invalid priority order summary nextIssue.");
@@ -1616,13 +2117,13 @@ function hasFreshTakeoverSignal(state: SessionState, observedAt: number): boolea
   );
 }
 
-function buildWhipTaskPrompt(task: WhipTask): string {
+function buildWhipTaskPrompt(task: WhipTask, issueCreationTemplate: string): string {
   return [
     "Continue the selected WHIP backlog task.",
     "The plugin tracks WHIP state and selects the next task. Focus only on the task in this prompt.",
     `Selected task: ${task.title}.`,
     task.prompt,
-    ISSUE_CREATION_TEMPLATE,
+    issueCreationTemplate,
     "Rules:",
     WHIP_WORKFLOW_RULES,
     "* Create GitHub issues for actionable findings instead of writing extra documentation",

@@ -4,6 +4,9 @@ set -euo pipefail
 # Smart GitHub Issues Priority Ordering
 # Creates a clean, dependency-aware prioritized work list
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$script_dir/_queue-policy.sh"
+
 json_mode=false
 show_help=false
 
@@ -15,16 +18,22 @@ for arg in "$@"; do
 done
 
 # Get all open issues with their labels (limit 100 to get all)
-issues_data=$(gh issue list --state open --limit 100 --json number,title,labels --jq '
-  map({
-    number: .number,
-    title: .title,
-    priority: (.labels | map(select(.name | startswith("P"))) | .[0].name // "P3-Medium"),
-    status: (.labels | map(select(.name | startswith("S"))) | .[0].name // "S-Ready"), 
-    component: (.labels | map(select(.name | startswith("C"))) | .[0].name // ""),
-    labels: [.labels[]?.name]
-  })
-')
+priority_labels_json="$(queue_priority_labels_json)"
+status_labels_json="$(queue_status_labels_json)"
+issues_data=$(gh issue list --state open --limit 100 --json number,title,labels | jq \
+	--arg componentPrefix "$QUEUE_COMPONENT_PREFIX" \
+	--arg defaultPriority "$QUEUE_DEFAULT_PRIORITY" \
+	--arg defaultStatus "$QUEUE_DEFAULT_STATUS" \
+	--argjson priorityLabels "$priority_labels_json" \
+	--argjson statusLabels "$status_labels_json" \
+	'map({
+	  number: .number,
+	  title: .title,
+	  priority: ((.labels | map(.name) | map(select(. as $label | $priorityLabels | index($label))) | .[0]) // $defaultPriority),
+	  status: ((.labels | map(.name) | map(select(. as $label | $statusLabels | index($label))) | .[0]) // $defaultStatus),
+	  component: (.labels | map(.name) | map(select(startswith($componentPrefix))) | .[0] // ""),
+	  labels: [.labels[]?.name]
+	})')
 
 # Function to get priority score for sorting
 get_priority_score() {
@@ -33,23 +42,8 @@ get_priority_score() {
 	local base_score
 	local status_modifier
 
-	# Base priority scores
-	case "$priority" in
-	"P1-Critical") base_score=1000 ;;
-	"P2-High") base_score=500 ;;
-	"P3-Medium") base_score=100 ;;
-	"P4-Low") base_score=10 ;;
-	*) base_score=50 ;; # Default for unlabeled
-	esac
-
-	# Status modifiers
-	case "$status" in
-	"S-Blocking") status_modifier=200 ;;
-	"S-Ready") status_modifier=50 ;;
-	"S-InProgress") status_modifier=25 ;;
-	"S-Blocked") status_modifier=-100 ;;
-	*) status_modifier=0 ;;
-	esac
+	base_score="$(queue_priority_score "$priority")"
+	status_modifier="$(queue_status_modifier "$status")"
 
 	echo $((base_score + status_modifier))
 }
@@ -77,16 +71,16 @@ build_ordered_issues_json() {
 			score=$(get_priority_score "$priority" "$status")
 			printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$score" "$priority" "$status" "$component" "$number" "$title"
 		done < <(
-			echo "$issues_data" | jq -r '.[] | [(.priority // "P3-Medium"), (.status // "S-Ready"), ((.component // "") | if . == "" then "__NONE__" else . end), (.number | tostring), .title] | @tsv'
+			echo "$issues_data" | jq -r --arg defaultPriority "$QUEUE_DEFAULT_PRIORITY" --arg defaultStatus "$QUEUE_DEFAULT_STATUS" '.[] | [(.priority // $defaultPriority), (.status // $defaultStatus), ((.component // "") | if . == "" then "__NONE__" else . end), (.number | tostring), .title] | @tsv'
 		) | sort -t$'\t' -k1,1nr -k2,2 -k3,3r -k5,5n
 	) | jq -s '.'
 }
 
 ordered_issues_json=$(build_ordered_issues_json)
-ready_issues_json=$(printf '%s\n' "$ordered_issues_json" | jq '[.[] | select(.status == "S-Ready") | .number]')
-blocked_issues_json=$(printf '%s\n' "$ordered_issues_json" | jq '[.[] | select(.status == "S-Blocked") | .number]')
-next_issue_json=$(printf '%s\n' "$ordered_issues_json" | jq '([.[] | select(.status != "S-InProgress" and .status != "S-Blocked") | .number] | .[0]) // null')
-in_progress_json=$(printf '%s\n' "$ordered_issues_json" | jq '[.[] | select(.status == "S-InProgress") | .number]')
+ready_issues_json=$(printf '%s\n' "$ordered_issues_json" | jq --arg readyStatus "$QUEUE_READY_STATUS" '[.[] | select(.status == $readyStatus) | .number]')
+blocked_issues_json=$(printf '%s\n' "$ordered_issues_json" | jq --arg blockedStatus "$QUEUE_BLOCKED_STATUS" '[.[] | select(.status == $blockedStatus) | .number]')
+next_issue_json=$(printf '%s\n' "$ordered_issues_json" | jq --arg blockedStatus "$QUEUE_BLOCKED_STATUS" --arg inProgressStatus "$QUEUE_IN_PROGRESS_STATUS" '([.[] | select(.status != $inProgressStatus and .status != $blockedStatus) | .number] | .[0]) // null')
+in_progress_json=$(printf '%s\n' "$ordered_issues_json" | jq --arg inProgressStatus "$QUEUE_IN_PROGRESS_STATUS" '[.[] | select(.status == $inProgressStatus) | .number]')
 
 if [ "$json_mode" = true ]; then
 	jq -n \
@@ -163,28 +157,21 @@ if [ "$show_help" = true ]; then
 	echo "===================="
 	echo ""
 	echo "Priority Labels (P):"
-	echo "  P1-Critical  🔴 Critical priority, blocks other work"
-	echo "  P2-High      🟠 High priority, next release"
-	echo "  P3-Medium    🟡 Medium priority, upcoming releases"
-	echo "  P4-Low       🟢 Low priority, future releases"
+	queue_print_priority_help
 	echo ""
 	echo "Status Labels (S):"
-	echo "  S-Ready      🟢 Ready to work on"
-	echo "  S-InProgress 🔵 Currently being worked"
-	echo "  S-Blocked    🟣 Blocked by dependencies"
-	echo "  S-Blocking   🟣 Blocks other work"
+	queue_print_status_help
 	echo ""
 	echo "Component Labels (C):"
-	echo "  C-Training      Training/ML model related"
-	echo "  C-Dataset       Dataset management"
-	echo "  C-Evaluation    Model evaluation"
-	echo "  C-Infrastructure Core infrastructure"
+	queue_print_component_help
 	echo ""
 	echo "Quick Commands:"
 	echo "  ./scripts/gh-update-labels.sh 14 start      # Mark as in progress"
 	echo "  ./scripts/gh-update-labels.sh 14 ready      # Mark as ready"
 	echo "  ./scripts/gh-update-labels.sh 14 block      # Mark as blocked"
 	echo "  ./scripts/gh-priority-order.sh --json       # Print machine-readable queue data"
-	echo "  ./scripts/gh-update-labels.sh 14 priority P2-High"
-	echo "  ./scripts/gh-update-labels.sh 14 component C-Infrastructure"
+	echo "  ./scripts/gh-update-labels.sh 14 priority ${QUEUE_PRIORITY_NAMES[1]}"
+	if queue_has_component_taxonomy; then
+		echo "  ./scripts/gh-update-labels.sh 14 component ${QUEUE_COMPONENT_NAMES[0]}"
+	fi
 fi

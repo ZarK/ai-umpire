@@ -12,6 +12,14 @@ import type { WhipState, WhipTask } from "../opencode/ai-umpire-continuation.ts"
 
 const tempDirs: string[] = [];
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const queuePolicy = readQueuePolicy(repoRoot);
+const issuePriorityLabels = queuePolicy.priorities
+  .filter((priority) => priority.createIssue)
+  .map((priority) => priority.name);
+const issueStatusLabels = queuePolicy.statuses
+  .filter((status) => status.createIssue)
+  .map((status) => status.name);
+const inProgressStatus = queuePolicy.statuses.find((status) => status.key === "in_progress")?.name;
 
 type PromptRecord = {
   agent?: string;
@@ -62,6 +70,20 @@ type QueueSummaryFixture = {
   nextIssue: number | null;
   readyIssues: number[];
   version: 1;
+};
+
+type QueuePolicyFixture = {
+  components: {
+    labels: Array<{ name: string }>;
+    prefix: string;
+  };
+  issueCreation: {
+    dependencyLine: string;
+    ensureLabelsCommand: string;
+    sequenceGuidance: string;
+  };
+  priorities: Array<{ createIssue: boolean; name: string }>;
+  statuses: Array<{ createIssue: boolean; key: string; name: string }>;
 };
 
 type ContextOverrides = {
@@ -126,11 +148,18 @@ describe("AiUmpireContinuationPlugin", () => {
     expect(prompts).toHaveLength(1);
     expect(prompts[0]?.sessionID).toBe("ses_ready");
     expect(prompts[0]?.text).toContain("Continue solving open issues from gh-priority-order.sh.");
-    expect(prompts[0]?.text).toContain("./scripts/gh-ensure-labels.sh");
+    expect(prompts[0]?.text).toContain(queuePolicy.issueCreation.ensureLabelsCommand);
     expect(prompts[0]?.text).toContain("## GitHub Issue Creation Rules (ALWAYS FOLLOW)");
     expect(prompts[0]?.text).toContain("## Issue Todo Template (ALWAYS USE THIS STRUCTURE)");
     expect(prompts[0]?.text).toContain("todowrite({ todos: [");
     expect(prompts[0]?.text).toContain("Never stage, commit, or push `.umpire/**` files.");
+    expect(prompts[0]?.text).toContain(
+      `Every created issue must have exactly one priority label: ${formatCodeList(issuePriorityLabels)}.`,
+    );
+    expect(prompts[0]?.text).toContain(
+      `Every created issue must have exactly one status label: ${formatCodeList(issueStatusLabels)}.${inProgressStatus === undefined ? "" : ` Do not create fresh issues directly as \`${inProgressStatus}\`.`}`,
+    );
+    expect(prompts[0]?.text).toContain(queuePolicy.issueCreation.dependencyLine);
   });
 
   it("consumes the real priority-order script JSON contract when selecting issue work", async () => {
@@ -140,10 +169,10 @@ describe("AiUmpireContinuationPlugin", () => {
     await installRealPriorityOrderScript(repoDir);
     const restorePath = await installFakeGhBinary(`
 process.stdout.write(JSON.stringify([
-  { number: 42, title: "Medium blocked", priority: "P3-Medium", status: "S-Blocked", component: "", labels: [] },
-  { number: 41, title: "Low but blocking", priority: "P4-Low", status: "S-Blocking", component: "", labels: [] },
-  { number: 77, title: "High in progress", priority: "P2-High", status: "S-InProgress", component: "", labels: [] },
-  { number: 43, title: "High ready", priority: "P2-High", status: "S-Ready", component: "C-Infrastructure", labels: [] }
+  { number: 42, title: "Medium blocked", labels: [{ name: "P3-Medium" }, { name: "S-Blocked" }] },
+  { number: 41, title: "Low but blocking", labels: [{ name: "P4-Low" }, { name: "S-Blocking" }] },
+  { number: 77, title: "High in progress", labels: [{ name: "P2-High" }, { name: "S-InProgress" }] },
+  { number: 43, title: "High ready", labels: [{ name: "P2-High" }, { name: "C-Infrastructure" }, { name: "S-Ready" }] }
 ]));
 `);
 
@@ -164,6 +193,71 @@ process.stdout.write(JSON.stringify([
     expect(prompts[0]?.sessionID).toBe("ses_ready");
     expect(prompts[0]?.text).toContain("Continue solving open issues from gh-priority-order.sh.");
     expect(readContinuationState(repoDir).lastPromptFingerprint).toBe("issues:43");
+  });
+
+  it("uses the repo-local queue policy when validating queue summaries and generating prompts", async () => {
+    const repoDir = await createTempDir(false);
+    const prompts: PromptRecord[] = [];
+    const customPolicy = readQueuePolicyDocument(repoDir);
+    const statuses = Array.isArray(customPolicy.statuses)
+      ? customPolicy.statuses as Array<Record<string, unknown>>
+      : [];
+
+    for (const status of statuses) {
+      if (status.key === "ready") {
+        status.name = "Ready-Now";
+      } else if (status.key === "in_progress") {
+        status.name = "Doing-Now";
+      } else if (status.key === "blocked") {
+        status.name = "Blocked-Later";
+      } else if (status.key === "blocking") {
+        status.name = "Blocking-Now";
+      }
+    }
+
+    await writeFile(
+      path.join(repoDir, "queue-policy.json"),
+      JSON.stringify(customPolicy, null, 2).concat("\n"),
+      "utf8",
+    );
+    await installStubPriorityOrderScript(
+      repoDir,
+      {
+        blockedIssues: [],
+        inProgress: [],
+        issues: [
+          {
+            component: "",
+            labels: ["P2-High", "Ready-Now"],
+            number: 26,
+            priority: "P2-High",
+            score: 550,
+            status: "Ready-Now",
+            title: "Ship continuation plugin",
+          },
+        ],
+        nextIssue: 26,
+        readyIssues: [26],
+        version: 1,
+      },
+      "1. #26: Ship continuation plugin [P2-High, Ready-Now]",
+    );
+
+    const plugin = await AiUmpireContinuationPlugin(createContext(repoDir, prompts, []));
+
+    await plugin.event?.({
+      event: {
+        properties: { sessionID: "ses_ready" },
+        type: "session.idle",
+      },
+    });
+
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]?.text).toContain("start next Ready-Now issue");
+    expect(prompts[0]?.text).toContain(
+      "Every created issue must have exactly one status label: `Ready-Now`, `Blocked-Later`, or `Blocking-Now`. Do not create fresh issues directly as `Doing-Now`.",
+    );
+    expect(readContinuationState(repoDir).lastPromptFingerprint).toBe("issues:26");
   });
 
   it("rejects inconsistent priority-order summaries instead of enqueueing issue work", async () => {
@@ -204,6 +298,44 @@ process.stdout.write(JSON.stringify([
 
     expect(prompts).toHaveLength(0);
     await waitForContinuationLogToContain(repoDir, "Invalid priority order summary readyIssues.");
+  });
+
+  it("fails plugin initialization when queue-policy.json is missing from the repo root", async () => {
+    const repoDir = await createTempDir(true);
+
+    await rm(path.join(repoDir, "queue-policy.json"), { force: true });
+
+    await expect(AiUmpireContinuationPlugin(createContext(repoDir, [], []))).rejects.toThrow(
+      "Failed to read queue-policy.json",
+    );
+  });
+
+  it("fails plugin initialization when queue-policy.json is invalid", async () => {
+    const repoDir = await createTempDir(true);
+    const queuePolicy = readQueuePolicyDocument(repoDir);
+
+    if (!Array.isArray(queuePolicy.statuses) || queuePolicy.statuses.length === 0) {
+      throw new Error("Missing statuses in queue-policy test fixture.");
+    }
+
+    queuePolicy.statuses[0] = {
+      ...(queuePolicy.statuses[0] as Record<string, unknown>),
+      key: "not-ready",
+    };
+    queuePolicy.defaults = {
+      ...(queuePolicy.defaults as Record<string, unknown>),
+      statusKey: "not-ready",
+    };
+
+    await writeFile(
+      path.join(repoDir, "queue-policy.json"),
+      JSON.stringify(queuePolicy, null, 2).concat("\n"),
+      "utf8",
+    );
+
+    await expect(AiUmpireContinuationPlugin(createContext(repoDir, [], []))).rejects.toThrow(
+      "Invalid queue-policy.json: missing required status key ready.",
+    );
   });
 
   it("starts continuation from an idle session.status event and dedupes the later session.idle event", async () => {
@@ -1708,6 +1840,7 @@ async function createTempDir(withReadyIssue: boolean): Promise<string> {
     ? "1. #26: Ship continuation plugin [P2-High, S-Ready]"
     : "Commands:\n  ./scripts/gh-priority-order.sh --help";
   await mkdir(scriptDir, { recursive: true });
+  await installQueuePolicyFiles(tempDir);
   await rm(path.join(tempDir, ".umpire"), { force: true, recursive: true });
   await installStubPriorityOrderScript(tempDir, queueSummary, humanOutput);
   return tempDir;
@@ -1737,9 +1870,20 @@ fi
 }
 
 async function installRealPriorityOrderScript(repoDir: string): Promise<void> {
+  await installQueuePolicyFiles(repoDir);
   const targetPath = path.join(repoDir, "scripts", "gh-priority-order.sh");
   await copyFile(path.join(repoRoot, "scripts", "gh-priority-order.sh"), targetPath);
   await chmod(targetPath, 0o755);
+}
+
+async function installQueuePolicyFiles(repoDir: string): Promise<void> {
+  await mkdir(path.join(repoDir, "scripts"), { recursive: true });
+  await copyFile(path.join(repoRoot, "queue-policy.json"), path.join(repoDir, "queue-policy.json"));
+  await copyFile(
+    path.join(repoRoot, "scripts", "_queue-policy.sh"),
+    path.join(repoDir, "scripts", "_queue-policy.sh"),
+  );
+  await chmod(path.join(repoDir, "scripts", "_queue-policy.sh"), 0o755);
 }
 
 async function installFakeGhBinary(ghBody: string): Promise<() => void> {
@@ -1847,6 +1991,31 @@ function createContext(
     directory: repoDir,
     worktree: repoDir,
   };
+}
+
+function readQueuePolicy(repoDir: string): QueuePolicyFixture {
+  return JSON.parse(readFileSync(path.join(repoDir, "queue-policy.json"), "utf8")) as QueuePolicyFixture;
+}
+
+function readQueuePolicyDocument(repoDir: string): Record<string, unknown> {
+  return JSON.parse(readFileSync(path.join(repoDir, "queue-policy.json"), "utf8")) as Record<string, unknown>;
+}
+
+function formatCodeList(values: readonly string[]): string {
+  const formatted = values.map((value) => `\`${value}\``);
+  if (formatted.length === 0) {
+    return "";
+  }
+
+  if (formatted.length === 1) {
+    return formatted[0] ?? "";
+  }
+
+  if (formatted.length === 2) {
+    return `${formatted[0]} or ${formatted[1]}`;
+  }
+
+  return `${formatted.slice(0, -1).join(", ")}, or ${formatted[formatted.length - 1]}`;
 }
 
 function readWhipState(repoDir: string) {
