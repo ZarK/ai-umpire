@@ -1,0 +1,23 @@
+opencode/ai-umpire-continuation.ts
+  e7f6c99fa3a23601 326-333,340-347,354-361,368-375,382-389,396-403,410-417,424-431
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.18",
+  "base_commit_sha": "113be64a53308b13f48065f9be95f999b71cb78b",
+  "prompts": {
+    "e7f6c99fa3a23601": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "e4e9738f-7cc1-497a-83c8-23db17ef9595",
+        "model": "unknown"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>",
+      "messages": [],
+      "total_additions": 64,
+      "total_deletions": 16,
+      "accepted_lines": 64,
+      "overriden_lines": 0
+    }
+  }
+}
