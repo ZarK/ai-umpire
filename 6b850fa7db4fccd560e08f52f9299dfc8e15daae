@@ -1,0 +1,39 @@
+package.json
+  6d74cb6f7d1649ed 1-5
+  b0284053cadaf293 6-14
+vitest.config.ts
+  6d74cb6f7d1649ed 1-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.18",
+  "base_commit_sha": "6b850fa7db4fccd560e08f52f9299dfc8e15daae",
+  "prompts": {
+    "6d74cb6f7d1649ed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d1bf9-8e6a-7141-a299-136d6e93fe19",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    },
+    "b0284053cadaf293": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "f48adf55-2588-400c-9c64-337ae719538b",
+        "model": "unknown"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 11,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}
