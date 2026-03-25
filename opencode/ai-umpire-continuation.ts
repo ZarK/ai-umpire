@@ -1952,7 +1952,9 @@ async function fetchSessionTodos(
     );
   }
 
-  return Array.isArray(response.data) ? response.data.map(cloneTodo) : [];
+  const data = response.data;
+  assertSessionTodoPayload(data, sessionID);
+  return data.map(cloneTodo);
 }
 
 type SessionMessageEnvelope = {
@@ -1975,7 +1977,27 @@ async function fetchSessionMessages(
     throw new Error(formatSessionApiError("fetch session messages", sessionID, response));
   }
 
-  return Array.isArray(response.data) ? response.data as SessionMessageEnvelope[] : [];
+  const data = response.data;
+  assertSessionMessagesPayload(data, sessionID);
+  return data;
+}
+
+function assertSessionTodoPayload(
+  raw: unknown,
+  sessionID: string,
+): asserts raw is TodoItem[] {
+  if (!Array.isArray(raw)) {
+    throw new Error(`Invalid session todo payload for ${sessionID}.`);
+  }
+}
+
+function assertSessionMessagesPayload(
+  raw: unknown,
+  sessionID: string,
+): asserts raw is SessionMessageEnvelope[] {
+  if (!Array.isArray(raw)) {
+    throw new Error(`Invalid session messages payload for ${sessionID}.`);
+  }
 }
 
 async function fetchSessionLastActivityAt(

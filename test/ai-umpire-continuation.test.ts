@@ -1606,6 +1606,24 @@ exit 99
     });
   });
 
+  it("logs and skips continuation when session todo payloads are malformed", async () => {
+    const repoDir = await createTempDir(true);
+    const prompts: PromptRecord[] = [];
+    const plugin = await AiUmpireContinuationPlugin(
+      createContext(repoDir, prompts, [], {}, {
+        todo: async () => ({
+          data: { items: [] },
+        }),
+      }),
+    );
+
+    await emitIdle(plugin, "ses_root");
+
+    expect(prompts).toHaveLength(0);
+    expect(maybeReadContinuationState(repoDir)).toBeUndefined();
+    await waitForContinuationLogToContain(repoDir, "Invalid session todo payload for ses_root.");
+  });
+
   it("forwards the cached session agent and model when enqueuing continuation", async () => {
     const repoDir = await createTempDir(true);
     const prompts: PromptRecord[] = [];
@@ -1674,6 +1692,28 @@ exit 99
       model: { modelID: "gpt-5.4", providerID: "openai" },
       sessionID: "ses_root",
     });
+  });
+
+  it("clears prompt reservations when session message payloads are malformed", async () => {
+    const repoDir = await createTempDir(true);
+    const prompts: PromptRecord[] = [];
+    const plugin = await AiUmpireContinuationPlugin(
+      createContext(repoDir, prompts, [], {}, {
+        messages: async () => ({
+          data: { items: [] },
+        }),
+      }),
+    );
+
+    await emitIdle(plugin, "ses_root");
+
+    const continuationState = readContinuationState(repoDir);
+    expect(prompts).toHaveLength(0);
+    expect(continuationState.ownerSessionID).toBe("ses_root");
+    expect(continuationState.lastPromptFingerprint).toBeUndefined();
+    expect(continuationState.pendingPromptFingerprint).toBeUndefined();
+    expect(continuationState.pendingWhipTaskID).toBeUndefined();
+    await waitForContinuationLogToContain(repoDir, "Invalid session messages payload for ses_root.");
   });
 
   it("delays TUI-triggered continuation and cancels it if the session becomes busy again", async () => {
