@@ -1295,7 +1295,7 @@ export class ContinuationController {
     try {
       await this.maybePrompt(sessionID);
     } catch (error) {
-      this.logger.error(formatError(error));
+      logContinuationError(this.logger, error, { sessionID });
     }
   }
 
@@ -1451,7 +1451,12 @@ export class ContinuationController {
             fingerprint: decision.fingerprint,
             sessionID,
           });
-          throw error;
+          throw withContinuationLogDetails(error, {
+            fingerprint: decision.fingerprint,
+            kind: decision.kind,
+            sessionID,
+            whipTaskID: decision.whipTaskID,
+          });
         }
 
         this.logger.info("Enqueued continuation prompt.", {
@@ -1928,7 +1933,10 @@ export async function AiUmpireContinuationPlugin(
       try {
         await controller.handleEvent(event);
       } catch (error) {
-        logger.error(formatError(error));
+        logContinuationError(logger, error, {
+          sessionID: getContinuationEventSessionID(event),
+          type: event.type,
+        });
       }
     },
   };
@@ -3338,6 +3346,64 @@ function formatError(error: unknown): string {
   return String(error);
 }
 
+class ContinuationLogContextError extends Error {
+  readonly details?: Record<string, unknown>;
+
+  readonly originalError: unknown;
+
+  constructor(error: unknown, details?: Record<string, unknown>) {
+    const originalError = error instanceof ContinuationLogContextError ? error.originalError : error;
+    super(formatError(originalError), originalError instanceof Error ? { cause: originalError } : undefined);
+    this.name = error instanceof Error ? error.name : "ContinuationLogContextError";
+    this.originalError = originalError;
+    this.details = mergeLogDetails(
+      error instanceof ContinuationLogContextError ? error.details : undefined,
+      details,
+    );
+    if (originalError instanceof Error && originalError.stack !== undefined) {
+      this.stack = originalError.stack;
+    }
+  }
+}
+
+function mergeLogDetails(
+  ...detailSets: Array<Record<string, unknown> | undefined>
+): Record<string, unknown> | undefined {
+  const merged = detailSets.reduce<Record<string, unknown>>((result, details) => {
+    if (details === undefined) {
+      return result;
+    }
+
+    return { ...result, ...details };
+  }, {});
+
+  return Object.keys(merged).length === 0 ? undefined : merged;
+}
+
+function withContinuationLogDetails(
+  error: unknown,
+  details?: Record<string, unknown>,
+): unknown {
+  if (details === undefined) {
+    return error;
+  }
+
+  return new ContinuationLogContextError(error, details);
+}
+
+function logContinuationError(
+  logger: ContinuationLogger,
+  error: unknown,
+  details?: Record<string, unknown>,
+): void {
+  const originalError = error instanceof ContinuationLogContextError ? error.originalError : error;
+  const contextualDetails = mergeLogDetails(
+    error instanceof ContinuationLogContextError ? error.details : undefined,
+    details,
+  );
+  logger.error(formatError(originalError), contextualDetails);
+}
+
 class ContinuationLogger {
   private readonly client?: ContinuationClient;
 
@@ -3365,8 +3431,8 @@ class ContinuationLogger {
     this.write("debug", message, details);
   }
 
-  error(message: string): void {
-    this.write("error", message);
+  error(message: string, details?: Record<string, unknown>): void {
+    this.write("error", message, details);
   }
 
   info(message: string, details?: Record<string, unknown>): void {
@@ -3393,9 +3459,7 @@ class ContinuationLogger {
     message: string,
     details?: Record<string, unknown>,
   ): void {
-    const line = level === "error"
-      ? `[ai-umpire-continuation] ${message}`
-      : formatLoggerLine(level, message, details);
+    const line = formatLoggerLine(level, message, details);
     this.writeToClient(level, line);
     this.writeToDisk(line);
   }
@@ -3418,7 +3482,7 @@ class ContinuationLogger {
 }
 
 function formatLoggerLine(
-  level: "debug" | "info",
+  level: "debug" | "error" | "info",
   message: string,
   details?: Record<string, unknown>,
 ): string {
