@@ -1161,7 +1161,7 @@ export class ContinuationController {
         reason: event.type,
         sessionID,
       });
-      state.preparedDecision = this.resolveDecision().catch((error) => {
+      state.preparedDecision = this.resolveDecision(sessionID).catch((error) => {
         state.preparedDecision = undefined;
         throw error;
       });
@@ -1191,7 +1191,7 @@ export class ContinuationController {
     state: SessionState,
     sessionID: string,
   ): Promise<ContinuationDecision | undefined> {
-    const preparedDecision = state.preparedDecision ?? this.resolveDecision();
+    const preparedDecision = state.preparedDecision ?? this.resolveDecision(sessionID);
     try {
       return await preparedDecision;
     } finally {
@@ -1308,7 +1308,7 @@ export class ContinuationController {
     });
 
     if (await this.isHelperSession(sessionID, state)) {
-      this.logger.debug("Skipping continuation for helper session.", { sessionID });
+      this.logger.info("Skipping continuation for helper session.", { sessionID });
       return;
     }
 
@@ -1322,12 +1322,12 @@ export class ContinuationController {
     });
 
     if (!state.idle) {
-      this.logger.debug("Skipping continuation because session is not idle.", { sessionID });
+      this.logger.info("Skipping continuation because session is not idle.", { sessionID });
       return;
     }
 
     if (hasActiveTodos(todos)) {
-      this.logger.debug("Skipping continuation because active todos remain.", {
+      this.logger.info("Skipping continuation because active todos remain.", {
         activeTodoCount: countActiveTodos(todos),
         sessionID,
       });
@@ -1361,7 +1361,7 @@ export class ContinuationController {
           continuationState.ownerSessionID !== undefined &&
           continuationState.ownerSessionID !== sessionID
         ) {
-          this.logger.debug("Skipping continuation because another session owns it.", {
+          this.logger.info("Skipping continuation because another session owns it.", {
             ownerSessionID: continuationState.ownerSessionID,
             sessionID,
           });
@@ -1382,7 +1382,7 @@ export class ContinuationController {
 
         continuationState = await this.completeWhipTaskIfNeeded(sessionID, continuationState);
         if (continuationState.pendingPromptFingerprint !== undefined) {
-          this.logger.debug("Skipping continuation because a prompt reservation is already pending.", {
+          this.logger.info("Skipping continuation because a prompt reservation is already pending.", {
             pendingPromptFingerprint: continuationState.pendingPromptFingerprint,
             pendingWhipTaskID: continuationState.pendingWhipTaskID,
             sessionID,
@@ -1399,7 +1399,7 @@ export class ContinuationController {
         }
 
         if (decision.fingerprint === continuationState.lastPromptFingerprint) {
-          this.logger.debug("Skipping continuation because the next fingerprint matches the last delivered prompt.", {
+          this.logger.info("Skipping continuation because the next fingerprint matches the last delivered prompt.", {
             fingerprint: decision.fingerprint,
             sessionID,
           });
@@ -1497,10 +1497,7 @@ export class ContinuationController {
     );
 
     if (!lockResult.acquired) {
-      this.logger.debug("Skipping continuation because the lock is already held.", {
-        continuationLockPath: this.continuationLockPath,
-        sessionID,
-      });
+      this.logger.info("Skipping continuation because the lock is already held.", { sessionID });
     }
   }
 
@@ -1823,7 +1820,7 @@ export class ContinuationController {
     return undefined;
   }
 
-  private async resolveDecision(): Promise<ContinuationDecision | undefined> {
+  private async resolveDecision(sessionID: string): Promise<ContinuationDecision | undefined> {
     const readyIssueProbe = await this.probeReadyIssueAvailability();
     if (readyIssueProbe.kind !== "empty") {
       const priorityOrderSummary = await this.loadPriorityOrderSummary();
@@ -1837,6 +1834,7 @@ export class ContinuationController {
       if (readyIssueProbe.kind === "ready") {
         this.logger.info("Ready issue probe changed before priority ordering completed.", {
           readyIssueCount: readyIssueProbe.readyIssueCount,
+          sessionID,
         });
         return undefined;
       }
@@ -1845,7 +1843,7 @@ export class ContinuationController {
     const whipState = await ensureWhipState(this.whipPath, this.commandTimeoutMs);
     const nextTask = selectNextWhipTask(whipState.tasks);
     if (nextTask === undefined) {
-      this.logger.debug("No ready issues or whip tasks remain for continuation.");
+      this.logger.info("No ready issues or whip tasks remain for continuation.", { sessionID });
       return undefined;
     }
 

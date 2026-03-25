@@ -636,19 +636,105 @@ process.exit(1);
     expect(prompts[0]?.sessionID).toBe("ses_primary");
   });
 
+  it("logs info when skipping continuation because active todos remain", async () => {
+    const repoDir = await createTempDir(true);
+    const prompts: PromptRecord[] = [];
+    const appLog = vi.fn();
+    const activeTodos = [
+      { content: "Keep working", id: "todo-1", priority: "high", status: "in_progress" },
+    ];
+    const plugin = await AiUmpireContinuationPlugin(
+      createContext(repoDir, prompts, activeTodos, {}, { appLog }),
+    );
+
+    await emitIdle(plugin, "ses_busy");
+
+    expect(prompts).toHaveLength(0);
+    await waitForContinuationLogToContain(repoDir, "Skipping continuation because active todos remain.");
+
+    const infoMessages = appLog.mock.calls
+      .map(([input]) => input.body)
+      .filter((body) => body.level === "info")
+      .map((body) => body.message);
+
+    expect(
+      infoMessages.some(
+        (message) =>
+          message.includes("Skipping continuation because active todos remain.") &&
+          message.includes('"activeTodoCount":1') &&
+          message.includes('"sessionID":"ses_busy"'),
+      ),
+    ).toBe(true);
+    expect(await readContinuationLog(repoDir)).toContain(
+      "[ai-umpire-continuation:info] Skipping continuation because active todos remain.",
+    );
+  });
+
+  it("logs info when skipping continuation because another session owns it", async () => {
+    const repoDir = await createTempDir(true);
+    const prompts: PromptRecord[] = [];
+    const appLog = vi.fn();
+    const sessionInfoByID = {
+      ses_owner: { id: "ses_owner" },
+      ses_guest: { id: "ses_guest" },
+    } satisfies Record<string, SessionInfoRecord>;
+
+    const plugin = await AiUmpireContinuationPlugin(
+      createContext(repoDir, prompts, [], sessionInfoByID, { appLog }),
+    );
+
+    // First session claims it
+    await plugin.event?.({
+      event: {
+        properties: { sessionID: "ses_owner" },
+        type: "session.idle",
+      },
+    });
+
+    // Second session tries to claim it
+    await plugin.event?.({
+      event: {
+        properties: { sessionID: "ses_guest" },
+        type: "session.idle",
+      },
+    });
+
+    await waitForContinuationLogToContain(repoDir, "Skipping continuation because another session owns it.");
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]?.sessionID).toBe("ses_owner");
+
+    const infoMessages = appLog.mock.calls
+      .map(([input]) => input.body)
+      .filter((body) => body.level === "info")
+      .map((body) => body.message);
+
+    expect(
+      infoMessages.some(
+        (message) =>
+          message.includes("Skipping continuation because another session owns it.") &&
+          message.includes('"ownerSessionID":"ses_owner"') &&
+          message.includes('"sessionID":"ses_guest"'),
+      ),
+    ).toBe(true);
+    expect(await readContinuationLog(repoDir)).toContain(
+      "[ai-umpire-continuation:info] Skipping continuation because another session owns it.",
+    );
+  });
+
   it("persists continuation ownership and dedupe across plugin instances", async () => {
     const repoDir = await createTempDir(true);
     const prompts: PromptRecord[] = [];
+    const appLog = vi.fn();
     const sessionInfoByID = {
       ses_primary: { id: "ses_primary" },
       ses_secondary: { id: "ses_secondary" },
     } satisfies Record<string, SessionInfoRecord>;
 
     const firstPlugin = await AiUmpireContinuationPlugin(
-      createContext(repoDir, prompts, [], sessionInfoByID),
+      createContext(repoDir, prompts, [], sessionInfoByID, { appLog }),
     );
     const secondPlugin = await AiUmpireContinuationPlugin(
-      createContext(repoDir, prompts, [], sessionInfoByID),
+      createContext(repoDir, prompts, [], sessionInfoByID, { appLog }),
     );
 
     await firstPlugin.event?.({
@@ -678,6 +764,29 @@ process.exit(1);
     expect(prompts[0]?.sessionID).toBe("ses_primary");
     expect(continuationState.ownerSessionID).toBe("ses_primary");
     expect(continuationState.lastPromptFingerprint).toBe("issues:26");
+    await waitForContinuationLogToContain(
+      repoDir,
+      "Skipping continuation because the next fingerprint matches the last delivered prompt.",
+    );
+
+    const infoMessages = appLog.mock.calls
+      .map(([input]) => input.body)
+      .filter((body) => body.level === "info")
+      .map((body) => body.message);
+
+    expect(
+      infoMessages.some(
+        (message) =>
+          message.includes(
+            "Skipping continuation because the next fingerprint matches the last delivered prompt.",
+          ) &&
+          message.includes('"fingerprint":"issues:26"') &&
+          message.includes('"sessionID":"ses_primary"'),
+      ),
+    ).toBe(true);
+    expect(await readContinuationLog(repoDir)).toContain(
+      "[ai-umpire-continuation:info] Skipping continuation because the next fingerprint matches the last delivered prompt.",
+    );
   });
 
   it("creates whip state, claims the first task, and keeps .umpire out of shipping prompts", async () => {
@@ -841,6 +950,50 @@ exit 99
     expect(readPriorityOrderInvocationCount(priorityOrderCountPath)).toBe(0);
     expect(prompts[1]?.text).toContain(
       "Selected task: Create validation issues for all 9 AIQ stages when @tjalve/aiq is in use.",
+    );
+  });
+
+  it("logs a specific info outcome when no ready issues or whip tasks remain", async () => {
+    const repoDir = await createTempDir(false);
+    const prompts: PromptRecord[] = [];
+    const appLog = vi.fn();
+    const timestamp = new Date("2026-03-25T00:00:00.000Z").toISOString();
+
+    await writeWhipState(repoDir, {
+      createdAt: timestamp,
+      tasks: [],
+      updatedAt: timestamp,
+      version: 1,
+    });
+
+    const plugin = await AiUmpireContinuationPlugin(
+      createContext(repoDir, prompts, [], {}, { appLog }),
+    );
+
+    await emitIdle(plugin, "ses_idle");
+
+    expect(prompts).toHaveLength(0);
+    await waitForContinuationLogToContain(repoDir, "No ready issues or whip tasks remain for continuation.");
+
+    const infoMessages = appLog.mock.calls
+      .map(([input]) => input.body)
+      .filter((body) => body.level === "info")
+      .map((body) => body.message);
+
+    expect(
+      infoMessages.some(
+        (message) =>
+          message.includes("No ready issues or whip tasks remain for continuation.") &&
+          message.includes('"sessionID":"ses_idle"'),
+      ),
+    ).toBe(true);
+    expect(
+      infoMessages.some((message) =>
+        message.includes("Skipping continuation because no next decision was available."),
+      ),
+    ).toBe(false);
+    expect(await readContinuationLog(repoDir)).toContain(
+      "[ai-umpire-continuation:info] No ready issues or whip tasks remain for continuation.",
     );
   });
 
