@@ -1,9 +1,11 @@
+import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export interface PluginContext {
+  commandTimeoutMs?: number;
   continuationLogPath?: string;
   client: ContinuationClient;
   directory: string;
@@ -339,6 +341,12 @@ const OWNER_SESSION_STALE_MS = 10 * 60_000;
 const RECENT_OWNER_HANDOFF_QUIET_MS = 20_000;
 
 const SESSION_STATE_STALE_MS = 30 * 60_000;
+
+const COMMAND_TIMEOUT_EXIT_CODE = 124;
+
+const DEFAULT_COMMAND_TIMEOUT_MS = 30_000;
+
+const COMMAND_TIMEOUT_KILL_SIGNAL = "SIGKILL";
 
 const DEFAULT_CONTINUATION_LOCK_PATH = path.join(".umpire", "continuation.lock");
 
@@ -950,6 +958,8 @@ export class ContinuationController {
 
   private readonly continuationStatePath: string;
 
+  private readonly commandTimeoutMs: number;
+
   private readonly cwd: string;
 
   private readonly issueCreationTemplate: string;
@@ -975,6 +985,7 @@ export class ContinuationController {
   constructor(context: PluginContext, logger: ContinuationLogger) {
     this.client = context.client;
     this.cwd = path.resolve(context.worktree ?? context.directory);
+    this.commandTimeoutMs = normalizeCommandTimeoutMs(context.commandTimeoutMs);
     const queuePolicy = loadQueuePolicy(this.cwd);
     this.logger = logger;
     this.continuationLockPath = path.resolve(this.cwd, DEFAULT_CONTINUATION_LOCK_PATH);
@@ -986,6 +997,7 @@ export class ContinuationController {
     this.priorityOrderScript = path.resolve(this.cwd, "scripts", "gh-priority-order.sh");
     this.whipPath = path.resolve(this.cwd, DEFAULT_WHIP_PATH);
     this.logger.info("Initialized continuation controller.", {
+      commandTimeoutMs: this.commandTimeoutMs,
       cwd: this.cwd,
       idleDelayMs: this.idleDelayMs,
       logLevel: context.logLevel ?? "silent",
@@ -1113,7 +1125,7 @@ export class ContinuationController {
         reason: event.type,
         sessionID: getContinuationEventSessionID(event),
       });
-      this.managedStateRootReady = ensureManagedStateRoot(this.cwd);
+      this.managedStateRootReady = ensureManagedStateRoot(this.cwd, this.commandTimeoutMs);
     }
 
     await this.managedStateRootReady;
@@ -1333,7 +1345,10 @@ export class ContinuationController {
           },
           state,
         );
-        let continuationState = await ensureContinuationState(this.continuationStatePath);
+        let continuationState = await ensureContinuationState(
+          this.continuationStatePath,
+          this.commandTimeoutMs,
+        );
         continuationState = await this.releaseInactiveOwnerIfNeeded(sessionID, state, continuationState);
         continuationState = await this.releaseStalePendingPromptIfNeeded(continuationState);
 
@@ -1349,10 +1364,14 @@ export class ContinuationController {
         }
 
         if (continuationState.ownerSessionID === undefined) {
-          continuationState = await writeContinuationState(this.continuationStatePath, {
-            ...continuationState,
-            ownerSessionID: sessionID,
-          });
+          continuationState = await writeContinuationState(
+            this.continuationStatePath,
+            {
+              ...continuationState,
+              ownerSessionID: sessionID,
+            },
+            this.commandTimeoutMs,
+          );
           this.logger.info("Claimed continuation ownership.", { sessionID });
         }
 
@@ -1382,13 +1401,17 @@ export class ContinuationController {
           return;
         }
 
-        continuationState = await writeContinuationState(this.continuationStatePath, {
-          ...continuationState,
-          ownerSessionID: sessionID,
-          pendingPromptFingerprint: decision.fingerprint,
-          pendingPromptUpdatedAt: new Date().toISOString(),
-          pendingWhipTaskID: decision.whipTaskID,
-        });
+        continuationState = await writeContinuationState(
+          this.continuationStatePath,
+          {
+            ...continuationState,
+            ownerSessionID: sessionID,
+            pendingPromptFingerprint: decision.fingerprint,
+            pendingPromptUpdatedAt: new Date().toISOString(),
+            pendingWhipTaskID: decision.whipTaskID,
+          },
+          this.commandTimeoutMs,
+        );
 
         this.logger.info("Reserved continuation prompt.", {
           fingerprint: decision.fingerprint,
@@ -1409,12 +1432,16 @@ export class ContinuationController {
           });
           await promptSession(this.client, sessionID, this.cwd, decision.prompt, promptTarget);
         } catch (error) {
-          await writeContinuationState(this.continuationStatePath, {
-            ...continuationState,
-            pendingPromptFingerprint: undefined,
-            pendingPromptUpdatedAt: undefined,
-            pendingWhipTaskID: undefined,
-          });
+          await writeContinuationState(
+            this.continuationStatePath,
+            {
+              ...continuationState,
+              pendingPromptFingerprint: undefined,
+              pendingPromptUpdatedAt: undefined,
+              pendingWhipTaskID: undefined,
+            },
+            this.commandTimeoutMs,
+          );
           this.logger.debug("Cleared failed continuation prompt reservation.", {
             fingerprint: decision.fingerprint,
             sessionID,
@@ -1431,22 +1458,31 @@ export class ContinuationController {
         state.skipNextSessionIdle = true;
 
         if (decision.kind === "whip" && decision.whipTaskID !== undefined) {
-          await updateWhipTaskStatus(this.whipPath, decision.whipTaskID, "in_progress");
+          await updateWhipTaskStatus(
+            this.whipPath,
+            decision.whipTaskID,
+            "in_progress",
+            this.commandTimeoutMs,
+          );
           this.logger.debug("Marked whip task in progress after prompt enqueue.", {
             sessionID,
             whipTaskID: decision.whipTaskID,
           });
         }
 
-        await writeContinuationState(this.continuationStatePath, {
-          ...continuationState,
-          activeWhipTaskID: decision.kind === "whip" ? decision.whipTaskID : undefined,
-          lastPromptFingerprint: decision.fingerprint,
-          ownerSessionID: sessionID,
-          pendingPromptFingerprint: undefined,
-          pendingPromptUpdatedAt: undefined,
-          pendingWhipTaskID: undefined,
-        });
+        await writeContinuationState(
+          this.continuationStatePath,
+          {
+            ...continuationState,
+            activeWhipTaskID: decision.kind === "whip" ? decision.whipTaskID : undefined,
+            lastPromptFingerprint: decision.fingerprint,
+            ownerSessionID: sessionID,
+            pendingPromptFingerprint: undefined,
+            pendingPromptUpdatedAt: undefined,
+            pendingWhipTaskID: undefined,
+          },
+          this.commandTimeoutMs,
+        );
       },
     );
 
@@ -1469,15 +1505,24 @@ export class ContinuationController {
       return continuationState;
     }
 
-    await updateWhipTaskStatus(this.whipPath, continuationState.activeWhipTaskID, "completed");
+    await updateWhipTaskStatus(
+      this.whipPath,
+      continuationState.activeWhipTaskID,
+      "completed",
+      this.commandTimeoutMs,
+    );
     this.logger.info("Completed active whip task before selecting the next continuation prompt.", {
       sessionID,
       whipTaskID: continuationState.activeWhipTaskID,
     });
-    return writeContinuationState(this.continuationStatePath, {
-      ...continuationState,
-      activeWhipTaskID: undefined,
-    });
+    return writeContinuationState(
+      this.continuationStatePath,
+      {
+        ...continuationState,
+        activeWhipTaskID: undefined,
+      },
+      this.commandTimeoutMs,
+    );
   }
 
   private async isHelperSession(sessionID: string, state: SessionState): Promise<boolean> {
@@ -1597,7 +1642,12 @@ export class ContinuationController {
     },
   ): Promise<ContinuationState> {
     if (continuationState.pendingWhipTaskID !== undefined) {
-      await updateWhipTaskStatus(this.whipPath, continuationState.pendingWhipTaskID, "in_progress");
+      await updateWhipTaskStatus(
+        this.whipPath,
+        continuationState.pendingWhipTaskID,
+        "in_progress",
+        this.commandTimeoutMs,
+      );
     }
 
     const ownerState = this.sessionStates.get(details.ownerSessionID);
@@ -1607,15 +1657,19 @@ export class ContinuationController {
 
     this.logger.info(details.message, details);
 
-    return writeContinuationState(this.continuationStatePath, {
-      ...continuationState,
-      activeWhipTaskID: undefined,
-      lastPromptFingerprint: undefined,
-      ownerSessionID: undefined,
-      pendingPromptFingerprint: undefined,
-      pendingPromptUpdatedAt: undefined,
-      pendingWhipTaskID: undefined,
-    });
+    return writeContinuationState(
+      this.continuationStatePath,
+      {
+        ...continuationState,
+        activeWhipTaskID: undefined,
+        lastPromptFingerprint: undefined,
+        ownerSessionID: undefined,
+        pendingPromptFingerprint: undefined,
+        pendingPromptUpdatedAt: undefined,
+        pendingWhipTaskID: undefined,
+      },
+      this.commandTimeoutMs,
+    );
   }
 
   private async releaseStalePendingPromptIfNeeded(
@@ -1627,22 +1681,31 @@ export class ContinuationController {
 
     if (continuationState.pendingWhipTaskID !== undefined) {
       if (!isPendingPromptFresh(continuationState.pendingPromptUpdatedAt)) {
-        await updateWhipTaskStatus(this.whipPath, continuationState.pendingWhipTaskID, "in_progress");
+        await updateWhipTaskStatus(
+          this.whipPath,
+          continuationState.pendingWhipTaskID,
+          "in_progress",
+          this.commandTimeoutMs,
+        );
 
         this.logger.info("Released stale pending whip reservation.", {
           pendingPromptFingerprint: continuationState.pendingPromptFingerprint,
           pendingWhipTaskID: continuationState.pendingWhipTaskID,
         });
 
-        return writeContinuationState(this.continuationStatePath, {
-          ...continuationState,
-          activeWhipTaskID: undefined,
-          lastPromptFingerprint: undefined,
-          ownerSessionID: undefined,
-          pendingPromptFingerprint: undefined,
-          pendingPromptUpdatedAt: undefined,
-          pendingWhipTaskID: undefined,
-        });
+        return writeContinuationState(
+          this.continuationStatePath,
+          {
+            ...continuationState,
+            activeWhipTaskID: undefined,
+            lastPromptFingerprint: undefined,
+            ownerSessionID: undefined,
+            pendingPromptFingerprint: undefined,
+            pendingPromptUpdatedAt: undefined,
+            pendingWhipTaskID: undefined,
+          },
+          this.commandTimeoutMs,
+        );
       }
 
       return continuationState;
@@ -1652,12 +1715,16 @@ export class ContinuationController {
       this.logger.info("Promoted untimestamped pending prompt reservation to last delivered fingerprint.", {
         pendingPromptFingerprint: continuationState.pendingPromptFingerprint,
       });
-      return writeContinuationState(this.continuationStatePath, {
-        ...continuationState,
-        lastPromptFingerprint: continuationState.pendingPromptFingerprint,
-        pendingPromptFingerprint: undefined,
-        pendingPromptUpdatedAt: undefined,
-      });
+      return writeContinuationState(
+        this.continuationStatePath,
+        {
+          ...continuationState,
+          lastPromptFingerprint: continuationState.pendingPromptFingerprint,
+          pendingPromptFingerprint: undefined,
+          pendingPromptUpdatedAt: undefined,
+        },
+        this.commandTimeoutMs,
+      );
     }
 
     const pendingUpdatedAt = Date.parse(continuationState.pendingPromptUpdatedAt);
@@ -1669,12 +1736,16 @@ export class ContinuationController {
         pendingPromptFingerprint: continuationState.pendingPromptFingerprint,
         pendingPromptUpdatedAt: continuationState.pendingPromptUpdatedAt,
       });
-      return writeContinuationState(this.continuationStatePath, {
-        ...continuationState,
-        lastPromptFingerprint: continuationState.pendingPromptFingerprint,
-        pendingPromptFingerprint: undefined,
-        pendingPromptUpdatedAt: undefined,
-      });
+      return writeContinuationState(
+        this.continuationStatePath,
+        {
+          ...continuationState,
+          lastPromptFingerprint: continuationState.pendingPromptFingerprint,
+          pendingPromptFingerprint: undefined,
+          pendingPromptUpdatedAt: undefined,
+        },
+        this.commandTimeoutMs,
+      );
     }
 
     return continuationState;
@@ -1761,7 +1832,7 @@ export class ContinuationController {
       }
     }
 
-    const whipState = await ensureWhipState(this.whipPath);
+    const whipState = await ensureWhipState(this.whipPath, this.commandTimeoutMs);
     const nextTask = selectNextWhipTask(whipState.tasks);
     if (nextTask === undefined) {
       this.logger.debug("No ready issues or whip tasks remain for continuation.");
@@ -1780,7 +1851,11 @@ export class ContinuationController {
     readyIssueCount?: number;
   }> {
     try {
-      const readyIssues = await listReadyIssueNumbers(this.cwd, this.queueStatusNames);
+      const readyIssues = await listReadyIssueNumbers(
+        this.cwd,
+        this.queueStatusNames,
+        this.commandTimeoutMs,
+      );
       this.logger.debug("Checked ready GitHub issue availability.", {
         readyIssueCount: readyIssues.length,
       });
@@ -1797,7 +1872,11 @@ export class ContinuationController {
   }
 
   private async loadPriorityOrderSummary(): Promise<PriorityOrderSummary> {
-    const priorityOrder = await runPriorityOrderScript(this.cwd, this.priorityOrderScript);
+    const priorityOrder = await runPriorityOrderScript(
+      this.cwd,
+      this.priorityOrderScript,
+      this.commandTimeoutMs,
+    );
     if (priorityOrder.exitCode !== 0) {
       throw new Error(
         `Failed to run ${path.relative(this.cwd, this.priorityOrderScript) || this.priorityOrderScript}: ${priorityOrder.stderr.trim() || `exit code ${priorityOrder.exitCode}`}`,
@@ -1958,15 +2037,24 @@ async function promptSession(
   }
 }
 
-async function runPriorityOrderScript(cwd: string, scriptPath: string): Promise<CommandRunResult> {
-  return runCommand("bash", [scriptPath, "--json"], cwd);
+async function runPriorityOrderScript(
+  cwd: string,
+  scriptPath: string,
+  commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
+): Promise<CommandRunResult> {
+  return runCommand("bash", [scriptPath, "--json"], cwd, commandTimeoutMs);
 }
 
-async function listReadyIssueNumbers(cwd: string, queueStatusNames: QueueStatusNames): Promise<number[]> {
+async function listReadyIssueNumbers(
+  cwd: string,
+  queueStatusNames: QueueStatusNames,
+  commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
+): Promise<number[]> {
   const result = await runCommand(
     "gh",
     ["issue", "list", "--state", "open", "--limit", "100", "--json", "number,labels"],
     cwd,
+    commandTimeoutMs,
   );
   if (result.exitCode !== 0) {
     throw new Error(
@@ -2003,41 +2091,108 @@ async function runCommand(
   command: string,
   args: readonly string[],
   cwd: string,
+  commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
 ): Promise<CommandRunResult> {
-  const { execFile } = await import("node:child_process");
-  const { promisify } = await import("node:util");
+  return await new Promise<CommandRunResult>((resolve, reject) => {
+    const maxBufferBytes = 10 * 1024 * 1024;
+    let settled = false;
+    let timedOut = false;
+    let outputOverflowed = false;
+    let stdout = "";
+    let stderr = "";
 
-  const execFileAsync = promisify(execFile);
+    const finish = (result: CommandRunResult): void => {
+      if (settled) {
+        return;
+      }
 
-  try {
-    const result = await execFileAsync(command, [...args], {
-      cwd,
-      encoding: "utf8",
-      maxBuffer: 10 * 1024 * 1024,
+      settled = true;
+      clearTimeout(timeoutHandle);
+      resolve(result);
+    };
+
+    const fail = (error: unknown): void => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeoutHandle);
+      reject(error);
+    };
+
+    const timeoutMessage = `Command ${command} timed out after ${commandTimeoutMs}ms and was killed with ${COMMAND_TIMEOUT_KILL_SIGNAL}.`;
+    const overflowMessage = `Command ${command} exceeded the ${maxBufferBytes} byte output buffer and was killed with ${COMMAND_TIMEOUT_KILL_SIGNAL}.`;
+    const child = spawn(
+      command,
+      [...args],
+      {
+        cwd,
+        detached: process.platform !== "win32",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+
+    const appendOutput = (target: "stderr" | "stdout", chunk: string | Buffer): void => {
+      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      if (target === "stdout") {
+        stdout += text;
+      } else {
+        stderr += text;
+      }
+
+      if (Buffer.byteLength(stdout, "utf8") + Buffer.byteLength(stderr, "utf8") > maxBufferBytes) {
+        outputOverflowed = true;
+        killCommandProcessTree(child, COMMAND_TIMEOUT_KILL_SIGNAL);
+      }
+    };
+
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string | Buffer) => {
+      appendOutput("stdout", chunk);
     });
 
-    return {
-      exitCode: 0,
-      stderr: result.stderr,
-      stdout: result.stdout,
-    };
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "stdout" in error &&
-      "stderr" in error &&
-      "code" in error
-    ) {
-      return {
-        exitCode: typeof error.code === "number" ? error.code : 1,
-        stderr: String(error.stderr),
-        stdout: String(error.stdout),
-      };
-    }
+    child.stderr?.setEncoding("utf8");
+    child.stderr?.on("data", (chunk: string | Buffer) => {
+      appendOutput("stderr", chunk);
+    });
 
-    throw error;
-  }
+    child.once("error", (error: Error) => {
+      fail(error);
+    });
+
+    child.once("close", (code: number | null) => {
+      if (timedOut) {
+        finish({
+          exitCode: COMMAND_TIMEOUT_EXIT_CODE,
+          stderr: stderr.length > 0 ? `${timeoutMessage}\n${stderr}` : timeoutMessage,
+          stdout,
+        });
+        return;
+      }
+
+      if (outputOverflowed) {
+        finish({
+          exitCode: 1,
+          stderr: stderr.length > 0 ? `${overflowMessage}\n${stderr}` : overflowMessage,
+          stdout,
+        });
+        return;
+      }
+
+      finish({
+        exitCode: typeof code === "number" ? code : 1,
+        stderr,
+        stdout,
+      });
+    });
+
+    const timeoutHandle = setTimeout(() => {
+      timedOut = true;
+      killCommandProcessTree(child, COMMAND_TIMEOUT_KILL_SIGNAL);
+    }, commandTimeoutMs);
+    timeoutHandle.unref?.();
+  });
 }
 
 function buildIssueDecision(
@@ -2321,8 +2476,11 @@ function buildWhipTaskPrompt(task: WhipTask, issueCreationTemplate: string): str
   ].join("\n");
 }
 
-async function ensureContinuationState(continuationStatePath: string): Promise<ContinuationState> {
-  await ensureManagedStateRoot(path.dirname(path.dirname(continuationStatePath)));
+async function ensureContinuationState(
+  continuationStatePath: string,
+  commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
+): Promise<ContinuationState> {
+  await ensureManagedStateRoot(path.dirname(path.dirname(continuationStatePath)), commandTimeoutMs);
 
   try {
     const raw = await readFile(continuationStatePath, "utf8");
@@ -2338,7 +2496,7 @@ async function ensureContinuationState(continuationStatePath: string): Promise<C
     version: 1,
   };
 
-  await writeContinuationState(continuationStatePath, state);
+  await writeContinuationState(continuationStatePath, state, commandTimeoutMs);
   return state;
 }
 
@@ -2346,8 +2504,9 @@ async function writeContinuationState(
   continuationStatePath: string,
   state: Omit<ContinuationState, "updatedAt" | "version"> &
     Partial<Pick<ContinuationState, "updatedAt" | "version">>,
+  commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
 ): Promise<ContinuationState> {
-  await ensureManagedStateRoot(path.dirname(path.dirname(continuationStatePath)));
+  await ensureManagedStateRoot(path.dirname(path.dirname(continuationStatePath)), commandTimeoutMs);
 
   const nextState: ContinuationState = {
     activeWhipTaskID: state.activeWhipTaskID,
@@ -2467,8 +2626,11 @@ async function releaseContinuationLock(
   await rm(continuationLockPath, { force: true, recursive: true });
 }
 
-async function ensureWhipState(whipPath: string): Promise<WhipState> {
-  await ensureManagedStateRoot(path.dirname(path.dirname(whipPath)));
+async function ensureWhipState(
+  whipPath: string,
+  commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
+): Promise<WhipState> {
+  await ensureManagedStateRoot(path.dirname(path.dirname(whipPath)), commandTimeoutMs);
 
   try {
     const raw = await readFile(whipPath, "utf8");
@@ -2492,31 +2654,41 @@ async function ensureWhipState(whipPath: string): Promise<WhipState> {
   return state;
 }
 
-async function ensureManagedStateRoot(repoRoot: string): Promise<void> {
-  const existing = managedStateRootReady.get(repoRoot);
+async function ensureManagedStateRoot(
+  repoRoot: string,
+  commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
+): Promise<void> {
+  const cacheKey = getManagedStateRootCacheKey(repoRoot, commandTimeoutMs);
+  const existing = managedStateRootReady.get(cacheKey);
   if (existing !== undefined) {
     return existing;
   }
 
-  const pending = ensureManagedStateRootOnce(repoRoot).catch((error) => {
-    managedStateRootReady.delete(repoRoot);
+  const pending = ensureManagedStateRootOnce(repoRoot, commandTimeoutMs).catch((error) => {
+    managedStateRootReady.delete(cacheKey);
     throw error;
   });
-  managedStateRootReady.set(repoRoot, pending);
+  managedStateRootReady.set(cacheKey, pending);
   return pending;
 }
 
-async function ensureManagedStateRootOnce(repoRoot: string): Promise<void> {
-  await ensureManagedStateIgnored(repoRoot);
+async function ensureManagedStateRootOnce(
+  repoRoot: string,
+  commandTimeoutMs: number,
+): Promise<void> {
+  await ensureManagedStateIgnored(repoRoot, commandTimeoutMs);
   await mkdir(path.join(repoRoot, ".umpire"), { recursive: true });
-  await assertManagedStateUntracked(repoRoot);
+  await assertManagedStateUntracked(repoRoot, commandTimeoutMs);
 }
 
-async function ensureManagedStateIgnored(repoRoot: string): Promise<void> {
+async function ensureManagedStateIgnored(
+  repoRoot: string,
+  commandTimeoutMs: number,
+): Promise<void> {
   const ignoreEntry = ".umpire/";
   await ensureIgnoreEntry(path.join(repoRoot, ".gitignore"), ignoreEntry);
 
-  const gitDir = await resolveGitDir(repoRoot);
+  const gitDir = await resolveGitDir(repoRoot, commandTimeoutMs);
   if (gitDir !== undefined) {
     await ensureIgnoreEntry(path.join(gitDir, "info", "exclude"), ignoreEntry);
   }
@@ -2550,8 +2722,11 @@ async function ensureIgnoreEntry(filePath: string, ignoreEntry: string): Promise
   await writeFile(filePath, next, "utf8");
 }
 
-async function assertManagedStateUntracked(repoRoot: string): Promise<void> {
-  const trackedPaths = await listTrackedManagedStatePaths(repoRoot);
+async function assertManagedStateUntracked(
+  repoRoot: string,
+  commandTimeoutMs: number,
+): Promise<void> {
+  const trackedPaths = await listTrackedManagedStatePaths(repoRoot, commandTimeoutMs);
   if (trackedPaths.length === 0) {
     return;
   }
@@ -2561,8 +2736,11 @@ async function assertManagedStateUntracked(repoRoot: string): Promise<void> {
   );
 }
 
-async function listTrackedManagedStatePaths(repoRoot: string): Promise<string[]> {
-  const result = await runCommand("git", ["ls-files", "--", ".umpire"], repoRoot);
+async function listTrackedManagedStatePaths(
+  repoRoot: string,
+  commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
+): Promise<string[]> {
+  const result = await runCommand("git", ["ls-files", "--", ".umpire"], repoRoot, commandTimeoutMs);
   if (result.exitCode !== 0) {
     const stderr = result.stderr.trim();
     if (stderr.includes("not a git repository")) {
@@ -2578,8 +2756,11 @@ async function listTrackedManagedStatePaths(repoRoot: string): Promise<string[]>
     .filter((line) => line.length > 0);
 }
 
-async function resolveGitDir(repoRoot: string): Promise<string | undefined> {
-  const result = await runCommand("git", ["rev-parse", "--git-dir"], repoRoot);
+async function resolveGitDir(
+  repoRoot: string,
+  commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
+): Promise<string | undefined> {
+  const result = await runCommand("git", ["rev-parse", "--git-dir"], repoRoot, commandTimeoutMs);
   if (result.exitCode !== 0) {
     const stderr = result.stderr.trim();
     if (stderr.includes("not a git repository")) {
@@ -2601,8 +2782,9 @@ async function updateWhipTaskStatus(
   whipPath: string,
   taskID: string,
   status: WhipTask["status"],
+  commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
 ): Promise<WhipState> {
-  const state = await ensureWhipState(whipPath);
+  const state = await ensureWhipState(whipPath, commandTimeoutMs);
   const tasks = state.tasks.map((task) => task.id === taskID ? { ...task, status } : task);
 
   if (tasks.every((task, index) => task.status === state.tasks[index]?.status)) {
@@ -2912,8 +3094,63 @@ function isMissingFileError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 }
 
+function normalizeCommandTimeoutMs(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_COMMAND_TIMEOUT_MS;
+  }
+
+  return Math.max(1, Math.floor(value));
+}
+
+function getManagedStateRootCacheKey(repoRoot: string, commandTimeoutMs: number): string {
+  return `${repoRoot}\u0000${commandTimeoutMs}`;
+}
+
+function killCommandProcessTree(child: ChildProcess, signal: NodeJS.Signals): void {
+  const { pid } = child;
+  if (pid === undefined) {
+    return;
+  }
+
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-pid, signal);
+      return;
+    } catch (error) {
+      if (!isMissingProcessError(error)) {
+        try {
+          child.kill(signal);
+        } catch {
+          return;
+        }
+      }
+      return;
+    }
+  }
+
+  try {
+    const taskkill = spawn("taskkill", ["/pid", String(pid), "/t", "/f"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    taskkill.unref();
+    return;
+  } catch {
+  }
+
+  try {
+    child.kill(signal);
+  } catch {
+    return;
+  }
+}
+
 function isAlreadyExistsError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "EEXIST";
+}
+
+function isMissingProcessError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ESRCH";
 }
 
 function isNotFoundError(error: unknown): boolean {
