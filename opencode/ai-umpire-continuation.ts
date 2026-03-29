@@ -1848,9 +1848,16 @@ export class ContinuationController {
   }
 
   private async resolveDecision(sessionID: string): Promise<ContinuationDecision | undefined> {
-    const readyIssueProbe = await this.probeReadyIssueAvailability();
-    if (readyIssueProbe.kind !== "empty") {
+    const issueAvailabilityProbe = await this.probeIssueAvailability();
+    if (issueAvailabilityProbe.kind !== "empty") {
       const priorityOrderSummary = await this.loadPriorityOrderSummary();
+      if (priorityOrderSummary.inProgress.length > 0) {
+        this.logger.debug("Selected continuation prompt from in-progress issues.", {
+          inProgressIssues: priorityOrderSummary.inProgress,
+        });
+        return buildIssueDecision(priorityOrderSummary.inProgress, this.issuePrompt);
+      }
+
       if (priorityOrderSummary.readyIssues.length > 0) {
         this.logger.debug("Selected continuation prompt from ready issues.", {
           readyIssues: priorityOrderSummary.readyIssues,
@@ -1858,9 +1865,10 @@ export class ContinuationController {
         return buildIssueDecision(priorityOrderSummary.readyIssues, this.issuePrompt);
       }
 
-      if (readyIssueProbe.kind === "ready") {
-        this.logger.info("Ready issue probe changed before priority ordering completed.", {
-          readyIssueCount: readyIssueProbe.readyIssueCount,
+      if (issueAvailabilityProbe.kind === "available") {
+        this.logger.info("Issue availability probe changed before priority ordering completed.", {
+          inProgressIssueCount: issueAvailabilityProbe.inProgressIssueCount,
+          readyIssueCount: issueAvailabilityProbe.readyIssueCount,
           sessionID,
         });
         return undefined;
@@ -1870,7 +1878,7 @@ export class ContinuationController {
     const whipState = await ensureWhipState(this.whipPath, this.commandTimeoutMs);
     const nextTask = selectNextWhipTask(whipState.tasks);
     if (nextTask === undefined) {
-      this.logger.info("No ready issues or whip tasks remain for continuation.", { sessionID });
+      this.logger.info("No ready or in-progress issues and no whip tasks remain for continuation.", { sessionID });
       return undefined;
     }
 
@@ -1881,28 +1889,34 @@ export class ContinuationController {
     return buildWhipDecision(nextTask, this.issueCreationTemplate);
   }
 
-  private async probeReadyIssueAvailability(): Promise<{
-    kind: "empty" | "ready" | "unknown";
+  private async probeIssueAvailability(): Promise<{
+    inProgressIssueCount: number;
+    kind: "available" | "empty" | "unknown";
     readyIssueCount?: number;
   }> {
     try {
-      const readyIssues = await listReadyIssueNumbers(
+      const issueNumbers = await listContinuableIssueNumbers(
         this.cwd,
         this.queueStatusNames,
         this.commandTimeoutMs,
       );
-      this.logger.debug("Checked ready GitHub issue availability.", {
-        readyIssueCount: readyIssues.length,
+      this.logger.debug("Checked GitHub issue availability.", {
+        inProgressIssueCount: issueNumbers.inProgress.length,
+        readyIssueCount: issueNumbers.readyIssues.length,
       });
 
-      return readyIssues.length === 0
-        ? { kind: "empty", readyIssueCount: 0 }
-        : { kind: "ready", readyIssueCount: readyIssues.length };
+      return issueNumbers.readyIssues.length === 0 && issueNumbers.inProgress.length === 0
+        ? { kind: "empty", inProgressIssueCount: 0, readyIssueCount: 0 }
+        : {
+            kind: "available",
+            inProgressIssueCount: issueNumbers.inProgress.length,
+            readyIssueCount: issueNumbers.readyIssues.length,
+          };
     } catch (error) {
-      this.logger.info("Ready issue probe failed; falling back to full priority order summary.", {
+      this.logger.info("Issue availability probe failed; falling back to full priority order summary.", {
         error: formatError(error),
       });
-      return { kind: "unknown" };
+      return { kind: "unknown", inProgressIssueCount: 0, readyIssueCount: 0 };
     }
   }
 
@@ -2106,11 +2120,11 @@ async function runPriorityOrderScript(
   return runCommand("bash", [scriptPath, "--json"], cwd, commandTimeoutMs);
 }
 
-async function listReadyIssueNumbers(
+async function listContinuableIssueNumbers(
   cwd: string,
   queueStatusNames: QueueStatusNames,
   commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
-): Promise<number[]> {
+): Promise<{ inProgress: number[]; readyIssues: number[] }> {
   const result = await runCommand(
     "gh",
     ["issue", "list", "--state", "open", "--limit", "100", "--json", "number,labels"],
@@ -2119,11 +2133,11 @@ async function listReadyIssueNumbers(
   );
   if (result.exitCode !== 0) {
     throw new Error(
-      `Failed to probe ready GitHub issues: ${result.stderr.trim() || `exit code ${result.exitCode}`}`,
+      `Failed to probe GitHub issue availability: ${result.stderr.trim() || `exit code ${result.exitCode}`}`,
     );
   }
 
-  return parseReadyIssueNumbers(result.stdout, queueStatusNames);
+  return parseContinuableIssueNumbers(result.stdout, queueStatusNames);
 }
 
 async function fetchSessionInfo(
@@ -2279,49 +2293,58 @@ function buildWhipDecision(
   };
 }
 
-function parseReadyIssueNumbers(output: string, queueStatusNames: QueueStatusNames): number[] {
+function parseContinuableIssueNumbers(
+  output: string,
+  queueStatusNames: QueueStatusNames,
+): { inProgress: number[]; readyIssues: number[] } {
   let parsed: unknown;
 
   try {
     parsed = JSON.parse(output) as unknown;
   } catch (error) {
-    throw new Error(`Invalid ready issue JSON: ${formatError(error)}`);
+    throw new Error(`Invalid issue availability JSON: ${formatError(error)}`);
   }
 
   if (!Array.isArray(parsed)) {
-    throw new Error("Invalid ready issue list.");
+    throw new Error("Invalid issue availability list.");
   }
 
-  return parsed.flatMap((entry) => {
+  return parsed.reduce<{ inProgress: number[]; readyIssues: number[] }>((issueNumbers, entry) => {
     if (typeof entry !== "object" || entry === null || !("number" in entry) || !("labels" in entry)) {
-      throw new Error("Invalid ready issue entry.");
+      throw new Error("Invalid issue availability entry.");
     }
 
     const issue = entry as { labels?: unknown; number?: unknown };
     const number = issue.number;
     if (!isPositiveInteger(number)) {
-      throw new Error("Invalid ready issue number.");
+      throw new Error("Invalid issue availability number.");
     }
 
     const labels = parseIssueLabelNames(issue.labels);
     const status = resolveEffectiveIssueStatus(labels, queueStatusNames);
-    return status === queueStatusNames.ready ? [number] : [];
-  });
+    if (status === queueStatusNames.inProgress) {
+      issueNumbers.inProgress.push(number);
+    } else if (status === queueStatusNames.ready) {
+      issueNumbers.readyIssues.push(number);
+    }
+
+    return issueNumbers;
+  }, { inProgress: [], readyIssues: [] });
 }
 
 function parseIssueLabelNames(raw: unknown): string[] {
   if (!Array.isArray(raw)) {
-    throw new Error("Invalid ready issue labels.");
+    throw new Error("Invalid issue availability labels.");
   }
 
   return raw.map((entry) => {
     if (typeof entry !== "object" || entry === null || !("name" in entry)) {
-      throw new Error("Invalid ready issue label.");
+      throw new Error("Invalid issue availability label.");
     }
 
     const name = (entry as { name?: unknown }).name;
     if (typeof name !== "string" || name.length === 0) {
-      throw new Error("Invalid ready issue label name.");
+      throw new Error("Invalid issue availability label name.");
     }
 
     return name;
