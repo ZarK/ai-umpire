@@ -5,6 +5,7 @@
 ## What It Ships
 
 - a package-backed `aiu` CLI
+- shared CLI metadata, help, schema, and JSON behavior through `@tjalve/qube-cli`
 - package metadata for the `@tjalve/aiu` npm package
 - a package-backed `aiu` executable
 - TypeScript source, build, typecheck, test, and package dry-run checks
@@ -33,6 +34,7 @@ Inspect package paths:
 ```bash
 pnpm exec aiu paths
 pnpm exec aiu paths --json
+pnpm exec aiu schema --json
 ```
 
 Run release checks:

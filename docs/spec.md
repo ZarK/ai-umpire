@@ -41,7 +41,7 @@ Requirements use stable identifiers (`FR-XX-NNN`) so milestones and issues can r
 
 | ID | Requirement | Status |
 |----|-------------|--------|
-| FR-03-001 | Umpire uses a metadata-backed CLI so help, schema, JSON output, mutation labels, dry-run labels, and tests do not drift. | Required |
+| FR-03-001 | Umpire uses `@tjalve/qube-cli` as the shared metadata-backed CLI layer so help, schema, JSON output, mutation labels, dry-run labels, and tests do not drift. | Required |
 | FR-03-002 | Implemented commands support `--help`; Umpire also supports `aiu help <command-or-topic...>` and `aiu <command-or-topic...> help`. Help invocations are always non-mutating. | Required |
 | FR-03-003 | Running `aiu` with no arguments shows a concise landing page with common commands, host setup guidance, and agent-facing schema guidance. | Required |
 | FR-03-004 | Unknown commands and misspelled flags may suggest alternatives, but suggestions never execute automatically. | Required |

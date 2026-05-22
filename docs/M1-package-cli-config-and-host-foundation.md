@@ -60,6 +60,8 @@ Package scripts must run real checks or fail:
 
 ## Part 2: CLI Foundation
 
+Umpire uses `@tjalve/qube-cli` for shared command metadata, help rendering, runtime dispatch, schema output, JSON output conventions, and CLI contract testing. Umpire-owned modules keep command behavior, config policy, host planning, diagnostics, and all side effects.
+
 M1 implements only real commands owned by M1:
 
 - `aiu`
