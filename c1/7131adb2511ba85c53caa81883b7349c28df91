@@ -1,0 +1,23 @@
+tsconfig.json
+  s_f8aaaf4fdfe4d6::t_b932c1f9ccb908 9,13
+package.json
+  s_f8aaaf4fdfe4d6::t_b932c1f9ccb908 42,47
+test/package-surface.test.ts
+  s_f8aaaf4fdfe4d6::t_b932c1f9ccb908 1,4,25,27,34-36,42-44,51-53,63-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "c17131adb2511ba85c53caa81883b7349c28df91",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
