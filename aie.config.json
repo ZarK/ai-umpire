@@ -84,7 +84,9 @@
     },
     "gates": {
       "definitions": [],
-      "qualityGates": [],
+      "qualityGates": [
+        "pnpm run release:check"
+      ],
       "qualityControl": false
     },
     "audit": {
@@ -101,9 +103,9 @@
       "supplyChainSafety": true
     },
     "migration": {
-      "legacyScripts": "preserve",
+      "legacyScripts": "cleanup",
       "compatibilityWrappers": false,
-      "cleanupKnownHelpers": false
+      "cleanupKnownHelpers": true
     },
     "supplyChain": {
       "exactVersions": true,
