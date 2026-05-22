@@ -1,0 +1,43 @@
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_0e0b3c52979a84 1-67
+pnpm-lock.yaml
+  ai_agent 10-13,24-37,41-193,202-212,215-249,254-368,372-383
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_017e6c1855fb36 2-3,5-6,8-10,101-103,105-107,109-120
+  s_f8aaaf4fdfe4d6::t_0e0b3c52979a84 1,4,7,11-99,122
+  s_f8aaaf4fdfe4d6::t_1f959bb8a4bff7 100,104,108,121
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_0e0b3c52979a84 1,4,6-13,15-50
+  s_f8aaaf4fdfe4d6::t_bc5c97fd6351c8 2-3,5,14
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_0e0b3c52979a84 6-13
+package.json
+  s_f8aaaf4fdfe4d6::t_5e1735746e34de 48-50
+  s_f8aaaf4fdfe4d6::t_017e6c1855fb36 42
+test/package-surface.test.ts
+  s_f8aaaf4fdfe4d6::t_0e0b3c52979a84 66
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_fff11917bba3bd 44
+src/bin/aiu.ts
+  s_f8aaaf4fdfe4d6::t_0e0b3c52979a84 3,5
+docs/M1-package-cli-config-and-host-foundation.md
+  s_f8aaaf4fdfe4d6::t_fff11917bba3bd 63-64
+README.md
+  s_f8aaaf4fdfe4d6::t_fff11917bba3bd 8,37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "f5048bb01cd8a68a5eba66099ecfa40405802679",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
