@@ -1,15 +1,14 @@
 # AI Umpire
 
-`@tjalve/aiu` provides the `aiu` CLI and runtime for safe agent continuation. It reads configured trusted state commands, evaluates continuation policy, and wires supported host tools to package-backed Umpire entrypoints.
+`@tjalve/aiu` provides the `aiu` CLI and runtime foundation for safe agent continuation. It is being built to read configured trusted state commands, evaluate continuation policy, and wire supported host tools to package-backed Umpire entrypoints.
 
 ## What It Ships
 
 - a package-backed `aiu` CLI
-- repository config, init, doctor, paths, schema, status, and hook entrypoints
-- OpenCode project plugin wrapper support
-- Codex and Claude Code stop-hook entrypoints
-- dry-run planning for host installation and migration
-- TypeScript runtime/config/policy types for supported extension points
+- package metadata for the `@tjalve/aiu` npm package
+- a package-backed `aiu` executable
+- TypeScript source, build, typecheck, test, and package dry-run checks
+- a minimal `aiu paths` command for package asset inspection
 
 It does not bundle companion CLIs or keep copied helper scripts as a runtime fallback path. Repositories configure trusted commands explicitly.
 
@@ -29,63 +28,25 @@ Install companion tools separately only when repository policy uses their comman
 
 ## Quick Start
 
-Preview host setup without writing files:
+Inspect package paths:
 
 ```bash
-pnpm exec aiu init . --dry-run
-pnpm exec aiu init . --tool all --dry-run --json
-```
-
-Apply selected host setup explicitly:
-
-```bash
-pnpm exec aiu init . --tool opencode
-pnpm exec aiu init . --tool codex
-pnpm exec aiu init . --tool claude-code
-```
-
-Inspect package and repository health:
-
-```bash
-pnpm exec aiu doctor
+pnpm exec aiu paths
 pnpm exec aiu paths --json
-pnpm exec aiu schema --json
 ```
 
-Tool support:
-
-- OpenCode: installs a project plugin wrapper that delegates to the package runtime.
-- Codex: installs a project Stop hook that runs `aiu hook stop --tool codex`.
-- Claude Code: installs a project Stop hook that runs `aiu hook stop --tool claude-code`.
-
-Stop hooks allow stopping unless trusted state loads successfully and the decision engine returns a safe, concrete continuation or repair prompt.
-
-## Migration
-
-Repositories that previously used repo-local Umpire hooks, local-checkout imports, copied helper scripts, or old host entries can use migration tooling to move to package-backed entrypoints.
-
-Migration is dry-run first:
+Run release checks:
 
 ```bash
-pnpm exec aiu migrate --dry-run
-pnpm exec aiu migrate --dry-run --json
+pnpm run release:check
 ```
 
-Migration does not stage, commit, branch, push, open PRs, close work items, or preserve old helper semantics as runtime fallback behavior.
+Host init, doctor, schema, status, and stop-hook commands are planned package functionality. They should be added only as real commands with tests and dry-run behavior where applicable.
 
 ## Package Surfaces
 
-- `@tjalve/aiu` - public runtime/config/policy types and helpers
-- `@tjalve/aiu/opencode` - OpenCode plugin export for project wrappers
-- `aiu hook stop --tool codex|claude-code` - stop-hook entrypoint that emits host JSON
-
-Example OpenCode wrapper:
-
-```ts
-import AiUmpireContinuationPlugin from "@tjalve/aiu/opencode";
-
-export default AiUmpireContinuationPlugin;
-```
+- `@tjalve/aiu` - public package asset helpers
+- `aiu` - package CLI foundation
 
 ## Development
 

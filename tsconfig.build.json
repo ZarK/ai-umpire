@@ -11,12 +11,13 @@
     "types": ["node"]
   },
   "include": [
-    "opencode/**/*.ts",
     "src/**/*.ts"
   ],
   "exclude": [
     "test/**/*.ts",
     ".opencode/**/*.ts",
+    "opencode/**/*.ts",
+    "src/opencode/**/*.ts",
     "dist/**"
   ]
 }

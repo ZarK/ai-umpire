@@ -8,20 +8,9 @@ export const AIU_PLUGIN_WRAPPER_RELATIVE_PATH = path.join(
   "ai-umpire-continuation.ts",
 );
 
-export const AIU_SCRIPT_FILE_NAMES = [
-  "_queue-policy.sh",
-  "gh-ensure-labels.sh",
-  "gh-issue-start.sh",
-  "gh-priority-order.sh",
-  "gh-update-labels.sh",
-] as const;
-
 export interface AiuPackageAssetPaths {
   packageRoot: string;
   pluginWrapperRelativePath: string;
-  queuePolicyPath: string;
-  scriptsDir: string;
-  scriptFileNames: readonly string[];
 }
 
 export function getAiuPackageRoot(): string {
@@ -32,7 +21,7 @@ export function getAiuPackageRoot(): string {
   ];
 
   for (const candidate of candidates) {
-    if (existsSync(path.join(candidate, "queue-policy.json")) && existsSync(path.join(candidate, "scripts"))) {
+    if (existsSync(path.join(candidate, "package.json"))) {
       return candidate;
     }
   }
@@ -44,8 +33,5 @@ export function getAiuPackageAssetPaths(): AiuPackageAssetPaths {
   return {
     packageRoot: getAiuPackageRoot(),
     pluginWrapperRelativePath: AIU_PLUGIN_WRAPPER_RELATIVE_PATH,
-    queuePolicyPath: path.resolve(getAiuPackageRoot(), "queue-policy.json"),
-    scriptFileNames: [...AIU_SCRIPT_FILE_NAMES],
-    scriptsDir: path.resolve(getAiuPackageRoot(), "scripts"),
   };
 }

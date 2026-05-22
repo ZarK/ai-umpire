@@ -1,8 +1,18 @@
 {
   "name": "@tjalve/aiu",
   "version": "0.0.0",
-  "description": "AI Umpire continuation plugin, queue assets, and installer CLI for OpenCode repos.",
+  "description": "AI Umpire package foundation and CLI for safe agent continuation.",
   "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@11.0.4",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZarK/ai-umpire.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ZarK/ai-umpire/issues"
+  },
+  "homepage": "https://github.com/ZarK/ai-umpire#readme",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
   "bin": {
@@ -12,30 +22,29 @@
     ".": {
       "types": "./dist/src/index.d.ts",
       "import": "./dist/src/index.js"
-    },
-    "./opencode": {
-      "types": "./dist/src/opencode/index.d.ts",
-      "import": "./dist/src/opencode/index.js"
     }
   },
   "files": [
-    "dist",
-    "scripts",
-    "queue-policy.json"
+    "dist/src",
+    "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "npm run build",
-    "pack:dry-run": "npm pack --dry-run",
+    "pack:dry-run": "pnpm pack --dry-run",
+    "release:check": "pnpm run build && pnpm run typecheck && pnpm test && pnpm run pack:dry-run",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --pretty false"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.1"
+    "@types/node": "25.5.0",
+    "typescript": "6.0.2",
+    "vitest": "4.1.1"
   }
 }

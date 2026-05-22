@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "providers": {
+    "work": {
+      "kind": "github"
+    },
+    "review": {
+      "kind": "github"
+    },
+    "repository": {
+      "kind": "local-git"
+    },
+    "ci": {
+      "kind": "github"
+    },
+    "layout": {
+      "kind": "local"
+    },
+    "capabilities": {
+      "work": true,
+      "review": true,
+      "repository": true,
+      "ci": true,
+      "layout": true
+    }
+  },
+  "policy": {
+    "labels": {
+      "priorities": [
+        "P1-Critical",
+        "P2-High",
+        "P3-Medium",
+        "P4-Low"
+      ],
+      "statuses": [
+        "S-Ready",
+        "S-InProgress",
+        "S-Blocked",
+        "S-Blocking"
+      ],
+      "components": [
+        "C-Architecture",
+        "C-Backend",
+        "C-Frontend",
+        "C-Testing",
+        "C-Tooling",
+        "C-Docs",
+        "C-DevEx",
+        "C-CI",
+        "C-Security",
+        "C-Data"
+      ]
+    },
+    "milestoneOrdering": {
+      "enabled": false,
+      "order": [],
+      "missingAssignment": "warn"
+    },
+    "branch": {
+      "naming": "issue/<number>-<slug>",
+      "baseBranch": "main",
+      "baseRemote": "origin",
+      "noWorktree": true,
+      "blockOnOpenPRs": true,
+      "requireBaseBranchFreshness": true,
+      "ignoredAutomationAuthors": [
+        "dependabot[bot]",
+        "renovate[bot]",
+        "github-actions[bot]"
+      ]
+    },
+    "lifecycle": {
+      "assignOnStart": true,
+      "commentOnStart": true
+    },
+    "shipping": {
+      "autonomousMode": true,
+      "mergeStrategy": "squash"
+    },
+    "reviews": {
+      "agents": [],
+      "waitMinutes": 10,
+      "requestText": ""
+    },
+    "gates": {
+      "definitions": [],
+      "qualityGates": [],
+      "qualityControl": false
+    },
+    "audit": {
+      "manualUiAudit": true,
+      "appLaunch": "",
+      "target": ""
+    },
+    "instructions": {
+      "opencodeCommandAlias": false,
+      "namingRules": false,
+      "promptInjectionWarning": true,
+      "noCreditWarning": true,
+      "implementationGuardrails": true,
+      "supplyChainSafety": true
+    },
+    "migration": {
+      "legacyScripts": "preserve",
+      "compatibilityWrappers": false,
+      "cleanupKnownHelpers": false
+    },
+    "supplyChain": {
+      "exactVersions": true,
+      "intentionalLockfileChanges": true,
+      "disableLifecycleScripts": true,
+      "pinCiActions": true,
+      "packageAgeDays": 7,
+      "highRiskPackageAgeDays": 14,
+      "requireApprovalForUnverifiedRisk": true,
+      "writePackageManagerDefaults": false
+    }
+  }
+}

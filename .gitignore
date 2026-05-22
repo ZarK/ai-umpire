@@ -1,3 +1,6 @@
 .umpire/
 dist/
 node_modules/
+.opencode/node_modules/
+.opencode/bun.lock
+*.tgz

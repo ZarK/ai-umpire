@@ -9,8 +9,6 @@
     "types": ["node", "vitest/globals"]
   },
   "include": [
-    ".opencode/plugins/**/*.ts",
-    "opencode/**/*.ts",
     "src/**/*.ts",
     "test/**/*.ts",
     "vitest.config.ts"
