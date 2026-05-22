@@ -24,7 +24,7 @@ describe("package foundation", () => {
 
     assert.match(packageJson.packageManager ?? "", /^pnpm@\d+\.\d+\.\d+$/);
     for (const version of Object.values(dependencies)) {
-      assert.match(version, /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/);
+      assert.match(version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/);
     }
   });
 
