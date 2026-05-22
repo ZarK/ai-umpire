@@ -39,12 +39,11 @@
     "build": "tsc -p tsconfig.build.json",
     "pack:dry-run": "pnpm pack --dry-run",
     "release:check": "pnpm run build && pnpm run typecheck && pnpm test && pnpm run pack:dry-run",
-    "test": "vitest run",
+    "test": "node --test test/package-surface.test.ts",
     "typecheck": "tsc --noEmit --pretty false"
   },
   "devDependencies": {
     "@types/node": "25.5.0",
-    "typescript": "6.0.2",
-    "vitest": "4.1.1"
+    "typescript": "6.0.2"
   }
 }
