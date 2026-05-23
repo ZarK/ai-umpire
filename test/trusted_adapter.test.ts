@@ -217,8 +217,8 @@ describe("trusted command adapters", () => {
             title: "Typecheck",
             status: "fail",
             affectedPaths: ["src/state.ts", 42],
-            command: { id: "quality-typecheck", argv: ["pnpm", "run", "typecheck"] },
-            rerunCommand: { id: "quality-typecheck", argv: ["pnpm", "run", "typecheck"] },
+            command: { id: "quality-typecheck", argv: ["pnpm", "run", "typecheck"], timeoutMs: 10.5, maxOutputBytes: -1 },
+            rerunCommand: { id: "quality-typecheck", argv: ["pnpm", "run", "typecheck"], timeoutMs: 1000, maxOutputBytes: 16384 },
           }],
           findings: [{
             id: "supply-chain-risk",
@@ -238,6 +238,9 @@ describe("trusted command adapters", () => {
     const value = result.states[0]?.value;
     assert.equal(value?.kind, "quality");
     assert.equal(value?.kind === "quality" ? value.stages[0]?.command?.argv.join(" ") : "", "pnpm run typecheck");
+    assert.equal(value?.kind === "quality" ? value.stages[0]?.command?.timeoutMs : undefined, undefined);
+    assert.equal(value?.kind === "quality" ? value.stages[0]?.rerunCommand?.timeoutMs : undefined, 1000);
+    assert.equal(value?.kind === "quality" ? value.stages[0]?.rerunCommand?.maxOutputBytes : undefined, 16384);
     assert.deepEqual(value?.kind === "quality" ? value.stages[0]?.affectedPaths : [], ["src/state.ts"]);
     assert.equal(value?.kind === "quality" ? value.findings[0]?.supplyChainApprovalRequired : false, true);
     assert.deepEqual(value?.kind === "quality" ? value.failingChecks : [], ["typecheck"]);

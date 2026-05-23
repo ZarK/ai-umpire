@@ -456,12 +456,14 @@ function normalizeCommandRef(value: unknown): AiuTrustedStateCommandRef | undefi
   if (!isRecord(value) || !readString(value.id) || !Array.isArray(value.argv) || value.argv.length === 0 || !value.argv.every((item) => typeof item === "string" && item.length > 0)) {
     return undefined;
   }
+  const timeoutMs = readPositiveInteger(value.timeoutMs);
+  const maxOutputBytes = readPositiveInteger(value.maxOutputBytes);
   return Object.freeze({
     id: readString(value.id) as string,
     argv: Object.freeze([...value.argv]) as readonly [string, ...string[]],
     ...(readString(value.cwd) ? { cwd: readString(value.cwd) } : {}),
-    ...(typeof value.timeoutMs === "number" ? { timeoutMs: value.timeoutMs } : {}),
-    ...(typeof value.maxOutputBytes === "number" ? { maxOutputBytes: value.maxOutputBytes } : {}),
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    ...(maxOutputBytes !== undefined ? { maxOutputBytes } : {}),
   });
 }
 
@@ -561,6 +563,10 @@ function readBooleanUnknown(value: unknown): boolean | "unknown" | undefined {
 
 function readBooleanUnknownUnsupported(value: unknown, fallback: boolean): boolean | "unknown" | "unsupported" {
   return typeof value === "boolean" || value === "unknown" || value === "unsupported" ? value : fallback;
+}
+
+function readPositiveInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 
 function readTrustLevel(value: unknown): AiuTrustLevel {
