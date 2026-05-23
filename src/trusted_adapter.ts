@@ -22,6 +22,7 @@ import {
 
 export const AIU_TRUSTED_COMMAND_DEFAULT_TIMEOUT_MS = 30_000;
 export const AIU_TRUSTED_COMMAND_DEFAULT_MAX_OUTPUT_BYTES = 1_048_576;
+export const AIU_TRUSTED_COMMAND_DEFAULT_KILL_GRACE_MS = 1_000;
 
 export const AIU_TRUSTED_ADAPTER_ERROR_CODES = [
   "trusted-command-spawn-failed",
@@ -88,6 +89,7 @@ export interface AiuTrustedCommandExecutionOptions {
   readonly cwd?: string;
   readonly timeoutMs?: number;
   readonly maxOutputBytes?: number;
+  readonly killGraceMs?: number;
   readonly env?: NodeJS.ProcessEnv;
   readonly observedAt?: string;
 }
@@ -135,8 +137,9 @@ export function executeAiuTrustedCommand(
   options: AiuTrustedCommandExecutionOptions = {},
 ): Promise<AiuTrustedCommandExecutionResult> {
   const command = toAiuTrustedStateCommandRef(sourceId, descriptor);
-  const timeoutMs = options.timeoutMs ?? descriptor.timeoutMs ?? AIU_TRUSTED_COMMAND_DEFAULT_TIMEOUT_MS;
-  const maxOutputBytes = options.maxOutputBytes ?? descriptor.maxOutputBytes ?? AIU_TRUSTED_COMMAND_DEFAULT_MAX_OUTPUT_BYTES;
+  const timeoutMs = normalizePositiveInteger(options.timeoutMs ?? descriptor.timeoutMs, AIU_TRUSTED_COMMAND_DEFAULT_TIMEOUT_MS);
+  const maxOutputBytes = normalizePositiveInteger(options.maxOutputBytes ?? descriptor.maxOutputBytes, AIU_TRUSTED_COMMAND_DEFAULT_MAX_OUTPUT_BYTES);
+  const killGraceMs = normalizePositiveInteger(options.killGraceMs, AIU_TRUSTED_COMMAND_DEFAULT_KILL_GRACE_MS);
   const startedAt = Date.now();
   const stdoutChunks: Buffer[] = [];
   const stderrChunks: Buffer[] = [];
@@ -146,6 +149,7 @@ export function executeAiuTrustedCommand(
   let timedOut = false;
   let outputLimitExceeded = false;
   let settled = false;
+  let forceKill: NodeJS.Timeout | undefined;
 
   return new Promise((resolve) => {
     const [executable, ...args] = descriptor.argv;
@@ -157,7 +161,10 @@ export function executeAiuTrustedCommand(
     });
     const timeout = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGTERM");
+      requestTermination({
+        code: "trusted-command-timeout",
+        message: `Trusted command ${sourceId} timed out after ${timeoutMs}ms.`,
+      });
     }, timeoutMs);
 
     child.stdout?.on("data", (chunk: Buffer) => {
@@ -214,10 +221,22 @@ export function executeAiuTrustedCommand(
         if (remaining > 0) {
           target.push(chunk.subarray(0, remaining));
         }
-        child.kill("SIGTERM");
+        requestTermination({
+          code: "trusted-command-output-limit",
+          message: `Trusted command ${sourceId} exceeded ${maxOutputBytes} output bytes.`,
+        });
         return;
       }
       target.push(chunk);
+    }
+
+    function requestTermination(error: AiuTrustedAdapterError): void {
+      if (settled) return;
+      child.kill("SIGTERM");
+      forceKill ??= setTimeout(() => {
+        child.kill("SIGKILL");
+        finishWithRecord(buildRecord(null, "SIGKILL"), error);
+      }, killGraceMs);
     }
 
     function finish(error: AiuTrustedAdapterError): void {
@@ -228,6 +247,8 @@ export function executeAiuTrustedCommand(
     function finishWithRecord(record: AiuTrustedCommandExecutionRecord, error: AiuTrustedAdapterError): void {
       if (settled) return;
       settled = true;
+      clearTimeout(timeout);
+      if (forceKill) clearTimeout(forceKill);
       resolve(Object.freeze({
         ok: false as const,
         record,
@@ -435,4 +456,8 @@ function isCapabilitySupport(value: unknown): value is AiuStateCapabilitySupport
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null;
+}
+
+function normalizePositiveInteger(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : fallback;
 }

@@ -90,6 +90,33 @@ describe("trusted command adapters", () => {
     assert.equal(outputLimit.record.outputLimitExceeded, true);
   });
 
+  it("hard-bounds timeout promises when a child ignores SIGTERM", async () => {
+    const { executeAiuTrustedCommand } = await loadTrustedAdapter();
+    const result = await executeAiuTrustedCommand("stubborn", {
+      argv: [process.execPath, "-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"],
+      timeoutMs: 200,
+      maxOutputBytes: 16_384,
+    }, { killGraceMs: 20 });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, "trusted-command-timeout");
+    assert.equal(result.record.signal, "SIGKILL");
+    assert.equal(result.record.elapsedMs < 2_000, true);
+  });
+
+  it("normalizes invalid execution option limits to safe defaults", async () => {
+    const { executeAiuTrustedCommand } = await loadTrustedAdapter();
+    const result = await executeAiuTrustedCommand("limits", {
+      argv: [process.execPath, "-e", "process.stdout.write('ok')"],
+      timeoutMs: Number.NaN,
+      maxOutputBytes: Number.NaN,
+    }, { killGraceMs: -1 });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.record.timeoutMs, 30_000);
+    assert.equal(result.record.maxOutputBytes, 1_048_576);
+  });
+
   it("returns stable parse errors for malformed JSON and unknown schemas", async () => {
     const { parseAiuTrustedStateJson, toAiuTrustedStateCommandRef } = await loadTrustedAdapter();
     const command = toAiuTrustedStateCommandRef("work", { argv: ["fixture"] });
