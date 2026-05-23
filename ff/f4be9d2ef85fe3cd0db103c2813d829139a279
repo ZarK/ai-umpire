@@ -1,0 +1,39 @@
+test/extensions.test.ts
+  s_f8aaaf4fdfe4d6::t_29ef5972189740 75,82,85,92-95,101
+  s_f8aaaf4fdfe4d6::t_bfe487f6c5529f 65
+docs/M3-provider-status-integration-and-stop-hooks.md
+  s_f8aaaf4fdfe4d6::t_bfe487f6c5529f 210-211
+src/state.ts
+  s_f8aaaf4fdfe4d6::t_53e989a9a753e7 205-209
+test/opencode.test.ts
+  s_f8aaaf4fdfe4d6::t_29ef5972189740 1-4,6-103,105,107-108,156-174,190-191,193-196,198-207,209-244
+  s_f8aaaf4fdfe4d6::t_409a93aa0db3fe 5,192,197,208
+  s_f8aaaf4fdfe4d6::t_60acf861e1a28f 109-130,132-155
+  s_f8aaaf4fdfe4d6::t_3803db3ca10f8f 104
+  s_f8aaaf4fdfe4d6::t_b160b6ea6707f6 106,131
+  s_f8aaaf4fdfe4d6::t_69ddea15f7ff2c 175-189
+src/opencode.ts
+  s_f8aaaf4fdfe4d6::t_69ddea15f7ff2c 350,357-360,362-365
+  s_f8aaaf4fdfe4d6::t_60acf861e1a28f 134,196-200,281-284
+  s_f8aaaf4fdfe4d6::t_53e989a9a753e7 2-10,20-24,30-64,78-79,82-90,98-103,109-133,135-153,169,172-195,201-248,250-259,263-274,276-280,285-312,316-328,331-349,351-356,366-381,384-406
+  s_f8aaaf4fdfe4d6::t_3803db3ca10f8f 1,170
+  s_f8aaaf4fdfe4d6::t_b160b6ea6707f6 260-262,275
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_bfe487f6c5529f 100-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "fff4be9d2ef85fe3cd0db103c2813d829139a279",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
