@@ -1,0 +1,49 @@
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_b61f1cfb29f8d7 513,517
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_d4571d5cca8c85 102-103,115
+README.md
+  s_f8aaaf4fdfe4d6::t_c5d49448e079ad 214-215,220,243
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_7ce602898dc224 117,127,130,135
+src/hook_stop.ts
+  s_f8aaaf4fdfe4d6::t_cea87c344bae43 1-6,11-13,18,21-25,28-47,49-50,52-55,58-69,71-77,79-81,87-88,90-99,104-110,115-126,128-129,132-138,141-142,186,188-189,191-194,196-212,214-318,325-328,330-341,351-367
+  s_f8aaaf4fdfe4d6::t_7473e9e9d278b1 48,319-324
+  s_f8aaaf4fdfe4d6::t_f046d860e101ab 56-57,187,190,195,213
+  s_f8aaaf4fdfe4d6::t_144719e74f003e 70,78,82-86,89,100-103,111-114,127,139-140,329,342-350
+src/host_policy.ts
+  s_f8aaaf4fdfe4d6::t_1f6979ef1c1a48 110,112-113,121-122,220,222-223,231-232,321
+src/config.ts
+  s_f8aaaf4fdfe4d6::t_99cd1842ed2590 704-707
+test/hook_stop.test.ts
+  s_f8aaaf4fdfe4d6::t_c9b2395d98e89b 66,71-74,76,88,90-91
+  s_f8aaaf4fdfe4d6::t_3c7adb603b99be 67,75
+  s_f8aaaf4fdfe4d6::t_0e47bc580195b1 97-130
+  s_f8aaaf4fdfe4d6::t_6eeb04fa2968d7 64-65,68-70,77-87,89,92-96,282,311
+  s_f8aaaf4fdfe4d6::t_fab20a1509130d 1-63,131-187,198-281,283-310,312-337
+  s_f8aaaf4fdfe4d6::t_8b23232f1d0455 188-197
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_6d0eea668e2e8a 178
+  s_f8aaaf4fdfe4d6::t_dc6100fd36a889 371,386,391
+test/host_policy.test.ts
+  s_f8aaaf4fdfe4d6::t_92a17310aefe97 23,104,113
+docs/M3-provider-status-integration-and-stop-hooks.md
+  s_f8aaaf4fdfe4d6::t_6f464e992b6ad2 75,81
+  s_f8aaaf4fdfe4d6::t_a4ea77459ca978 124,216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "25d56c259ee94ccfd6ab8c7ff5742b3b1069dc6b",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
