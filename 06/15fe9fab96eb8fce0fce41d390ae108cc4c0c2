@@ -1,0 +1,55 @@
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_ea9b6938d383c8 11,117
+test/package-surface.test.ts
+  s_f8aaaf4fdfe4d6::t_75ad413eb16b4b 12,48-53
+test/extensions.test.ts
+  s_f8aaaf4fdfe4d6::t_ea3d7a367e961f 69
+  s_f8aaaf4fdfe4d6::t_75ad413eb16b4b 1-8,12-13,15-16,19-42,44,46-61,64-68,70-84,87-102
+  s_f8aaaf4fdfe4d6::t_a2456be886f470 9
+  s_f8aaaf4fdfe4d6::t_7fcea7bce5f833 85-86
+  s_f8aaaf4fdfe4d6::t_c59f44119eb567 10-11,14,17-18,43,45,62-63
+src/extensions.ts
+  s_f8aaaf4fdfe4d6::t_a6f668ccafbbb6 1-35
+README.md
+  s_f8aaaf4fdfe4d6::t_de968f904c1d09 154-203,223,226
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_a6f668ccafbbb6 24,35-37,66-68,84-87
+src/opencode.ts
+  s_f8aaaf4fdfe4d6::t_a6f668ccafbbb6 1-38,40-79
+  s_f8aaaf4fdfe4d6::t_ea3d7a367e961f 39
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_ea9b6938d383c8 117,145
+docs/M3-provider-status-integration-and-stop-hooks.md
+  s_f8aaaf4fdfe4d6::t_de968f904c1d09 9-10,54
+src/config.ts
+  s_f8aaaf4fdfe4d6::t_a6f668ccafbbb6 9,14,26,71-80,149-151,229,254,475-556,816-819,836-849
+package.json
+  s_f8aaaf4fdfe4d6::t_a6f668ccafbbb6 25-28
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_875f59291ad1c8 101
+  s_f8aaaf4fdfe4d6::t_de968f904c1d09 88,100
+docs/M2-continuation-state-and-policy-engine.md
+  s_f8aaaf4fdfe4d6::t_de968f904c1d09 149-150
+src/init.ts
+  s_f8aaaf4fdfe4d6::t_a6f668ccafbbb6 92-95
+examples/opencode-extension.ts
+  s_f8aaaf4fdfe4d6::t_a6f668ccafbbb6 1-26
+test/config.test.ts
+  s_f8aaaf4fdfe4d6::t_75ad413eb16b4b 37,88-95,119-120,170-179,200-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "0615fe9fab96eb8fce0fce41d390ae108cc4c0c2",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
