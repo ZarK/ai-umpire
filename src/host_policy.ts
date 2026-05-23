@@ -107,10 +107,10 @@ const HOST_PROFILES: Readonly<Record<AiuHost, AiuHostCapabilityProfile>> = Objec
     description: "Repo-local Codex plugin with a Stop hook delegating to the package-backed aiu entrypoint.",
     capabilities: Object.freeze({
       idleEvents: capability("idleEvents", "unsupported", [], "Codex project integration does not expose a verified idle event contract yet."),
-      stopHook: capability("stopHook", "experimental", [], "Codex Stop hook files can be installed, but blocking decisions are not wired until later M3 work."),
+      stopHook: capability("stopHook", "experimental", [], "Codex Stop hook files can delegate to the package-backed decision runtime."),
       todoRead: capability("todoRead", "unknown", [], "Codex todo state is not a trusted v1 runtime input."),
-      sessionState: capability("sessionState", "experimental", ["wait"], "Codex host session state is experimental until stop-hook decisions are wired."),
-      promptDelivery: capability("promptDelivery", "experimental", ["continue", "repair"], "Codex stop hooks can emit stdout responses, but safe blocking prompt delivery is not enabled in M3.1.", "stdout"),
+      sessionState: capability("sessionState", "experimental", ["wait"], "Codex host session state is derived from the Stop hook payload when available."),
+      promptDelivery: capability("promptDelivery", "experimental", ["continue", "repair"], "Codex stop hooks can emit stdout block responses with concrete continuation prompts.", "stdout"),
       selectedSession: capability("selectedSession", "unknown", [], "Selected Codex session awareness is not a verified v1 contract."),
       modelTargeting: capability("modelTargeting", "unknown", [], "Codex model or agent targeting is outside the M3.1 runtime contract."),
       userActivity: capability("userActivity", "unsupported", ["wait"], "Codex TUI typing activity is not available to M3.1 runtime policy."),
@@ -118,8 +118,8 @@ const HOST_PROFILES: Readonly<Record<AiuHost, AiuHostCapabilityProfile>> = Objec
     }),
     stopHook: Object.freeze({
       support: "experimental",
-      blocksByDefault: false,
-      description: "Codex Stop hook installation is experimental and safe-allows stopping until decision blocking is implemented.",
+      blocksByDefault: true,
+      description: "Codex Stop hook blocking is available when hosts.stopHookBlocking.codex is explicitly enabled.",
     }),
     managedFiles: Object.freeze([
       Object.freeze({
@@ -217,10 +217,10 @@ const HOST_PROFILES: Readonly<Record<AiuHost, AiuHostCapabilityProfile>> = Objec
     description: "Claude Code project settings Stop hook delegating to the package-backed aiu entrypoint.",
     capabilities: Object.freeze({
       idleEvents: capability("idleEvents", "unsupported", [], "Claude Code project settings do not expose a verified idle event contract yet."),
-      stopHook: capability("stopHook", "experimental", [], "Claude Code Stop hook files can be installed, but blocking decisions are not wired until later M3 work."),
+      stopHook: capability("stopHook", "experimental", [], "Claude Code Stop hook files can delegate to the package-backed decision runtime."),
       todoRead: capability("todoRead", "unknown", [], "Claude Code todo state is not a trusted v1 runtime input."),
-      sessionState: capability("sessionState", "experimental", ["wait"], "Claude Code host session state is experimental until stop-hook decisions are wired."),
-      promptDelivery: capability("promptDelivery", "experimental", ["continue", "repair"], "Claude Code stop hooks can emit stdout responses, but safe blocking prompt delivery is not enabled in M3.1.", "stdout"),
+      sessionState: capability("sessionState", "experimental", ["wait"], "Claude Code host session state is derived from the Stop hook payload when available."),
+      promptDelivery: capability("promptDelivery", "experimental", ["continue", "repair"], "Claude Code stop hooks can emit stdout block responses with concrete continuation prompts.", "stdout"),
       selectedSession: capability("selectedSession", "unknown", [], "Selected Claude Code session awareness is not a verified v1 contract."),
       modelTargeting: capability("modelTargeting", "unknown", [], "Claude Code model or agent targeting is outside the M3.1 runtime contract."),
       userActivity: capability("userActivity", "unsupported", ["wait"], "Claude Code typing activity is not available to M3.1 runtime policy."),
@@ -228,8 +228,8 @@ const HOST_PROFILES: Readonly<Record<AiuHost, AiuHostCapabilityProfile>> = Objec
     }),
     stopHook: Object.freeze({
       support: "experimental",
-      blocksByDefault: false,
-      description: "Claude Code Stop hook installation is experimental and safe-allows stopping until decision blocking is implemented.",
+      blocksByDefault: true,
+      description: "Claude Code Stop hook blocking is available when hosts.stopHookBlocking.claude-code is explicitly enabled.",
     }),
     managedFiles: Object.freeze([
       Object.freeze({
@@ -318,7 +318,7 @@ function evaluateHostMode(
     return modeCheck(profile.tool, mode, requiredCapabilities, "error", "host-capability-unsupported", `${profile.tool} cannot use ${mode}: required capability ${capability} is not supported.`, `Remove ${mode} from hosts.modes.${profile.tool} or choose a host profile that supports ${capability}.`);
   }
   if (experimental !== undefined) {
-    return modeCheck(profile.tool, mode, requiredCapabilities, "warning", "host-capability-experimental", `${profile.tool} uses experimental ${experimental} support for ${mode}.`, `Keep stop-hook blocking disabled until the ${profile.tool} runtime is fully wired.`);
+    return modeCheck(profile.tool, mode, requiredCapabilities, "warning", "host-capability-experimental", `${profile.tool} uses experimental ${experimental} support for ${mode}.`, `Keep ${profile.tool} stop-hook blocking explicitly configured and covered by trusted-state tests.`);
   }
   return modeCheck(profile.tool, mode, requiredCapabilities, "ok", "host-mode-supported", `${profile.tool} supports ${mode} with the configured capabilities.`, "Continue using this host runtime policy.");
 }

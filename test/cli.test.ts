@@ -175,7 +175,7 @@ describe("metadata-backed CLI", () => {
     assert.deepEqual(parsed.sections?.config?.hostCapabilitySupport, ["supported", "experimental", "disabled", "unsupported", "unknown"]);
     assert.deepEqual(parsed.sections?.config?.hostProfiles?.map((profile) => profile.tool), ["opencode", "codex", "claude-code"]);
     assert.deepEqual(parsed.sections?.config?.hostProfiles?.map((profile) => profile.supportLevel), ["supported", "experimental", "experimental"]);
-    assert.equal(parsed.sections?.config?.hostProfiles?.find((profile) => profile.tool === "codex")?.stopHook?.blocksByDefault, false);
+    assert.equal(parsed.sections?.config?.hostProfiles?.find((profile) => profile.tool === "codex")?.stopHook?.blocksByDefault, true);
     assert.ok(parsed.sections?.config?.policyFields?.includes("hosts.stopHookBlocking"));
     assert.deepEqual(parsed.sections?.config?.promptSectionKinds, ["work", "planning", "quality", "whip"]);
     assert.equal(parsed.sections?.trustedState?.schemaVersion, 1);
@@ -368,7 +368,7 @@ describe("metadata-backed CLI", () => {
 
     assert.equal(hostResponse.exitCode, 0);
     assert.equal(hostResponse.stdout, "{}\n");
-    assert.equal(hostResponse.stderr, "");
+    assert.match(hostResponse.stderr, /empty-hook-input/);
 
     const result = await runCli(["hook-stop", "--tool", "claude-code", "--json"]);
     const parsed = JSON.parse(result.stdout) as {
@@ -383,12 +383,12 @@ describe("metadata-backed CLI", () => {
     };
 
     assert.equal(result.exitCode, 0);
-    assert.equal(result.stderr, "");
+    assert.match(result.stderr, /empty-hook-input/);
     assert.equal(parsed.ok, true);
     assert.equal(parsed.command, "hook-stop");
     assert.equal(parsed.hookStop.tool, "claude-code");
     assert.equal(parsed.hookStop.decision, "allow");
-    assert.match(parsed.hookStop.reason, /safe behavior is to allow/);
+    assert.equal(parsed.hookStop.reason, "empty-hook-input");
     assert.deepEqual(parsed.hookStop.stdoutJson, {});
   });
 

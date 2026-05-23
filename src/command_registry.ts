@@ -510,11 +510,11 @@ export const hookStopCommand = defineCommand({
   ],
   examples: [
     defineExample({
-      description: "Allow a Codex Stop hook using safe package defaults.",
+      description: "Handle a Codex Stop hook using trusted-state decisions and host policy.",
       command: "aiu hook-stop --tool codex",
     }),
     defineExample({
-      description: "Inspect the safe Stop hook result as JSON.",
+      description: "Inspect the Claude Code Stop hook decision result as JSON.",
       command: "aiu hook-stop --tool claude-code --json",
     }),
   ],

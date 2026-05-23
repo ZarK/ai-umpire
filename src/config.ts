@@ -701,8 +701,10 @@ function validateHostRuntimePolicy(hosts: AiuHostsConfig, continuation: AiuConti
   }
   for (const [host, blocking] of Object.entries(hosts.stopHookBlocking) as Array<[AiuHost, boolean]>) {
     const profile = report.profiles.find((item) => item.tool === host);
-    if (blocking && profile?.stopHook.blocksByDefault !== true) {
-      diagnostics.push(diagnostic("host-stop-hook-blocking-unsafe", `$.hosts.stopHookBlocking.${host}`, `${host} stop-hook blocking is not supported by the current runtime profile.`, "Set stopHookBlocking to false until M3 stop-hook blocking is fully wired."));
+    if (blocking && !hosts.enabled.includes(host)) {
+      diagnostics.push(diagnostic("host-stop-hook-blocking-unsafe", `$.hosts.stopHookBlocking.${host}`, `${host} stop-hook blocking requires the host to be enabled.`, `Add ${host} to hosts.enabled or set hosts.stopHookBlocking.${host} to false.`));
+    } else if (blocking && profile?.stopHook.blocksByDefault !== true) {
+      diagnostics.push(diagnostic("host-stop-hook-blocking-unsafe", `$.hosts.stopHookBlocking.${host}`, `${host} stop-hook blocking is not supported by the current runtime profile.`, `Set hosts.stopHookBlocking.${host} to false until the host profile supports blocking.`));
     }
   }
 }

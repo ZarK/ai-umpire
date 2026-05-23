@@ -99,6 +99,8 @@ M3.1 adds the provider-neutral host policy surface. `host_policy` exposes typed 
 
 M3.2 wires the `@tjalve/aiu/opencode` runtime around trusted state adapters, the shared decision engine, and prompt rendering. The OpenCode subpath now builds normalized host-session state from idle, status, todo, message, TUI, and selected-session events; suppresses helper, busy, conflicting, active-user, and todo-active sessions; delivers only concrete `continue` or safe `repair` prompts through an injected host deliverer; and keeps repository wrappers on the public composition API.
 
+M3.3 wires `aiu hook-stop --tool codex|claude-code` into the same trusted-state decision runtime. Stop hooks parse host payloads, normalize host-session state, load configured trusted state commands, render concrete prompts, and emit clean host JSON. They block only when trusted state loads successfully, the decision is `continue` or safe `repair`, the prompt is concrete, and `hosts.stopHookBlocking.<tool>` is explicitly enabled; all unavailable, malformed, stale, unknown, unsupported, blocked, wait, stop, human-question, and safety-block states allow the host to stop.
+
 ## FR-07 - Host Integrations
 
 | ID | Requirement | Status |
@@ -110,7 +112,7 @@ M3.2 wires the `@tjalve/aiu/opencode` runtime around trusted state adapters, the
 | FR-07-005 | `aiu hook-stop --tool codex\|claude-code` reads host stop-hook input and writes the host's expected JSON response to stdout. | Required |
 | FR-07-006 | Stop hooks block stopping only when trusted state loaded successfully, the decision is safe `continue` or `repair`, the prompt is concrete, and host policy allows blocking. | Required |
 | FR-07-007 | `@tjalve/aiu/opencode` exposes typed OpenCode wrapper composition without requiring repositories to import package internals. | Required |
-| FR-07-008 | Prototype stop-hook installers must call a real package-backed command that safely allows stopping until the trusted-state decision engine is wired, instead of installing fake blocking behavior. | Required |
+| FR-07-008 | Prototype stop-hook installers must call a real package-backed command and keep blocking opt-in through host policy instead of installing fake or fallback blocking behavior. | Required |
 | FR-07-009 | Stop hooks allow stopping when no work is ready, all work is blocked, trusted state cannot be loaded, policy requires human input, or the decision is `wait` or `stop`. | Required |
 
 ## FR-08 - Idle Work Modes

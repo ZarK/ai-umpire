@@ -335,7 +335,7 @@ function checkHostRuntimePolicy(configLoad: AiuConfigLoadResult): readonly AiuDo
       return [];
     }
     return [
-      check(`host-stop-hook-blocking-${host}`, "host", "error", "host-stop-hook-blocking-unsafe", `${host} stop-hook blocking is not supported by the current runtime profile.`, configLoad.selectedPath, "Set stopHookBlocking to false until M3 stop-hook blocking is fully wired."),
+      check(`host-stop-hook-blocking-${host}`, "host", "error", "host-stop-hook-blocking-unsafe", `${host} stop-hook blocking is not supported by the current runtime profile.`, configLoad.selectedPath, `Set hosts.stopHookBlocking.${host} to false until M3 stop-hook blocking is fully wired.`),
     ];
   });
   return [...checks, ...modeChecks, ...stopHookChecks];
