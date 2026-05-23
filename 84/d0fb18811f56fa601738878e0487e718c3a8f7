@@ -1,0 +1,31 @@
+src/opencode.ts
+  s_f8aaaf4fdfe4d6::t_53e989a9a753e7 1-10,20-24,30-64,78-79,82-90,98-103,109-154,170-175,177-252,254-313,317-329,332-366,368-373,376-398
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_bfe487f6c5529f 100-101
+src/state.ts
+  s_f8aaaf4fdfe4d6::t_53e989a9a753e7 205-209
+test/extensions.test.ts
+  s_f8aaaf4fdfe4d6::t_29ef5972189740 75,82,85,92-95,101
+  s_f8aaaf4fdfe4d6::t_bfe487f6c5529f 65
+test/opencode.test.ts
+  s_f8aaaf4fdfe4d6::t_409a93aa0db3fe 5,129,134,145
+  s_f8aaaf4fdfe4d6::t_29ef5972189740 1-4,6-128,130-133,135-144,146-181
+docs/M3-provider-status-integration-and-stop-hooks.md
+  s_f8aaaf4fdfe4d6::t_bfe487f6c5529f 210-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "84d0fb18811f56fa601738878e0487e718c3a8f7",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
