@@ -21,6 +21,7 @@ export interface AiuConfig {
   readonly cooldowns: AiuCooldownsConfig;
   readonly paths: AiuPathsConfig;
   readonly supplyChain: AiuSupplyChainPolicy;
+  readonly whip: AiuWhipPolicy;
 }
 
 export interface AiuHostsConfig {
@@ -62,6 +63,20 @@ export interface AiuPathsConfig {
 
 export interface AiuSupplyChainPolicy {
   readonly stopOnApprovalRequired: boolean;
+}
+
+export interface AiuWhipPolicy {
+  readonly enabled: boolean;
+  readonly usePackageDefaults: boolean;
+  readonly tasks: readonly AiuWhipTaskDefinition[];
+  readonly statePath: string;
+}
+
+export interface AiuWhipTaskDefinition {
+  readonly id: string;
+  readonly title: string;
+  readonly prompt: string;
+  readonly priority: number;
 }
 
 export interface AiuConfigDiagnostic {
@@ -117,6 +132,12 @@ const DEFAULT_CONFIG: AiuConfig = Object.freeze({
   }),
   supplyChain: Object.freeze({
     stopOnApprovalRequired: true,
+  }),
+  whip: Object.freeze({
+    enabled: true,
+    usePackageDefaults: true,
+    tasks: Object.freeze([]),
+    statePath: ".umpire/whip.json",
   }),
 });
 
@@ -189,6 +210,7 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
   const cooldowns = normalizeCooldowns(raw.cooldowns, diagnostics);
   const pathsConfig = normalizePaths(raw.paths, diagnostics);
   const supplyChain = normalizeSupplyChain(raw.supplyChain, diagnostics);
+  const whip = normalizeWhip(raw.whip, diagnostics);
 
   validateNoLegacyFallback(raw, "$", diagnostics);
   if (isRecord(raw.continuation)) {
@@ -209,6 +231,7 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
       cooldowns,
       paths: pathsConfig,
       supplyChain,
+      whip,
     }),
     diagnostics: Object.freeze(diagnostics),
   };
@@ -428,6 +451,67 @@ function normalizeSupplyChain(value: unknown, diagnostics: AiuConfigDiagnostic[]
   });
 }
 
+function normalizeWhip(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuWhipPolicy {
+  if (value === undefined) {
+    return DEFAULT_CONFIG.whip;
+  }
+  if (!isRecord(value)) {
+    diagnostics.push(diagnostic("invalid-whip-policy", "$.whip", "whip must be an object.", "Use { \"enabled\": false } or configure concrete whip tasks."));
+    return DEFAULT_CONFIG.whip;
+  }
+
+  return Object.freeze({
+    enabled: normalizeBoolean(value.enabled, DEFAULT_CONFIG.whip.enabled, "$.whip.enabled", diagnostics),
+    usePackageDefaults: normalizeBoolean(value.usePackageDefaults, DEFAULT_CONFIG.whip.usePackageDefaults, "$.whip.usePackageDefaults", diagnostics),
+    tasks: Object.freeze(normalizeWhipTasks(value.tasks, diagnostics)),
+    statePath: normalizePathValue(value.statePath, DEFAULT_CONFIG.whip.statePath, "$.whip.statePath", diagnostics),
+  });
+}
+
+function normalizeWhipTasks(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuWhipTaskDefinition[] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    diagnostics.push(diagnostic("invalid-whip-tasks", "$.whip.tasks", "whip.tasks must be an array.", "Use concrete task objects with id, title, prompt, and optional priority."));
+    return [];
+  }
+
+  const tasks: AiuWhipTaskDefinition[] = [];
+  for (const [index, task] of value.entries()) {
+    const fieldPath = `$.whip.tasks[${index}]`;
+    if (!isRecord(task)) {
+      diagnostics.push(diagnostic("invalid-whip-task", fieldPath, "Whip tasks must be objects.", "Use { \"id\": \"...\", \"title\": \"...\", \"prompt\": \"...\" }."));
+      continue;
+    }
+    const id = normalizeWhipTaskString(task.id, `${fieldPath}.id`, "invalid-whip-task-id", /^[a-z][a-z0-9-]*$/i, diagnostics);
+    const title = normalizeWhipTaskString(task.title, `${fieldPath}.title`, "invalid-whip-task-title", /[\S]/, diagnostics);
+    const prompt = normalizeWhipTaskString(task.prompt, `${fieldPath}.prompt`, "invalid-whip-task-prompt", /[\S]/, diagnostics);
+    const priority = task.priority === undefined ? 100 : normalizeWhipTaskPriority(task.priority, `${fieldPath}.priority`, diagnostics);
+    if (id && title && prompt && priority !== undefined) {
+      tasks.push(Object.freeze({ id, title, prompt, priority }));
+    }
+  }
+
+  return [...new Map(tasks.map((task) => [task.id, task])).values()];
+}
+
+function normalizeWhipTaskString(value: unknown, fieldPath: string, kind: string, pattern: RegExp, diagnostics: AiuConfigDiagnostic[]): string | undefined {
+  if (typeof value !== "string" || value.trim().length === 0 || value.includes("\0") || !pattern.test(value)) {
+    diagnostics.push(diagnostic(kind, fieldPath, "Whip task fields must be non-empty safe strings.", "Use a stable id and concrete title/prompt text."));
+    return undefined;
+  }
+  return value.trim();
+}
+
+function normalizeWhipTaskPriority(value: unknown, fieldPath: string, diagnostics: AiuConfigDiagnostic[]): number | undefined {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    diagnostics.push(diagnostic("invalid-whip-task-priority", fieldPath, "Whip task priority must be a non-negative integer.", "Use a non-negative integer priority."));
+    return undefined;
+  }
+  return value;
+}
+
 function validatePolicy(continuation: AiuContinuationPolicy, supplyChain: AiuSupplyChainPolicy, diagnostics: AiuConfigDiagnostic[]): void {
   if (!continuation.modes.includes("stop")) {
     diagnostics.push(diagnostic("contradictory-policy", "$.continuation.modes", "Continuation modes must include stop so safety blocks have a terminal outcome.", "Add stop to continuation.modes."));
@@ -611,6 +695,10 @@ function cloneConfig(config: AiuConfig): AiuConfig {
     cooldowns: Object.freeze({ ...config.cooldowns }),
     paths: Object.freeze({ ...config.paths }),
     supplyChain: Object.freeze({ ...config.supplyChain }),
+    whip: Object.freeze({
+      ...config.whip,
+      tasks: Object.freeze(config.whip.tasks.map((task) => Object.freeze({ ...task }))),
+    }),
   });
 }
 

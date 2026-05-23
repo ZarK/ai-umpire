@@ -34,6 +34,10 @@ describe("config foundation", () => {
     assert.equal(result.config.continuation.allowBackgroundScheduling, false);
     assert.equal(result.config.continuation.trustUnstructuredProse, false);
     assert.equal(result.config.supplyChain.stopOnApprovalRequired, true);
+    assert.equal(result.config.whip.enabled, true);
+    assert.equal(result.config.whip.usePackageDefaults, true);
+    assert.deepEqual(result.config.whip.tasks, []);
+    assert.equal(result.config.whip.statePath, ".umpire/whip.json");
   });
 
   it("loads valid config with argv trusted state descriptors", async () => {
@@ -80,6 +84,19 @@ describe("config foundation", () => {
       supplyChain: {
         stopOnApprovalRequired: true,
       },
+      whip: {
+        enabled: false,
+        usePackageDefaults: false,
+        statePath: ".umpire/custom-whip.json",
+        tasks: [
+          {
+            id: "repo-docs",
+            title: "Review repo docs",
+            prompt: "Review repository docs for stale aiu examples.",
+            priority: 10,
+          },
+        ],
+      },
     });
 
     const result = loadAiuConfig({ cwd: repoRoot });
@@ -90,6 +107,10 @@ describe("config foundation", () => {
     assert.deepEqual(result.config.hosts.enabled, ["opencode", "codex"]);
     assert.deepEqual(result.config.trustedStateCommands.work?.argv, ["aie", "status", "--json"]);
     assert.equal(result.config.timeouts.commandMs, 10_000);
+    assert.equal(result.config.whip.enabled, false);
+    assert.equal(result.config.whip.usePackageDefaults, false);
+    assert.equal(result.config.whip.statePath, ".umpire/custom-whip.json");
+    assert.deepEqual(result.config.whip.tasks.map((task) => task.id), ["repo-docs"]);
   });
 
   it("returns stable validation diagnostics for unsafe config", async () => {
@@ -124,6 +145,17 @@ describe("config foundation", () => {
       supplyChain: {
         stopOnApprovalRequired: false,
       },
+      whip: {
+        enabled: "sometimes",
+        tasks: [
+          {
+            id: "bad id",
+            title: "",
+            prompt: "",
+            priority: -1,
+          },
+        ],
+      },
       runtimeFallback: true,
     });
 
@@ -139,6 +171,11 @@ describe("config foundation", () => {
     assert.ok(kinds.includes("path-not-directory"));
     assert.ok(kinds.includes("unsafe-policy"));
     assert.ok(kinds.includes("legacy-fallback-unsupported"));
+    assert.ok(kinds.includes("invalid-boolean"));
+    assert.ok(kinds.includes("invalid-whip-task-id"));
+    assert.ok(kinds.includes("invalid-whip-task-title"));
+    assert.ok(kinds.includes("invalid-whip-task-prompt"));
+    assert.ok(kinds.includes("invalid-whip-task-priority"));
   });
 
   it("rejects state paths below file ancestors and non-searchable directories", async (t) => {

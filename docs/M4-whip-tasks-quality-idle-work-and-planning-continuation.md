@@ -76,6 +76,19 @@ Whip tasks include:
 
 Task state is stored under `.umpire/whip.json` by default and validated on read.
 
+Repositories can disable idle whip prompts with committed config:
+
+```json
+{
+  "version": 1,
+  "whip": {
+    "enabled": false
+  }
+}
+```
+
+When disabled, existing `.umpire/whip.json` state is preserved and no whip prompt is enqueued. Repositories can replace package defaults with `whip.usePackageDefaults: false` plus a repo-owned `whip.tasks` list. Prompt delivery alone never completes a task; completion requires explicit task state transition evidence.
+
 ### 1.2 - Task Commands
 
 Implement:

@@ -112,6 +112,45 @@ The migration plan is expected to report repo-local hook wrappers, local-checkou
 
 Package-owned managed sections are the files and content emitted by `aiu init` or future migration apply commands. Repo-local customization points are repository policy, trusted state command argv arrays, host trust settings, prompts outside managed sections, and durable `.umpire/` state. If package-owned content conflicts with local content, review the diff and choose an explicit apply or `--force` path only when replacement is intentional.
 
+## Whip Tasks
+
+Whip tasks are optional idle work. They are considered only after higher-priority continuation work is unavailable, and prompt delivery alone never completes a whip task. Default package tasks are concrete maintenance prompts; Umpire must not generate hidden backlog work or vague "make it better" prompts.
+
+Disable all idle whip prompts with committed config:
+
+```json
+{
+  "version": 1,
+  "whip": {
+    "enabled": false
+  }
+}
+```
+
+When disabled, existing `.umpire/whip.json` state is preserved and Umpire reports a disabled/no-prompt outcome instead of editing generated state by hand.
+
+Replace package defaults with repo-owned tasks:
+
+```json
+{
+  "version": 1,
+  "whip": {
+    "enabled": true,
+    "usePackageDefaults": false,
+    "tasks": [
+      {
+        "id": "repo-docs",
+        "title": "Review repo docs",
+        "prompt": "Review repository docs for stale aiu examples, update only incorrect examples, then run the affected checks.",
+        "priority": 10
+      }
+    ]
+  }
+}
+```
+
+Temporarily pause whip work by committing `"enabled": false`; do not hand-edit `.umpire/whip.json` to pause tasks.
+
 ## Local Development
 
 Run release checks:

@@ -42,6 +42,12 @@ export {
   formatMigrationPlan,
   planAiuMigration,
 } from "./migrate.js";
+export {
+  AIU_DEFAULT_WHIP_TASKS,
+  AIU_WHIP_TASK_STATUSES,
+  decideAiuWhipContinuation,
+  resolveAiuWhipTasks,
+} from "./whip.js";
 export type {
   AiuPackageAssetPaths,
 } from "./assets.js";
@@ -54,6 +60,8 @@ export type {
   AiuHost,
   AiuHostCapabilityName,
   AiuTrustedStateCommandDescriptor,
+  AiuWhipPolicy,
+  AiuWhipTaskDefinition,
 } from "./config.js";
 export type {
   AiuDoctorCheck,
@@ -81,3 +89,12 @@ export type {
   AiuMigrationPlan,
   AiuMigrationStatePreservation,
 } from "./migrate.js";
+export type {
+  AiuWhipContinuationDecision,
+  AiuWhipContinuationInput,
+  AiuWhipOutcome,
+  AiuWhipSelectedTask,
+  AiuWhipState,
+  AiuWhipStateTask,
+  AiuWhipTaskStatus,
+} from "./whip.js";
