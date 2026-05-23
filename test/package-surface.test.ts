@@ -54,7 +54,7 @@ describe("package foundation", () => {
     assert.match(pnpmLock, /lockfileVersion:/);
   });
 
-  it("does not depend on companion workflow CLIs", async () => {
+  it("verifies CLI dependency contract", async () => {
     const packageJson = await readPackageJson();
     const dependencies = {
       ...packageJson.dependencies,

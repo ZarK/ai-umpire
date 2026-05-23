@@ -65,8 +65,19 @@ describe("metadata-backed CLI", () => {
       bin: string;
       commands: Array<{
         name: string;
-        interactions?: { json?: boolean };
+        flags?: Array<{ name: string; type: string }>;
+        examples?: Array<{ command: string }>;
+        output?: { formats?: string[]; defaultFormat?: string };
+        interactions?: {
+          json?: boolean;
+          noColor?: boolean;
+          nonInteractive?: boolean;
+          ttyPrompt?: boolean;
+        };
+        dryRun?: { supported?: boolean; reason?: string };
         mutation?: { mutates?: boolean };
+        errors?: Array<{ kind: string }>;
+        exitCodes?: Array<{ code: number }>;
       }>;
       package: { name: string };
     };
@@ -78,7 +89,31 @@ describe("metadata-backed CLI", () => {
 
     const commandNames = parsed.commands.map((command) => command.name);
     assert.deepEqual(commandNames, ["paths", "schema"]);
-    assert.equal(parsed.commands.find((command) => command.name === "paths")?.interactions?.json, true);
+
+    const paths = parsed.commands.find((command) => command.name === "paths");
+    assert.ok(paths);
+    assert.deepEqual(paths.output?.formats, ["human", "json"]);
+    assert.equal(paths.output?.defaultFormat, "human");
+    assert.equal(paths.interactions?.json, true);
+    assert.equal(paths.interactions?.noColor, true);
+    assert.equal(paths.interactions?.nonInteractive, true);
+    assert.equal(paths.interactions?.ttyPrompt, false);
+    assert.equal(paths.dryRun?.supported, false);
+    assert.equal(paths.mutation?.mutates, false);
+    assert.ok(paths.flags?.some((flag) => flag.name === "json" && flag.type === "boolean"));
+    assert.ok(paths.examples?.some((example) => example.command === "aiu paths --json"));
+    assert.ok(paths.errors?.some((error) => error.kind === "asset-paths-unavailable"));
+    assert.deepEqual(paths.exitCodes?.map((exitCode) => exitCode.code), [0, 1, 2]);
+
+    const schema = parsed.commands.find((command) => command.name === "schema");
+    assert.ok(schema);
+    assert.deepEqual(schema.output?.formats, ["json"]);
+    assert.equal(schema.output?.defaultFormat, "json");
+    assert.equal(schema.interactions?.json, true);
+    assert.equal(schema.dryRun?.supported, false);
+    assert.equal(schema.mutation?.mutates, false);
+    assert.ok(schema.flags?.some((flag) => flag.name === "json" && flag.type === "boolean"));
+    assert.ok(schema.examples?.some((example) => example.command === "aiu schema --json"));
   });
 
   it("suggests unknown commands and flags without executing alternatives", async () => {

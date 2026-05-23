@@ -12,6 +12,7 @@ interface PackageJson {
 }
 
 const packageJson = JSON.parse(readFileSync(path.join(getAiuPackageRoot(), "package.json"), "utf8")) as PackageJson;
+let runtimeRegistry = AIU_COMMAND_REGISTRY;
 
 export const aiuCli = createCli({
   bin: "aiu",
@@ -34,13 +35,15 @@ export const aiuCli = createCli({
       };
     }),
     createSchemaCommand({
-      registry: () => aiuCli.registry,
+      registry: () => runtimeRegistry,
       bin: "aiu",
       packageName: packageJson.name,
       packageVersion: packageJson.version,
     }),
   ],
 });
+
+runtimeRegistry = aiuCli.registry;
 
 export async function runAiuCli(input: readonly string[]): Promise<number> {
   const result = await runCli(aiuCli, input);
