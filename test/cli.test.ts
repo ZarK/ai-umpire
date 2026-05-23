@@ -116,6 +116,15 @@ describe("metadata-backed CLI", () => {
           hostCapabilityNames?: string[];
           promptSectionKinds?: string[];
         };
+        trustedState?: {
+          schemaVersion?: number;
+          stateKinds?: string[];
+          stateValueKinds?: string[];
+          trustLevels?: string[];
+          freshnessKinds?: string[];
+          capabilitySupport?: string[];
+          reasonCodes?: Array<{ code: string; category: string; decision: string; description: string }>;
+        };
       };
       package: { name: string };
     };
@@ -143,6 +152,24 @@ describe("metadata-backed CLI", () => {
     assert.deepEqual(parsed.sections?.config?.hostNames, ["opencode", "codex", "claude-code"]);
     assert.deepEqual(parsed.sections?.config?.hostCapabilityNames, ["stopHook", "sessionState", "promptDelivery"]);
     assert.deepEqual(parsed.sections?.config?.promptSectionKinds, ["work", "planning", "quality", "whip"]);
+    assert.equal(parsed.sections?.trustedState?.schemaVersion, 1);
+    assert.deepEqual(parsed.sections?.trustedState?.stateKinds, [
+      "work-queue",
+      "work-item",
+      "review",
+      "repository",
+      "gate-evidence",
+      "planning",
+      "quality",
+      "host-session",
+      "continuation-policy",
+    ]);
+    assert.deepEqual(parsed.sections?.trustedState?.stateValueKinds, ["pass", "fail", "missing", "stale", "unknown", "unsupported", "untrusted", "malformed"]);
+    assert.deepEqual(parsed.sections?.trustedState?.trustLevels, ["trusted", "advisory", "untrusted"]);
+    assert.deepEqual(parsed.sections?.trustedState?.freshnessKinds, ["fresh", "stale", "unknown"]);
+    assert.deepEqual(parsed.sections?.trustedState?.capabilitySupport, ["supported", "unsupported", "unknown"]);
+    assert.ok(parsed.sections?.trustedState?.reasonCodes?.some((reason) => reason.code === "continue-active-work" && reason.decision === "continue"));
+    assert.ok(parsed.sections?.trustedState?.reasonCodes?.some((reason) => reason.code === "stop-unsupported-input" && reason.category === "input"));
 
     const init = parsed.commands.find((command) => command.name === "init");
     assert.ok(init);

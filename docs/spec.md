@@ -73,6 +73,7 @@ Requirements use stable identifiers (`FR-XX-NNN`) so milestones and issues can r
 | FR-05-004 | Models distinguish pass/fail, missing, stale, unknown, unsupported, and untrusted states. Unknown and unsupported never imply success. | Required |
 | FR-05-005 | Command adapters execute only configured descriptors with bounded timeout/output, parse JSON, redact sensitive values in errors, and return typed results or stable parse errors. | Required |
 | FR-05-006 | Adapter modules are read-only. They must not mutate files, providers, work items, review items, config, or host state. | Required |
+| FR-05-007 | `aiu schema --json` exposes the trusted state schema version, state kinds, state values, trust levels, freshness kinds, capability support values, and reason-code catalog. | Required |
 
 ## FR-06 - Decision Engine And Prompts
 
