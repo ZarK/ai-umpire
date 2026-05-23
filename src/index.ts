@@ -52,6 +52,9 @@ export {
   planAiuMigration,
 } from "./migrate.js";
 export {
+  renderAiuContinuationPrompt,
+} from "./prompt.js";
+export {
   AIU_REASON_CODES,
   AIU_REASON_CODE_CATALOG,
   AIU_STATE_CAPABILITY_SUPPORT,
@@ -137,6 +140,11 @@ export type {
   AiuMigrationPlan,
   AiuMigrationStatePreservation,
 } from "./migrate.js";
+export type {
+  AiuContinuationPrompt,
+  AiuContinuationPromptInput,
+  AiuPromptSourceTimestamp,
+} from "./prompt.js";
 export type {
   AiuBaseState,
   AiuContinuationDecisionKind,

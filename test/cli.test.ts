@@ -130,6 +130,10 @@ describe("metadata-backed CLI", () => {
           promptKinds?: string[];
           modes?: string[];
         };
+        promptRendering?: {
+          fingerprintInputs?: string[];
+          customizableSections?: string[];
+        };
       };
       package: { name: string };
     };
@@ -180,6 +184,8 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.sections?.trustedState?.reasonCodes?.some((reason) => reason.code === "stop-unsupported-input" && reason.category === "input"));
     assert.deepEqual(parsed.sections?.decision?.modes, ["continue", "repair", "wait", "stop"]);
     assert.deepEqual(parsed.sections?.decision?.promptKinds, ["work", "review", "repair", "planning", "quality", "whip", "wait", "stop"]);
+    assert.deepEqual(parsed.sections?.promptRendering?.fingerprintInputs, ["decisionKind", "selectedItem", "reasonCodes", "sourceTimestamps", "body"]);
+    assert.deepEqual(parsed.sections?.promptRendering?.customizableSections, ["work", "planning", "quality", "whip"]);
 
     const init = parsed.commands.find((command) => command.name === "init");
     assert.ok(init);

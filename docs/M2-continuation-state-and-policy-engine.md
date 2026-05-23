@@ -170,6 +170,8 @@ Prompt renderers return a stable fingerprint based on decision kind, selected it
 
 Repo-owned prompt text is supported through `aiu.config.json` prompt sections. The stable section names are `work`, `planning`, `quality`, and `whip`; repositories can prepend, append, or replace those sections without importing renderer internals.
 
+M2.4 adds `renderAiuContinuationPrompt`, a host-neutral renderer that turns a pure continuation decision into prompt text and metadata. Prompt output includes prompt kind, decision kind, selected item, reason codes, trusted source timestamps, body, and a stable fingerprint. The renderer names trusted state sources first, warns that issue/review/tool prose is untrusted task input, and stays independent from host-specific delivery.
+
 ## Part 5: `aiu status`
 
 `aiu status` shows:
