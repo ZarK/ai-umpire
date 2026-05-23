@@ -62,7 +62,7 @@ describe("doctor diagnostics", () => {
     const report = runAiuDoctor({ cwd: repoRoot });
 
     assert.equal(report.status, "warning");
-    assert.ok(report.checks.some((check) => check.kind === "host-file-missing" && check.path?.endsWith(path.join(".codex", "hooks", "ai-umpire-stop.json"))));
+    assert.ok(report.checks.some((check) => check.kind === "host-file-missing" && check.path?.endsWith(path.join("plugins", "ai-umpire", "hooks", "hooks.json"))));
   });
 
   it("reports trusted command availability without executing commands", async () => {

@@ -332,6 +332,69 @@ export const initCommand = defineCommand({
   ],
 });
 
+export const hookStopCommand = defineCommand({
+  kind: "command",
+  name: "hook-stop",
+  description: "Handle host Stop hook input and emit the host JSON response.",
+  flags: [
+    jsonFlag,
+    defineFlag({
+      name: "tool",
+      description: "Host tool that invoked the Stop hook.",
+      type: "option",
+      options: ["codex", "claude-code"],
+      required: true,
+    }),
+  ],
+  examples: [
+    defineExample({
+      description: "Allow a Codex Stop hook using safe package defaults.",
+      command: "aiu hook-stop --tool codex",
+    }),
+    defineExample({
+      description: "Inspect the safe Stop hook result as JSON.",
+      command: "aiu hook-stop --tool claude-code --json",
+    }),
+  ],
+  output: {
+    formats: ["human", "json"],
+    defaultFormat: "human",
+  },
+  interactions: {
+    json: true,
+    dryRun: {
+      supported: false,
+      reason: "Hook commands are invoked by host runtimes and only emit a host response.",
+    },
+    noColor: true,
+    nonInteractive: true,
+    ttyPrompt: false,
+  },
+  errors: [
+    {
+      kind: "invalid-command-usage",
+      description: "Hook command usage was invalid.",
+    },
+  ],
+  exitCodes: [
+    {
+      code: 0,
+      category: "success",
+      description: "Hook input was handled and a host response was emitted.",
+    },
+    {
+      code: 2,
+      category: "usage",
+      description: "Command usage was invalid.",
+    },
+    {
+      code: 1,
+      category: "unexpected",
+      description: "Command failed unexpectedly.",
+    },
+  ],
+});
+
 export const migrateCommand = defineCommand({
   kind: "command",
   name: "migrate",
@@ -389,5 +452,5 @@ export const migrateCommand = defineCommand({
 });
 
 export const AIU_COMMAND_REGISTRY = createCommandRegistry({
-  commands: [configCommand, doctorCommand, initCommand, migrateCommand, pathsCommand],
+  commands: [configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand],
 });

@@ -29,7 +29,7 @@ describe("init planner", () => {
     assert.equal(parsed.command, "init");
     assert.equal(parsed.init.dryRun, true);
     assert.deepEqual(parsed.init.tools, ["opencode", "codex", "claude-code"]);
-    assert.equal(parsed.init.files.length, 3);
+    assert.equal(parsed.init.files.length, 6);
     assert.equal(parsed.init.config.operation, "create");
     assert.equal(parsed.init.recommendedNextCommand, "aiu config --json");
     assert.equal(existsSync(path.join(target, "aiu.config.json")), false);
@@ -44,11 +44,11 @@ describe("init planner", () => {
       },
       {
         tool: "codex",
-        file: path.join(".codex", "hooks", "ai-umpire-stop.json"),
+        file: path.join("plugins", "ai-umpire", "hooks", "hooks.json"),
       },
       {
         tool: "claude-code",
-        file: path.join(".claude", "hooks", "ai-umpire-stop.json"),
+        file: path.join(".claude", "settings.json"),
       },
     ];
 
@@ -65,6 +65,29 @@ describe("init planner", () => {
       assert.deepEqual(parsed.init.tools, [tool], tool);
       assert.equal(existsSync(path.join(target, file)), true, tool);
       assert.deepEqual(config.hosts.enabled, [tool], tool);
+
+      if (tool === "opencode") {
+        assert.match(await readFile(path.join(target, file), "utf8"), /createAiuOpenCodePlugin/);
+      } else if (tool === "codex") {
+        const hooks = JSON.parse(await readFile(path.join(target, file), "utf8")) as {
+          Stop: Array<{ hooks: Array<{ command: string; type: string }> }>;
+        };
+        const marketplace = JSON.parse(await readFile(path.join(target, ".agents", "plugins", "marketplace.json"), "utf8")) as {
+          plugins: Array<{ name: string; source: { path: string } }>;
+        };
+        assert.equal(existsSync(path.join(target, "plugins", "ai-umpire", ".codex-plugin", "plugin.json")), true);
+        assert.equal(existsSync(path.join(target, "plugins", "ai-umpire", "skills", "ai-umpire", "SKILL.md")), true);
+        assert.equal(hooks.Stop[0]?.hooks[0]?.type, "command");
+        assert.equal(hooks.Stop[0]?.hooks[0]?.command, "pnpm exec aiu hook-stop --tool codex");
+        assert.equal(marketplace.plugins[0]?.name, "ai-umpire");
+        assert.equal(marketplace.plugins[0]?.source.path, "./plugins/ai-umpire");
+      } else if (tool === "claude-code") {
+        const settings = JSON.parse(await readFile(path.join(target, file), "utf8")) as {
+          hooks: { Stop: Array<{ hooks: Array<{ command: string; type: string }> }> };
+        };
+        assert.equal(settings.hooks.Stop[0]?.hooks[0]?.type, "command");
+        assert.equal(settings.hooks.Stop[0]?.hooks[0]?.command, "pnpm exec aiu hook-stop --tool claude-code");
+      }
     }
   });
 
@@ -79,6 +102,7 @@ describe("init planner", () => {
 
     assert.equal(result.exitCode, 0);
     assert.deepEqual(parsed.init.hostProfiles.map((profile) => profile.tool), ["opencode", "codex", "claude-code"]);
+    assert.deepEqual(parsed.init.hostProfiles.map((profile) => profile.supportLevel), ["supported", "experimental", "experimental"]);
     assert.deepEqual(config.hosts.enabled, ["opencode", "codex", "claude-code"]);
     assert.ok(config.hosts.capabilities.opencode);
     assert.ok(config.hosts.capabilities.codex);
@@ -178,7 +202,7 @@ interface InitEnvelope {
     readonly ok: boolean;
     readonly dryRun: boolean;
     readonly tools: string[];
-    readonly hostProfiles: Array<{ tool: string }>;
+    readonly hostProfiles: Array<{ tool: string; supportLevel: string }>;
     readonly files: Array<{ operation: string; reason?: string }>;
     readonly config: { operation: string; hosts: string[]; trustedStateCommands: string[] };
     readonly recommendedNextCommand: string;

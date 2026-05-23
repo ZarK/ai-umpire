@@ -36,15 +36,16 @@ describe("packed tarball install smoke", () => {
     assert.equal(parsed.init.ok, true);
     assert.equal(parsed.init.dryRun, true);
     assert.deepEqual(parsed.init.tools, ["opencode", "codex", "claude-code"]);
-    assert.equal(parsed.init.files.length, 3);
+    assert.equal(parsed.init.files.length, 6);
     assert.equal(parsed.init.config.operation, "create");
     assert.equal(existsSync(path.join(target, "aiu.config.json")), false);
     assert.equal(existsSync(path.join(target, ".opencode")), false);
-    assert.equal(existsSync(path.join(target, ".codex")), false);
+    assert.equal(existsSync(path.join(target, ".agents")), false);
+    assert.equal(existsSync(path.join(target, "plugins")), false);
     assert.equal(existsSync(path.join(target, ".claude")), false);
     assert.equal(existsSync(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts")), false);
-    assert.equal(existsSync(path.join(target, ".codex", "hooks", "ai-umpire-stop.json")), false);
-    assert.equal(existsSync(path.join(target, ".claude", "hooks", "ai-umpire-stop.json")), false);
+    assert.equal(existsSync(path.join(target, "plugins", "ai-umpire", "hooks", "hooks.json")), false);
+    assert.equal(existsSync(path.join(target, ".claude", "settings.json")), false);
   });
 });
 

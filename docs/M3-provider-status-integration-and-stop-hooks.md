@@ -11,9 +11,10 @@ Repositories can compose OpenCode behavior through the public `@tjalve/aiu/openc
 M3 delivers five things:
 
 1. **OpenCode continuation adapter** - event-driven plugin integration around the M2 application service.
-2. **Stop-hook integration** - `aiu hook stop` for Codex and Claude Code using the same decision engine.
+2. **Stop-hook integration** - `aiu hook-stop` for Codex and Claude Code using the same decision engine.
 3. **Session ownership** - durable prompt ownership, deduplication, cooldowns, and lock coordination.
 4. **Host capability model** - one capability profile system for OpenCode, Codex, and Claude Code.
+5. **Host support matrix** - explicit supported, experimental, recipe-only, and unsupported target decisions so installers do not imply unverified hook semantics.
 ---
 
 ## Functional Requirements Addressed
@@ -71,7 +72,7 @@ Define host capability descriptors for:
 - user typing/TUI activity signals
 - project trust requirements
 
-OpenCode, Codex, and Claude Code are the only required v1 host profiles.
+OpenCode is the supported v1 host profile. Codex and Claude Code are experimental stop-hook installer targets because their project hook formats are known, but they must safe-allow stopping until the M2 decision engine is wired into M3 stop hooks. Other evaluated tools remain recipe-only or unsupported until they expose a confirmed project-level idle/stop hook contract.
 
 ### 1.2 - Host Policy
 
@@ -114,9 +115,11 @@ Todos are advisory host state, not the source of workflow truth. Umpire can use 
 
 ### 3.1 - CLI Contract
 
-`aiu hook stop --tool codex|claude-code` reads the host stop-hook payload from stdin and emits the host's expected JSON object to stdout.
+`aiu hook-stop --tool codex|claude-code` reads the host stop-hook payload from stdin and emits the host's expected JSON object to stdout.
 
 Stop-hook stderr is reserved for diagnostics only. JSON stdout must stay valid.
+
+The prototype command emits a valid allow response until the full M3 stop-hook decision flow exists; installers must not write host config that pretends continuation blocking is implemented earlier than it is.
 
 ### 3.2 - Block And Allow Rules
 

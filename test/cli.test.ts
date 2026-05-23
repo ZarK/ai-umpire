@@ -126,7 +126,7 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.package.name, "@tjalve/aiu");
 
     const commandNames = parsed.commands.map((command) => command.name);
-    assert.deepEqual(commandNames, ["config", "doctor", "init", "migrate", "paths", "schema"]);
+    assert.deepEqual(commandNames, ["config", "doctor", "hook-stop", "init", "migrate", "paths", "schema"]);
 
     const config = parsed.commands.find((command) => command.name === "config");
     assert.ok(config);
@@ -152,6 +152,13 @@ describe("metadata-backed CLI", () => {
     assert.ok(init.flags?.some((flag) => flag.name === "tool" && flag.type === "option"));
     assert.ok(init.flags?.some((flag) => flag.name === "dry-run" && flag.type === "boolean"));
     assert.ok(init.flags?.some((flag) => flag.name === "force" && flag.type === "boolean"));
+
+    const hookStop = parsed.commands.find((command) => command.name === "hook-stop");
+    assert.ok(hookStop);
+    assert.deepEqual(hookStop.output?.formats, ["human", "json"]);
+    assert.equal(hookStop.interactions?.json, true);
+    assert.equal(hookStop.mutation?.mutates, false);
+    assert.ok(hookStop.flags?.some((flag) => flag.name === "tool" && flag.type === "option"));
 
     const doctor = parsed.commands.find((command) => command.name === "doctor");
     assert.ok(doctor);
@@ -276,6 +283,35 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.migrate.managedSections.length >= 3);
     assert.ok(parsed.migrate.customizationPoints.includes("aiu.config.json trustedStateCommands argv arrays"));
     assert.equal(parsed.migrate.recommendedNextCommand, "aiu init --dry-run --json");
+  });
+
+  it("emits host Stop hook responses without extra output", async () => {
+    const hostResponse = await runCli(["hook-stop", "--tool", "codex"]);
+
+    assert.equal(hostResponse.exitCode, 0);
+    assert.equal(hostResponse.stdout, "{}\n");
+    assert.equal(hostResponse.stderr, "");
+
+    const result = await runCli(["hook-stop", "--tool", "claude-code", "--json"]);
+    const parsed = JSON.parse(result.stdout) as {
+      ok: boolean;
+      command: string;
+      hookStop: {
+        tool: string;
+        decision: string;
+        reason: string;
+        stdoutJson: Record<string, never>;
+      };
+    };
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.command, "hook-stop");
+    assert.equal(parsed.hookStop.tool, "claude-code");
+    assert.equal(parsed.hookStop.decision, "allow");
+    assert.match(parsed.hookStop.reason, /safe behavior is to allow/);
+    assert.deepEqual(parsed.hookStop.stdoutJson, {});
   });
 
   it("suggests unknown commands and flags without executing alternatives", async () => {

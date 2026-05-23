@@ -13,8 +13,9 @@ import {
   getDefaultAiuConfig,
   loadAiuConfig,
 } from "./config.js";
-import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, initCommand, migrateCommand, pathsCommand } from "./command_registry.js";
+import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand } from "./command_registry.js";
 import { formatAiuDoctorReport, formatAiuPaths, getAiuResolvedPaths, runAiuDoctor } from "./doctor.js";
+import { formatHookStopJson, readHookStopStdin, runAiuHookStop } from "./hook_stop.js";
 import { applyAiuInitPlan, formatInitPlan, planAiuInit, type AiuInitTool } from "./init.js";
 import { formatMigrationPlan, planAiuMigration } from "./migrate.js";
 
@@ -80,6 +81,26 @@ export const aiuCli = createCli({
         json: {
           init: plan,
         },
+      };
+    }),
+    createCommand(hookStopCommand, async (context) => {
+      const tool = context.flags.tool === "claude-code" ? "claude-code" : "codex";
+      const result = runAiuHookStop({ tool, stdin: await readHookStopStdin() });
+      if (context.flags.json === true) {
+        return {
+          json: {
+            hookStop: {
+              tool: result.tool,
+              decision: result.decision,
+              reason: result.reason,
+              inputBytes: result.inputBytes,
+              stdoutJson: result.stdoutJson,
+            },
+          },
+        };
+      }
+      return {
+        stdout: formatHookStopJson(result),
       };
     }),
     createCommand(migrateCommand, (context) => {

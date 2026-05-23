@@ -7,7 +7,7 @@
 - a package-backed `aiu` CLI
 - shared CLI metadata, help, schema, and JSON behavior through `@tjalve/qube-cli`
 - typed `aiu.config.json` discovery, defaults, and validation diagnostics
-- dry-runnable `aiu init` plans for OpenCode, Codex, and Claude Code host files
+- dry-runnable `aiu init` plans for OpenCode plus experimental Codex and Claude Code host files
 - non-mutating `aiu doctor` diagnostics for package, config, host, state, and trusted command health
 - package metadata for the `@tjalve/aiu` npm package
 - a package-backed `aiu` executable
@@ -73,8 +73,11 @@ If `aiu.config.json` is missing, Umpire reports typed conservative defaults. Con
 
 - `aiu.config.json`
 - `.opencode/plugins/ai-umpire-continuation.ts`
-- `.codex/hooks/ai-umpire-stop.json`
-- `.claude/hooks/ai-umpire-stop.json`
+- `.agents/plugins/marketplace.json`
+- `plugins/ai-umpire/.codex-plugin/plugin.json`
+- `plugins/ai-umpire/hooks/hooks.json`
+- `plugins/ai-umpire/skills/ai-umpire/SKILL.md`
+- `.claude/settings.json`
 
 Apply a reviewed init plan:
 
@@ -88,14 +91,14 @@ After init writes host files, review and enable the host-specific trust step nam
 Review generated assets with normal git tooling before trusting host hooks:
 
 ```bash
-git diff -- aiu.config.json .opencode .codex .claude
+git diff -- aiu.config.json .opencode .agents plugins .claude
 pnpm exec aiu doctor --json
 ```
 
 Revert an uncommitted init with:
 
 ```bash
-git restore -- aiu.config.json .opencode .codex .claude
+git restore -- aiu.config.json .opencode .agents plugins .claude
 ```
 
 Remove untracked init files only after reviewing `git status --short`; Umpire never stages, commits, pushes, or deletes repository files for you.
@@ -201,6 +204,21 @@ export default createAiuOpenCodePlugin({ before: [beforeUmpire] });
 
 Extension points compose with the package-backed `aiu` command. They do not preserve old copied helper scripts or fallback runtime behavior.
 
+## Host Support Matrix
+
+Supported targets are installed by `aiu init --tool <tool>` with package-backed files only.
+
+| Tool | Status | Lifecycle event | Prompt/continue path | Repo config written | Permission model | Install path | Main safety risk |
+|---|---|---|---|---|---|---|---|
+| OpenCode | Supported | Project plugin event hooks | Host plugin delegates to `@tjalve/aiu/opencode` and the package `aiu` command | `.opencode/plugins/ai-umpire-continuation.ts` | Review and enable project plugin | `aiu init --tool opencode` | Host plugin trust must be explicit. |
+| Codex CLI/Desktop | Experimental | `Stop` hook from a repo-local Codex plugin | `pnpm exec aiu hook-stop --tool codex`; currently safe-allows until the decision engine is wired | `.agents/plugins/marketplace.json`, `plugins/ai-umpire/**` | Install repo-local plugin and approve hook trust | `aiu init --tool codex` | Stop-hook continuation must not surprise the user; trust prompt is required. |
+| Claude Code | Experimental | Project `Stop` hook | `pnpm exec aiu hook-stop --tool claude-code`; currently safe-allows until the decision engine is wired | `.claude/settings.json` | Review project settings and approve hook trust | `aiu init --tool claude-code` | Project settings can run local commands, so conflicts are preserved by default. |
+| Gemini CLI, Cursor, Aider, Continue.dev, Goose | Unsupported recipe targets | No confirmed project Stop hook contract in this package | Document recipes only; no installer writes files | none | Tool-specific | none | Wrappers/MCP/rules may not have autonomous idle continuation semantics. |
+| Generic MCP server | Unsupported as a continuation hook | Host must call MCP explicitly | Possible future tool-provider integration only | none | Host MCP trust | none | MCP alone cannot continue an idle session unless the host invokes it. |
+| Git hooks and GitHub Actions | Unsupported for interactive continuation | Repository/CI events, not agent idle events | Validation only | none | Git/CI trust | none | Wrong lifecycle; these must not drive interactive continuation. |
+
+The experimental stop-hook command emits a valid allow response today instead of pretending the M2/M3 decision engine is already available. Future M3 work will replace that safe allow path with trusted-state decisions before blocking host stops.
+
 ## Local Development
 
 Run release checks:
@@ -222,6 +240,7 @@ Use `pnpm exec aiu paths --json` to inspect the resolved package root, config pa
 - `@tjalve/aiu` - public package asset helpers
 - `@tjalve/aiu/opencode` - OpenCode plugin composition helpers
 - `aiu` - package CLI foundation
+- `aiu hook-stop` - experimental Codex and Claude Code Stop hook entrypoint that safely allows until M3 decisions are wired
 - `loadAiuConfig` - typed config discovery, defaults, and validation
 - `renderAiuPromptSection` - repo-level prompt section customization helper
 - `runAiuDoctor` and `getAiuResolvedPaths` - read-only diagnostics and path inspection helpers
