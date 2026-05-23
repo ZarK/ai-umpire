@@ -65,6 +65,17 @@ describe("continuation decision engine", () => {
 
     assertDecision(
       decideAiuContinuation({
+        states: [
+          env(workQueue({ activeItems: [workItem("47", "active")], readyItems: [workItem("48", "ready")] }), { sourceId: "work-a" }),
+          env(workQueue({ activeItems: [workItem("47", "active")], readyItems: [workItem("49", "ready")] }), { sourceId: "work-b" }),
+        ],
+      }),
+      "stop",
+      "stop-contradictory-state",
+    );
+
+    assertDecision(
+      decideAiuContinuation({
         states: [env(workQueue({ activeItems: [workItem("47", "active"), workItem("48", "active")] }))],
       }),
       "stop",
@@ -77,6 +88,14 @@ describe("continuation decision engine", () => {
       }),
       "stop",
       "stop-active-review-conflict",
+    );
+
+    assertDecision(
+      decideAiuContinuation({
+        states: [env(review("active", { targetId: "pr-1" })), env(review("changes-requested", { targetId: "pr-1" }))],
+      }),
+      "continue",
+      "continue-active-review",
     );
 
     assertDecision(
@@ -163,6 +182,14 @@ describe("continuation decision engine", () => {
 
   it("continues planning, ready work, quality work, whip slot, or clean stop in priority order", () => {
     assertDecision(decideAiuContinuation({ states: [env(planning({ needsPlanning: true }))] }), "continue", "continue-planning");
+
+    assertDecision(
+      decideAiuContinuation({
+        states: [env(planning({ needsPlanning: "unknown", humanInputRequired: "unknown" })), env(workQueue({ readyItems: [workItem("47", "ready")] }))],
+      }),
+      "stop",
+      "stop-unknown-input",
+    );
 
     const ready = decideAiuContinuation({
       states: [env(workQueue({ readyItems: [workItem("low", "ready", { priority: "low" }), workItem("critical", "ready", { priority: "critical" })] }))],

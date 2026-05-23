@@ -23,6 +23,8 @@ export const AIU_DECISION_PROMPT_KINDS = [
   "stop",
 ] as const;
 
+export const AIU_DECISION_MODES = ["continue", "repair", "wait", "stop"] as const;
+
 export type AiuDecisionPromptKind = (typeof AIU_DECISION_PROMPT_KINDS)[number];
 
 export interface AiuContinuationDecisionPolicy {
@@ -91,7 +93,7 @@ interface IndexedState {
 }
 
 const DEFAULT_POLICY: DecisionPolicy = Object.freeze({
-  modes: Object.freeze(["continue", "repair", "wait", "stop"] satisfies AiuContinuationDecisionKind[]),
+  modes: Object.freeze([...AIU_DECISION_MODES]),
   stopOnUnknownState: true,
   stopOnStaleState: true,
   stopOnUnsafeState: true,
@@ -122,6 +124,11 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
   const planningHumanBlock = findPlanningHumanBlock(indexed);
   if (planningHumanBlock) {
     return decision(policy, "stop", "stop-human-input-required", summaries, "stop", planningHumanBlock, "Stop: answer the named planning question before continuing.");
+  }
+
+  const planningUnknownBlock = findPlanningUnknownBlock(indexed, policy);
+  if (planningUnknownBlock) {
+    return decision(policy, "stop", "stop-unknown-input", summaries, "stop", planningUnknownBlock, "Stop: refresh planning state before continuing.");
   }
 
   const contradiction = findContradiction(indexed);
@@ -263,8 +270,18 @@ function findPlanningHumanBlock(indexed: readonly IndexedState[]): AiuDecisionSe
   return planning ? selectState(planning) : undefined;
 }
 
+function findPlanningUnknownBlock(indexed: readonly IndexedState[], policy: DecisionPolicy): AiuDecisionSelectedItem | undefined {
+  if (!policy.stopOnUnknownState) {
+    return undefined;
+  }
+  const planning = indexed.find(
+    (item) => item.value.kind === "planning" && (item.value.needsPlanning === "unknown" || item.value.humanInputRequired === "unknown"),
+  );
+  return planning ? selectState(planning) : undefined;
+}
+
 function findContradiction(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
-  const workSignatures = new Set(indexed.filter((item) => hasKind(item, "work-queue")).map((item) => item.value.activeItems.map((work) => work.id).sort().join(",")));
+  const workSignatures = new Set(indexed.filter((item) => hasKind(item, "work-queue")).map((item) => workQueueSignature(item.value)));
   if (workSignatures.size > 1) {
     const first = indexed.find((item) => item.value.kind === "work-queue");
     return first ? selectState(first) : undefined;
@@ -346,9 +363,36 @@ function collectReadyWork(indexed: readonly IndexedState[]): readonly AiuWorkIte
 }
 
 function collectActiveReviews(indexed: readonly IndexedState[]): readonly AiuReviewState[] {
-  return indexed
+  return uniqueReviews(indexed
     .filter((item) => item.value.kind === "review" && (item.value.reviewStatus === "active" || item.value.reviewStatus === "changes-requested"))
-    .map((item) => item.value as AiuReviewState);
+    .map((item) => item.value as AiuReviewState));
+}
+
+function workQueueSignature(value: Extract<AiuTrustedStatePayload, { readonly kind: "work-queue" }>): string {
+  return JSON.stringify({
+    status: value.status,
+    activeItems: value.activeItems.map(workItemSignature).sort(),
+    readyItems: value.readyItems.map(workItemSignature).sort(),
+  });
+}
+
+function workItemSignature(value: AiuWorkItemState): string {
+  return JSON.stringify({
+    id: value.id,
+    lifecycle: value.lifecycle,
+    status: value.status,
+    blockers: [...value.blockers].sort(),
+    priority: value.priority ?? "",
+    title: value.title ?? "",
+  });
+}
+
+function uniqueReviews(items: readonly AiuReviewState[]): readonly AiuReviewState[] {
+  return [...new Map(items.map((item) => [reviewIdentity(item), item])).values()];
+}
+
+function reviewIdentity(item: AiuReviewState): string {
+  return item.targetId ?? `${item.reviewStatus}:${item.status}:${item.unresolvedFeedbackCount ?? ""}`;
 }
 
 function findPlanningContinuation(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {

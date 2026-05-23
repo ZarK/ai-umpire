@@ -27,6 +27,7 @@ export {
   loadAiuConfig,
 } from "./config.js";
 export {
+  AIU_DECISION_MODES,
   AIU_DECISION_PROMPT_KINDS,
   decideAiuContinuation,
 } from "./decision.js";
