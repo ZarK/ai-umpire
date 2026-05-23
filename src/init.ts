@@ -206,6 +206,10 @@ export function applyAiuInitPlan(plan: AiuInitPlan): AiuInitPlan {
   return refreshed;
 }
 
+export function getAiuHostCapabilityProfiles(tools: readonly AiuHost[] = ["opencode", "codex", "claude-code"]): readonly AiuHostCapabilityProfile[] {
+  return Object.freeze(tools.map((tool) => HOST_PROFILES[tool]));
+}
+
 export function formatInitPlan(plan: AiuInitPlan): string {
   const sections = [
     `repoRoot: ${plan.repoRoot}`,

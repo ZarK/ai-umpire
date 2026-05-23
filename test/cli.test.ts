@@ -48,6 +48,10 @@ describe("metadata-backed CLI", () => {
       paths: {
         packageRoot: string;
         pluginWrapperRelativePath: string;
+        config: { selectedPath: string; found: boolean };
+        state: { stateDir: string; lockDir: string; logDir: string };
+        hosts: Array<{ host: string; files: Array<{ absolutePath: string }> }>;
+        trustedCommands: unknown[];
       };
     };
 
@@ -57,6 +61,31 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.command, "paths");
     assert.equal(typeof parsed.paths.packageRoot, "string");
     assert.equal(parsed.paths.pluginWrapperRelativePath, ".opencode/plugins/ai-umpire-continuation.ts");
+    assert.equal(parsed.paths.config.found, false);
+    assert.equal(typeof parsed.paths.state.stateDir, "string");
+    assert.ok(parsed.paths.hosts.some((host) => host.host === "opencode"));
+    assert.deepEqual(parsed.paths.trustedCommands, []);
+  });
+
+  it("emits clean JSON for doctor diagnostics", async () => {
+    const result = await runCli(["doctor", "--json"]);
+    const parsed = JSON.parse(result.stdout) as {
+      ok: boolean;
+      command: string;
+      doctor: {
+        status: "ok" | "warning" | "error";
+        config: { found: boolean; valid: boolean };
+        checks: Array<{ status: string; kind: string }>;
+      };
+    };
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.command, "doctor");
+    assert.equal(parsed.doctor.config.found, false);
+    assert.equal(parsed.doctor.config.valid, true);
+    assert.ok(parsed.doctor.checks.some((check) => check.kind === "config-missing"));
   });
 
   it("emits implemented command schema as clean JSON", async () => {
@@ -96,7 +125,7 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.package.name, "@tjalve/aiu");
 
     const commandNames = parsed.commands.map((command) => command.name);
-    assert.deepEqual(commandNames, ["config", "init", "paths", "schema"]);
+    assert.deepEqual(commandNames, ["config", "doctor", "init", "paths", "schema"]);
 
     const config = parsed.commands.find((command) => command.name === "config");
     assert.ok(config);
@@ -122,6 +151,15 @@ describe("metadata-backed CLI", () => {
     assert.ok(init.flags?.some((flag) => flag.name === "dry-run" && flag.type === "boolean"));
     assert.ok(init.flags?.some((flag) => flag.name === "force" && flag.type === "boolean"));
 
+    const doctor = parsed.commands.find((command) => command.name === "doctor");
+    assert.ok(doctor);
+    assert.equal(doctor.interactions?.json, true);
+    assert.equal(doctor.dryRun?.supported, false);
+    assert.equal(doctor.mutation?.mutates, false);
+    assert.ok(doctor.flags?.some((flag) => flag.name === "json" && flag.type === "boolean"));
+    assert.ok(doctor.flags?.some((flag) => flag.name === "config" && flag.type === "string"));
+    assert.ok(doctor.errors?.some((error) => error.kind === "trusted-command-missing"));
+
     const paths = parsed.commands.find((command) => command.name === "paths");
     assert.ok(paths);
     assert.deepEqual(paths.output?.formats, ["human", "json"]);
@@ -133,6 +171,7 @@ describe("metadata-backed CLI", () => {
     assert.equal(paths.dryRun?.supported, false);
     assert.equal(paths.mutation?.mutates, false);
     assert.ok(paths.flags?.some((flag) => flag.name === "json" && flag.type === "boolean"));
+    assert.ok(paths.flags?.some((flag) => flag.name === "config" && flag.type === "string"));
     assert.ok(paths.examples?.some((example) => example.command === "aiu paths --json"));
     assert.ok(paths.errors?.some((error) => error.kind === "asset-paths-unavailable"));
     assert.deepEqual(paths.exitCodes?.map((exitCode) => exitCode.code), [0, 1, 2]);
