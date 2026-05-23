@@ -99,6 +99,15 @@ Command execution records:
 
 Adapters parse configured command output into core state models. Adapter modules return typed results or stable errors and must not mutate files, providers, work items, review items, config, or host state.
 
+M2.2 adds the read-only adapter primitives that later `aiu status` uses:
+
+- `executeAiuTrustedCommand` runs only explicit argv descriptors with `shell: false`, timeout limits, combined output byte limits, exit metadata, elapsed time, stdout/stderr byte counts, and redacted stderr summaries.
+- `parseAiuTrustedStateJson` parses schema-versioned JSON into trusted state envelopes or stable adapter errors.
+- `runAiuTrustedStateAdapter` composes execution and parsing for configured trusted commands without provider mutation or fallback helper compatibility.
+- Adapter error codes are exposed from the package entrypoint and in `aiu schema --json` under `trustedState.adapterErrorCodes`.
+
+The stable adapter errors distinguish spawn failure, timeout, non-zero exit, output limit, malformed JSON, unknown schema, unsupported capability, stale state, and invalid state. Unsupported capabilities and stale state are structured errors, never success.
+
 ## Part 3: Decision Engine
 
 The decision engine returns:
