@@ -215,7 +215,24 @@ describe("migration planner", () => {
     assert.match(await readFile(path.join(target, ".umpire", "continuation.json"), "utf8"), /"active":true/);
   });
 
-  it("force apply replaces only managed host files and leaves cleanup candidates untouched", async () => {
+  it("force apply replaces managed host files when no non-managed blockers remain", async () => {
+    const target = await createRepoRoot();
+    await mkdir(path.join(target, ".opencode", "plugins"), { recursive: true });
+    await writeFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "export const oldLocalHook = true;\n", "utf8");
+
+    const result = await runCli(target, ["migrate", "--apply", "--force", "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationApplyEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.migrate.force, true);
+    assert.equal(parsed.migrate.ok, true);
+    assert.ok(parsed.migrate.changed.some((item) => item.relativePath === path.join(".opencode", "plugins", "ai-umpire-continuation.ts") && item.action === "update"));
+    assert.equal(parsed.migrate.recommendedNextCommand, "aiu doctor --json");
+    assert.match(await readFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "utf8"), /createAiuOpenCodePlugin/);
+  });
+
+  it("does not partially apply force when non-managed cleanup candidates remain", async () => {
     const target = await createRepoRoot();
     await mkdir(path.join(target, ".opencode", "plugins"), { recursive: true });
     await mkdir(path.join(target, "scripts"), { recursive: true });
@@ -228,10 +245,11 @@ describe("migration planner", () => {
     assert.equal(result.exitCode, 0);
     assert.equal(result.stderr, "");
     assert.equal(parsed.migrate.force, true);
-    assert.ok(parsed.migrate.changed.some((item) => item.relativePath === path.join(".opencode", "plugins", "ai-umpire-continuation.ts") && item.action === "update"));
+    assert.equal(parsed.migrate.ok, false);
+    assert.equal(parsed.migrate.changed.some((item) => item.relativePath === path.join(".opencode", "plugins", "ai-umpire-continuation.ts")), false);
     assert.ok(parsed.migrate.skipped.some((item) => item.relativePath === path.join("scripts", "aiu-stop.js") && item.category === "cleanup-candidate"));
     assert.equal(parsed.migrate.recommendedNextCommand, "Review reported paths, then rerun aiu migrate --dry-run --json.");
-    assert.match(await readFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "utf8"), /createAiuOpenCodePlugin/);
+    assert.equal(await readFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "utf8"), "export const oldLocalHook = true;\n");
     assert.equal(await readFile(path.join(target, "scripts", "aiu-stop.js"), "utf8"), "console.log('old ai-umpire helper');\n");
   });
 

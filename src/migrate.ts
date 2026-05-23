@@ -287,6 +287,22 @@ export function applyAiuMigration(options: AiuMigrationOptions = {}): AiuMigrati
   const preserved: AiuMigrationApplyAction[] = [];
   const skipped: AiuMigrationApplyAction[] = [];
   const conflicted: AiuMigrationApplyAction[] = [];
+  const unresolvedReview = plan.reviewRequired
+    .filter((finding) => !(force && managedPathSet.has(finding.relativePath)))
+    .map((finding) => applyAction(finding.relativePath, "review", finding.category, finding.reason, finding.fingerprint));
+  const unresolvedPlanConflicts = plan.conflicts
+    .filter((finding) => !(force && managedPathSet.has(finding.relativePath)))
+    .map((finding) => applyAction(finding.relativePath, "conflict", finding.category, finding.reason, finding.fingerprint));
+
+  collectPreservedApplyDiagnostics(plan, preserved);
+  skipped.push(...plan.cleanupCandidates.map((finding) => applyAction(finding.relativePath, "skip", "cleanup-candidate", "Cleanup is intentionally deferred to the explicit cleanup command.", finding.fingerprint)));
+
+  if (unresolvedReview.length > 0 || unresolvedPlanConflicts.length > 0) {
+    skipped.push(...plan.filesToCreate.map((item) => applyAction(item.relativePath, "skip", item.category, "Apply is blocked until review-required migration paths are resolved.", item.fingerprint)));
+    skipped.push(...plan.filesToUpdate.map((item) => applyAction(item.relativePath, "skip", item.category, "Apply is blocked until review-required migration paths are resolved.", item.fingerprint)));
+    skipped.push(...unresolvedReview.map((action) => applyAction(action.relativePath, "skip", action.category, "Review-required path was preserved without mutation.", action.fingerprint)));
+    return finalizeApplyResult(plan, force, managedPathSet, changed, preserved, skipped, unresolvedPlanConflicts, unresolvedReview);
+  }
 
   applyConfig(plan, changed, preserved, conflicted);
 
@@ -322,24 +338,21 @@ export function applyAiuMigration(options: AiuMigrationOptions = {}): AiuMigrati
     conflicted.push(applyAction(file.relativePath, "conflict", "package-managed-host-file", "Existing managed host file differs; preserving it unless --force is provided.", fingerprintText(existing.content ?? "")));
   }
 
-  for (const item of plan.stateMigrations) {
-    preserved.push(applyAction(item.relativePath, "preserve", "state-file", item.reason, item.fingerprint));
-  }
-  for (const finding of [...plan.promptCustomizations, ...plan.trustedCommandDescriptors]) {
-    preserved.push(applyAction(finding.relativePath, "preserve", finding.category, finding.reason, finding.fingerprint));
-  }
+  return finalizeApplyResult(plan, force, managedPathSet, changed, preserved, skipped, conflicted, []);
+}
 
-  const unresolvedReview = plan.reviewRequired
-    .filter((finding) => !(force && managedPathSet.has(finding.relativePath)))
-    .map((finding) => applyAction(finding.relativePath, "review", finding.category, finding.reason, finding.fingerprint));
-  skipped.push(...plan.cleanupCandidates.map((finding) => applyAction(finding.relativePath, "skip", "cleanup-candidate", "Cleanup is intentionally deferred to the explicit cleanup command.", finding.fingerprint)));
-  skipped.push(...unresolvedReview.map((action) => applyAction(action.relativePath, "skip", action.category, "Review-required path was preserved without mutation.", action.fingerprint)));
-
-  const unresolvedPlanConflicts = plan.conflicts
-    .filter((finding) => !(force && managedPathSet.has(finding.relativePath)))
-    .map((finding) => applyAction(finding.relativePath, "conflict", finding.category, finding.reason, finding.fingerprint));
-  const allConflicted = uniqueApplyActions([...conflicted, ...unresolvedPlanConflicts]);
-  const allReviewRequired = uniqueApplyActions(unresolvedReview);
+function finalizeApplyResult(
+  plan: AiuMigrationPlan,
+  force: boolean,
+  managedPathSet: ReadonlySet<string>,
+  changed: readonly AiuMigrationApplyAction[],
+  preserved: readonly AiuMigrationApplyAction[],
+  skipped: readonly AiuMigrationApplyAction[],
+  conflicted: readonly AiuMigrationApplyAction[],
+  reviewRequired: readonly AiuMigrationApplyAction[],
+): AiuMigrationApplyResult {
+  const allConflicted = uniqueApplyActions(conflicted);
+  const allReviewRequired = uniqueApplyActions(reviewRequired);
   const warnings = uniqueStrings([
     ...allConflicted.map((item) => `${item.relativePath}: ${item.reason}`),
     ...allReviewRequired.map((item) => `${item.relativePath}: ${item.reason}`),
@@ -364,6 +377,15 @@ export function applyAiuMigration(options: AiuMigrationOptions = {}): AiuMigrati
     requiredTrustSteps: plan.requiredTrustSteps,
     recommendedNextCommand,
   });
+}
+
+function collectPreservedApplyDiagnostics(plan: AiuMigrationPlan, preserved: AiuMigrationApplyAction[]): void {
+  for (const item of plan.stateMigrations) {
+    preserved.push(applyAction(item.relativePath, "preserve", "state-file", item.reason, item.fingerprint));
+  }
+  for (const finding of [...plan.existingConfig, ...plan.promptCustomizations, ...plan.trustedCommandDescriptors]) {
+    preserved.push(applyAction(finding.relativePath, "preserve", finding.category, finding.reason, finding.fingerprint));
+  }
 }
 
 export function formatMigrationPlan(plan: AiuMigrationPlan): string {
