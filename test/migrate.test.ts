@@ -64,6 +64,7 @@ describe("migration planner", () => {
     await mkdir(path.join(target, ".claude"), { recursive: true });
     await mkdir(path.join(target, ".agents", "plugins"), { recursive: true });
     await mkdir(path.join(target, "packages", "app"), { recursive: true });
+    await mkdir(path.join(target, "packages", "lib"), { recursive: true });
     await mkdir(path.join(target, "plugins", "ai-umpire", "hooks"), { recursive: true });
     await mkdir(path.join(target, "scripts"), { recursive: true });
     await mkdir(path.join(target, ".umpire"), { recursive: true });
@@ -104,6 +105,12 @@ describe("migration planner", () => {
         "@tjalve/aiu": "link:../../ai-umpire",
       },
     }, null, 2), "utf8");
+    await writeFile(path.join(target, "packages", "lib", "package.json"), JSON.stringify({
+      private: true,
+      dependencies: {
+        "@tjalve/aiu": "0.0.0",
+      },
+    }, null, 2), "utf8");
 
     const result = await runCli(target, ["migrate", "--dry-run", "--json"]);
     const parsed = JSON.parse(result.stdout) as MigrationEnvelope;
@@ -129,6 +136,7 @@ describe("migration planner", () => {
     assert.ok(parsed.migrate.hostInstructionReferences.some((finding) => finding.relativePath === "AGENTS.md"));
     assert.ok(parsed.migrate.trustedCommandDescriptors.some((finding) => finding.sourceCommandSummary === "aie status --json"));
     assert.ok(parsed.migrate.reviewRequired.some((finding) => finding.category === "unknown-aiu-file" && finding.relativePath === path.join(".opencode", "mystery.md")));
+    assert.equal(parsed.migrate.reviewRequired.some((finding) => finding.category === "unknown-aiu-file" && finding.relativePath === path.join("packages", "lib", "package.json")), false);
     assert.ok(parsed.migrate.cleanupCandidates.length >= 4);
     assert.ok(parsed.migrate.conflicts.length >= 6);
     assert.ok(parsed.migrate.filesToCreate.length >= 1);

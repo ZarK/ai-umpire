@@ -550,7 +550,7 @@ function findTrustedCommandDescriptors(configPath: string, trustedStateCommands:
 
 function findUnknownAiuFiles(repoRoot: string, candidates: readonly string[], knownPaths: ReadonlySet<string>): AiuMigrationFinding[] {
   return candidates.flatMap((relativePath) => {
-    if (knownPaths.has(relativePath) || ["package.json", "pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lock", "README.md", "AGENTS.md", "CLAUDE.md"].includes(relativePath)) {
+    if (knownPaths.has(relativePath) || MANIFEST_FILE_NAMES.has(path.basename(relativePath)) || ["README.md", "AGENTS.md", "CLAUDE.md"].includes(relativePath)) {
       return [];
     }
     const content = readText(path.join(repoRoot, relativePath));
