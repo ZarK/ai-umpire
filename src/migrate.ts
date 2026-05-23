@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import type { Dirent } from "node:fs";
 import path from "node:path";
 
@@ -11,6 +11,7 @@ export interface AiuMigrationOptions {
   readonly cwd?: string;
   readonly dryRun?: boolean;
   readonly force?: boolean;
+  readonly confirmations?: readonly string[];
 }
 
 export interface AiuMigrationPlan {
@@ -59,6 +60,7 @@ export interface AiuMigrationFinding {
   readonly requiredReview?: boolean;
   readonly host?: string;
   readonly evidence?: string;
+  readonly sourceCategory?: string;
 }
 
 export interface AiuMigrationManagedSection {
@@ -124,6 +126,32 @@ export interface AiuMigrationApplyAction {
   readonly category: string;
   readonly reason: string;
   readonly fingerprint?: string;
+}
+
+export interface AiuMigrationCleanupResult {
+  readonly ok: boolean;
+  readonly dryRun: boolean;
+  readonly cleanup: true;
+  readonly repoRoot: string;
+  readonly plan: AiuMigrationPlan;
+  readonly confirmations: readonly string[];
+  readonly planned: readonly AiuMigrationCleanupAction[];
+  readonly removed: readonly AiuMigrationCleanupAction[];
+  readonly preserved: readonly AiuMigrationCleanupAction[];
+  readonly skipped: readonly AiuMigrationCleanupAction[];
+  readonly conflicted: readonly AiuMigrationCleanupAction[];
+  readonly reviewRequired: readonly AiuMigrationCleanupAction[];
+  readonly warnings: readonly string[];
+  readonly recommendedNextCommand: string;
+}
+
+export interface AiuMigrationCleanupAction {
+  readonly relativePath: string;
+  readonly action: "planned" | "removed" | "preserve" | "skip" | "conflict" | "review";
+  readonly category: string;
+  readonly reason: string;
+  readonly fingerprint?: string;
+  readonly sourceCategory?: string;
 }
 
 interface ManagedHostPath {
@@ -273,7 +301,7 @@ export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigratio
     ]),
     requiredTrustSteps: Object.freeze(requiredTrustSteps),
     hostTrustSteps: Object.freeze(requiredTrustSteps),
-    plannedCommands: Object.freeze(["aiu migrate --dry-run --json", "aiu init --dry-run --json", "aiu init --tool all"]),
+    plannedCommands: Object.freeze(["aiu migrate --dry-run --json", "aiu migrate --cleanup --dry-run --json", "aiu init --dry-run --json", "aiu init --tool all"]),
     recommendedNextCommand: "aiu init --dry-run --json",
   });
 }
@@ -339,6 +367,69 @@ export function applyAiuMigration(options: AiuMigrationOptions = {}): AiuMigrati
   }
 
   return finalizeApplyResult(plan, force, managedPathSet, changed, preserved, skipped, conflicted, []);
+}
+
+export function cleanupAiuMigration(options: AiuMigrationOptions = {}): AiuMigrationCleanupResult {
+  const dryRun = options.dryRun !== false;
+  const plan = planAiuMigration({ cwd: options.cwd, dryRun: true });
+  const confirmations = normalizeConfirmations(options.confirmations ?? []);
+  const candidates = plan.cleanupCandidates.filter(isConfirmedCleanupCandidate);
+  const candidatePaths = new Set(candidates.map((candidate) => candidate.relativePath));
+  const preserved = preservedCleanupDiagnostics(plan);
+  const reviewRequired = uniqueCleanupActions(plan.reviewRequired
+    .filter((finding) => !candidatePaths.has(finding.relativePath))
+    .map((finding) => cleanupAction(finding.relativePath, "review", finding.category, finding.reason, finding.fingerprint, finding.sourceCategory)));
+  const planned: AiuMigrationCleanupAction[] = [];
+  const removed: AiuMigrationCleanupAction[] = [];
+  const skipped: AiuMigrationCleanupAction[] = [];
+  const conflicted: AiuMigrationCleanupAction[] = [];
+
+  for (const candidate of candidates) {
+    const confirmed = cleanupCandidateConfirmed(candidate, confirmations);
+    if (dryRun) {
+      planned.push(cleanupAction(candidate.relativePath, "planned", "cleanup-candidate", cleanupPlanReason(candidate, confirmed), candidate.fingerprint, candidate.sourceCategory));
+      continue;
+    }
+    if (!confirmed) {
+      skipped.push(cleanupAction(candidate.relativePath, "skip", "cleanup-candidate", "Cleanup candidate was preserved because its path or fingerprint was not confirmed.", candidate.fingerprint, candidate.sourceCategory));
+      continue;
+    }
+    const result = removeCleanupCandidate(plan.repoRoot, candidate);
+    if (result.ok) {
+      removed.push(cleanupAction(candidate.relativePath, "removed", "cleanup-candidate", result.reason, candidate.fingerprint, candidate.sourceCategory));
+    } else {
+      conflicted.push(cleanupAction(candidate.relativePath, "conflict", "cleanup-candidate", result.reason, candidate.fingerprint, candidate.sourceCategory));
+    }
+  }
+
+  for (const candidate of plan.cleanupCandidates.filter((finding) => !isConfirmedCleanupCandidate(finding))) {
+    skipped.push(cleanupAction(candidate.relativePath, "skip", "cleanup-candidate", "Cleanup candidate was preserved because it is not a removable old asset category.", candidate.fingerprint, candidate.sourceCategory));
+  }
+  addUnmatchedCleanupConfirmations(plan.repoRoot, confirmations, plan.cleanupCandidates, skipped, conflicted);
+
+  const allConflicted = uniqueCleanupActions(conflicted);
+  const allReviewRequired = uniqueCleanupActions(reviewRequired);
+  const warnings = uniqueStrings([
+    ...allConflicted.map((item) => `${item.relativePath}: ${item.reason}`),
+    ...allReviewRequired.map((item) => `${item.relativePath}: ${item.reason}`),
+  ]);
+
+  return Object.freeze({
+    ok: allConflicted.length === 0 && allReviewRequired.length === 0,
+    dryRun,
+    cleanup: true as const,
+    repoRoot: plan.repoRoot,
+    plan,
+    confirmations: Object.freeze([...confirmations]),
+    planned: Object.freeze(uniqueCleanupActions(planned)),
+    removed: Object.freeze(uniqueCleanupActions(removed)),
+    preserved: Object.freeze(uniqueCleanupActions(preserved)),
+    skipped: Object.freeze(uniqueCleanupActions(skipped)),
+    conflicted: Object.freeze(allConflicted),
+    reviewRequired: Object.freeze(allReviewRequired),
+    warnings: Object.freeze(warnings),
+    recommendedNextCommand: dryRun ? "aiu migrate --cleanup --confirm <path-or-fingerprint> --json" : "aiu migrate --dry-run --json",
+  });
 }
 
 function finalizeApplyResult(
@@ -458,6 +549,34 @@ export function formatMigrationApplyResult(result: AiuMigrationApplyResult): str
     "",
     "Required trust steps:",
     ...result.requiredTrustSteps.map((step) => `- ${step}`),
+    "",
+    `Recommended next command: ${result.recommendedNextCommand}`,
+    "",
+  ].join("\n");
+}
+
+export function formatMigrationCleanupResult(result: AiuMigrationCleanupResult): string {
+  return [
+    `repoRoot: ${result.repoRoot}`,
+    `mode: cleanup ${result.dryRun ? "dry-run" : "remove"}`,
+    "",
+    "Planned:",
+    ...formatCleanupActions(result.planned),
+    "",
+    "Removed:",
+    ...formatCleanupActions(result.removed),
+    "",
+    "Preserved:",
+    ...formatCleanupActions(result.preserved),
+    "",
+    "Skipped:",
+    ...formatCleanupActions(result.skipped),
+    "",
+    "Conflicted:",
+    ...formatCleanupActions(result.conflicted),
+    "",
+    "Review-required:",
+    ...formatCleanupActions(result.reviewRequired),
     "",
     `Recommended next command: ${result.recommendedNextCommand}`,
     "",
@@ -949,9 +1068,12 @@ function findingFrom(finding: AiuMigrationFinding, override: Pick<AiuMigrationFi
 }
 
 function conservativeCleanupCandidates(findings: readonly AiuMigrationFinding[]): readonly AiuMigrationFinding[] {
-  return Object.freeze(findings.map((finding) => findingFrom(finding, {
-    category: "cleanup-candidate",
-    reason: `Review after package-backed migration replaces ${finding.category}; deletion requires an explicit later cleanup confirmation.`,
+  return Object.freeze(findings.map((finding) => ({
+    ...findingFrom(finding, {
+      category: "cleanup-candidate",
+      reason: `Review after package-backed migration replaces ${finding.category}; deletion requires an explicit later cleanup confirmation.`,
+    }),
+    sourceCategory: finding.category,
   })));
 }
 
@@ -994,6 +1116,124 @@ function applyAction(relativePath: string, action: AiuMigrationApplyAction["acti
     reason,
     ...(fingerprint ? { fingerprint } : {}),
   };
+}
+
+const REMOVABLE_CLEANUP_SOURCE_CATEGORIES = new Set(["copied-helper", "command-wrapper", "old-hook-entry", "repo-local-hook"]);
+
+function isConfirmedCleanupCandidate(finding: AiuMigrationFinding): boolean {
+  return finding.category === "cleanup-candidate"
+    && finding.fingerprint !== undefined
+    && finding.sourceCategory !== undefined
+    && REMOVABLE_CLEANUP_SOURCE_CATEGORIES.has(finding.sourceCategory)
+    && !MANIFEST_FILE_NAMES.has(path.basename(finding.relativePath))
+    && !["AGENTS.md", "CLAUDE.md", "README.md", "aiu.config.json"].includes(finding.relativePath);
+}
+
+function cleanupCandidateConfirmed(finding: AiuMigrationFinding, confirmations: ReadonlySet<string>): boolean {
+  return confirmations.has(finding.relativePath) || (finding.fingerprint !== undefined && confirmations.has(finding.fingerprint));
+}
+
+function normalizeConfirmations(confirmations: readonly string[]): ReadonlySet<string> {
+  return new Set(confirmations.flatMap((item) => item.split(",")).map((item) => item.trim()).filter((item) => item.length > 0));
+}
+
+function cleanupPlanReason(candidate: AiuMigrationFinding, confirmed: boolean): string {
+  if (confirmed) {
+    return `Confirmed ${candidate.sourceCategory ?? "old asset"} cleanup candidate would be removed.`;
+  }
+  return `Cleanup candidate requires --confirm ${candidate.relativePath} or its fingerprint before removal.`;
+}
+
+function preservedCleanupDiagnostics(plan: AiuMigrationPlan): AiuMigrationCleanupAction[] {
+  return [
+    ...plan.existingConfig.map((finding) => cleanupAction(finding.relativePath, "preserve", finding.category, finding.reason, finding.fingerprint, finding.sourceCategory)),
+    ...plan.promptCustomizations.map((finding) => cleanupAction(finding.relativePath, "preserve", finding.category, finding.reason, finding.fingerprint, finding.sourceCategory)),
+    ...plan.stateFindings.map((finding) => cleanupAction(finding.relativePath, "preserve", finding.category, finding.reason, finding.fingerprint, finding.sourceCategory)),
+    ...plan.hostInstructionReferences.map((finding) => cleanupAction(finding.relativePath, "preserve", finding.category, finding.reason, finding.fingerprint, finding.sourceCategory)),
+    ...plan.trustedCommandDescriptors.map((finding) => cleanupAction(finding.relativePath, "preserve", finding.category, finding.reason, finding.fingerprint, finding.sourceCategory)),
+  ];
+}
+
+function removeCleanupCandidate(repoRoot: string, candidate: AiuMigrationFinding): { readonly ok: true; readonly reason: string } | { readonly ok: false; readonly reason: string } {
+  const absolutePath = path.resolve(repoRoot, candidate.relativePath);
+  const relativeFromRoot = path.relative(repoRoot, absolutePath);
+  if (relativeFromRoot.startsWith("..") || path.isAbsolute(relativeFromRoot)) {
+    return { ok: false, reason: "Cleanup refused because the resolved path is outside the repository root." };
+  }
+  let stat;
+  try {
+    stat = lstatSync(absolutePath);
+  } catch {
+    return { ok: true, reason: "Cleanup candidate was already absent." };
+  }
+  if (stat.isSymbolicLink()) {
+    return { ok: false, reason: "Cleanup refused to remove a symlink path." };
+  }
+  if (!stat.isFile()) {
+    return { ok: false, reason: "Cleanup only removes regular files." };
+  }
+  try {
+    unlinkSync(absolutePath);
+    return { ok: true, reason: "Removed confirmed cleanup candidate." };
+  } catch (error) {
+    return { ok: false, reason: `Cleanup candidate could not be removed: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+function addUnmatchedCleanupConfirmations(
+  repoRoot: string,
+  confirmations: ReadonlySet<string>,
+  candidates: readonly AiuMigrationFinding[],
+  skipped: AiuMigrationCleanupAction[],
+  conflicted: AiuMigrationCleanupAction[],
+): void {
+  const matched = new Set(candidates.flatMap((candidate) => [candidate.relativePath, candidate.fingerprint ?? ""]));
+  for (const confirmation of confirmations) {
+    if (matched.has(confirmation)) {
+      continue;
+    }
+    if (confirmation.startsWith("sha256:")) {
+      skipped.push(cleanupAction(confirmation, "skip", "cleanup-confirmation", "Confirmation fingerprint did not match any cleanup candidate."));
+      continue;
+    }
+    const absolutePath = path.resolve(repoRoot, confirmation);
+    const relativeFromRoot = path.relative(repoRoot, absolutePath);
+    if (relativeFromRoot.startsWith("..") || path.isAbsolute(relativeFromRoot)) {
+      conflicted.push(cleanupAction(confirmation, "conflict", "cleanup-confirmation", "Cleanup refused a confirmation path outside the repository root."));
+      continue;
+    }
+    skipped.push(cleanupAction(confirmation, "skip", "cleanup-confirmation", "Confirmation did not match a removable cleanup candidate."));
+  }
+}
+
+function cleanupAction(
+  relativePath: string,
+  action: AiuMigrationCleanupAction["action"],
+  category: string,
+  reason: string,
+  fingerprint?: string,
+  sourceCategory?: string,
+): AiuMigrationCleanupAction {
+  return {
+    relativePath,
+    action,
+    category,
+    reason,
+    ...(fingerprint ? { fingerprint } : {}),
+    ...(sourceCategory ? { sourceCategory } : {}),
+  };
+}
+
+function uniqueCleanupActions(actions: readonly AiuMigrationCleanupAction[]): AiuMigrationCleanupAction[] {
+  const seen = new Set<string>();
+  return actions.filter((action) => {
+    const key = `${action.action}\0${action.category}\0${action.relativePath}\0${action.reason}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function uniqueApplyActions(actions: readonly AiuMigrationApplyAction[]): AiuMigrationApplyAction[] {
@@ -1043,5 +1283,9 @@ function formatFileActions(actions: readonly AiuMigrationFileAction[]): string[]
 }
 
 function formatApplyActions(actions: readonly AiuMigrationApplyAction[]): string[] {
+  return actions.length === 0 ? ["- none"] : actions.map((action) => `- ${action.relativePath} [${action.action}/${action.category}]: ${action.reason}`);
+}
+
+function formatCleanupActions(actions: readonly AiuMigrationCleanupAction[]): string[] {
   return actions.length === 0 ? ["- none"] : actions.map((action) => `- ${action.relativePath} [${action.action}/${action.category}]: ${action.reason}`);
 }

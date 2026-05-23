@@ -122,6 +122,8 @@ Package-owned managed sections are the files and content emitted by `aiu init` o
 
 Apply is never the default. `pnpm exec aiu migrate --apply --json` writes package-backed config and managed host files for migration-safe paths, preserves existing config, prompt customizations, trusted command descriptors, and `.umpire/` state, and reports changed, preserved, skipped, conflicted, and review-required paths. Apply mode does not stage, commit, branch, push, open PRs, merge, close issues, delete cleanup candidates, or mutate provider state.
 
+Cleanup is also explicit and dry-run first. `pnpm exec aiu migrate --cleanup --dry-run --json` reports confirmed old-asset candidates, and `pnpm exec aiu migrate --cleanup --confirm scripts/aiu-stop.js --json` removes only the named cleanup candidate or matching fingerprint. Cleanup preserves manifests, host instructions, prompts, unknown files, state files, symlinks, and anything outside conservative old-asset categories.
+
 OpenCode continuation uses `.umpire/state/continuation.json`, `.umpire/locks/continuation.lock`, and `.umpire/logs/continuation.jsonl` by default. These paths are configurable in `aiu.config.json`, exposed by `aiu paths` and `aiu status --json`, and remain local state that should not be committed or uploaded as provider truth.
 
 ## Whip Tasks

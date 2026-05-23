@@ -590,6 +590,16 @@ export const migrateCommand = defineCommand({
       description: "Replace differing managed host files explicitly; never deletes preserved state or cleanup candidates.",
       type: "boolean",
     }),
+    defineFlag({
+      name: "cleanup",
+      description: "Inspect or remove confirmed old migration assets without changing host/config apply behavior.",
+      type: "boolean",
+    }),
+    defineFlag({
+      name: "confirm",
+      description: "Comma-separated cleanup candidate relative paths or fingerprints to remove.",
+      type: "string",
+    }),
   ],
   examples: [
     defineExample({
@@ -603,6 +613,14 @@ export const migrateCommand = defineCommand({
     defineExample({
       description: "Replace differing managed host files after review.",
       command: "aiu migrate --apply --force --json",
+    }),
+    defineExample({
+      description: "Inspect cleanup candidates without deleting files.",
+      command: "aiu migrate --cleanup --dry-run --json",
+    }),
+    defineExample({
+      description: "Remove a confirmed cleanup candidate by path or fingerprint.",
+      command: "aiu migrate --cleanup --confirm scripts/aiu-stop.js --json",
     }),
   ],
   output: {
@@ -625,6 +643,10 @@ export const migrateCommand = defineCommand({
     {
       kind: "migration-conflict",
       description: "Migration apply found paths requiring review or explicit force before replacement.",
+    },
+    {
+      kind: "migration-cleanup-conflict",
+      description: "Migration cleanup refused an unsafe or unconfirmed removal.",
     },
     {
       kind: "invalid-command-usage",

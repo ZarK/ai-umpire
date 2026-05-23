@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -266,6 +266,96 @@ describe("migration planner", () => {
     assert.ok(parsed.migrate.conflicted.some((item) => item.relativePath === path.join(".opencode", "plugins", "ai-umpire-continuation.ts") && item.category === "package-managed-host-file"));
     assert.equal(await readFile(path.join(target, ".opencode"), "utf8"), "not a directory\n");
   });
+
+  it("plans cleanup candidates without deleting files by default", async () => {
+    const target = await createRepoRoot();
+    await mkdir(path.join(target, "scripts"), { recursive: true });
+    await writeFile(path.join(target, "scripts", "aiu-stop.js"), "console.log('ai-umpire hook-stop helper');\n", "utf8");
+
+    const result = await runCli(target, ["migrate", "--cleanup", "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationCleanupEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.migrate.cleanup, true);
+    assert.equal(parsed.migrate.dryRun, true);
+    assert.ok(parsed.migrate.planned.some((item) => item.relativePath === path.join("scripts", "aiu-stop.js") && item.sourceCategory === "copied-helper"));
+    assert.equal(await readFile(path.join(target, "scripts", "aiu-stop.js"), "utf8"), "console.log('ai-umpire hook-stop helper');\n");
+  });
+
+  it("removes only explicitly confirmed cleanup candidates", async () => {
+    const target = await createRepoRoot();
+    await mkdir(path.join(target, "scripts"), { recursive: true });
+    await mkdir(path.join(target, ".opencode"), { recursive: true });
+    await mkdir(path.join(target, ".umpire"), { recursive: true });
+    await writeFile(path.join(target, "scripts", "aiu-stop.js"), "console.log('ai-umpire hook-stop helper');\n", "utf8");
+    await writeFile(path.join(target, ".opencode", "mystery.md"), "Umpire notes from an unknown local customization.\n", "utf8");
+    await writeFile(path.join(target, ".umpire", "whip.json"), JSON.stringify({ schemaVersion: 1, tasks: [] }), "utf8");
+
+    const result = await runCli(target, ["migrate", "--cleanup", "--confirm", path.join("scripts", "aiu-stop.js"), "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationCleanupEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.migrate.dryRun, false);
+    assert.equal(parsed.migrate.ok, false);
+    assert.ok(parsed.migrate.removed.some((item) => item.relativePath === path.join("scripts", "aiu-stop.js")));
+    assert.ok(parsed.migrate.reviewRequired.some((item) => item.relativePath === path.join(".opencode", "mystery.md")));
+    assert.ok(parsed.migrate.preserved.some((item) => item.relativePath === path.join(".umpire", "whip.json")));
+    assert.equal(existsSync(path.join(target, "scripts", "aiu-stop.js")), false);
+    assert.equal(existsSync(path.join(target, ".opencode", "mystery.md")), true);
+    assert.equal(existsSync(path.join(target, ".umpire", "whip.json")), true);
+  });
+
+  it("preserves package manifests even when confirmed for cleanup", async () => {
+    const target = await createRepoRoot();
+    await writeFile(path.join(target, "package.json"), JSON.stringify({
+      private: true,
+      devDependencies: {
+        "@tjalve/aiu": "file:../ai-umpire",
+      },
+    }, null, 2), "utf8");
+
+    const result = await runCli(target, ["migrate", "--cleanup", "--confirm", "package.json", "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationCleanupEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.migrate.dryRun, false);
+    assert.ok(parsed.migrate.skipped.some((item) => item.relativePath === "package.json" && item.action === "skip"));
+    assert.equal(existsSync(path.join(target, "package.json")), true);
+  });
+
+  it("reports outside-root cleanup confirmations as conflicts", async () => {
+    const target = await createRepoRoot();
+
+    const result = await runCli(target, ["migrate", "--cleanup", "--confirm", "../outside.js", "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationCleanupEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.migrate.ok, false);
+    assert.ok(parsed.migrate.conflicted.some((item) => item.relativePath === "../outside.js" && item.category === "cleanup-confirmation"));
+  });
+
+  it("refuses symlink cleanup candidates without following them", async () => {
+    const target = await createRepoRoot();
+    const outside = await mkdtemp(path.join(tmpdir(), "aiu-outside-"));
+    tempRoots.push(outside);
+    await mkdir(path.join(target, "scripts"), { recursive: true });
+    await writeFile(path.join(outside, "aiu-stop.js"), "console.log('outside ai-umpire helper');\n", "utf8");
+    await symlink(path.join(outside, "aiu-stop.js"), path.join(target, "scripts", "aiu-stop.js"));
+
+    const result = await runCli(target, ["migrate", "--cleanup", "--confirm", path.join("scripts", "aiu-stop.js"), "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationCleanupEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.migrate.ok, true);
+    assert.equal(parsed.migrate.removed.some((item) => item.relativePath === path.join("scripts", "aiu-stop.js")), false);
+    assert.equal(existsSync(path.join(target, "scripts", "aiu-stop.js")), true);
+    assert.equal(await readFile(path.join(outside, "aiu-stop.js"), "utf8"), "console.log('outside ai-umpire helper');\n");
+  });
 });
 
 interface MigrationEnvelope {
@@ -312,6 +402,21 @@ interface MigrationApplyEnvelope {
     readonly conflicted: Array<{ relativePath: string; action: string; category: string }>;
     readonly reviewRequired: Array<{ relativePath: string; action: string; category: string }>;
     readonly recommendedNextCommand: string;
+  };
+}
+
+interface MigrationCleanupEnvelope {
+  readonly ok: boolean;
+  readonly migrate: {
+    readonly ok: boolean;
+    readonly dryRun: boolean;
+    readonly cleanup: boolean;
+    readonly planned: Array<{ relativePath: string; action: string; category: string; sourceCategory?: string; reason: string }>;
+    readonly removed: Array<{ relativePath: string; action: string; category: string; sourceCategory?: string; reason: string }>;
+    readonly preserved: Array<{ relativePath: string; action: string; category: string; sourceCategory?: string; reason: string }>;
+    readonly skipped: Array<{ relativePath: string; action: string; category: string; sourceCategory?: string; reason: string }>;
+    readonly conflicted: Array<{ relativePath: string; action: string; category: string; sourceCategory?: string; reason: string }>;
+    readonly reviewRequired: Array<{ relativePath: string; action: string; category: string; sourceCategory?: string; reason: string }>;
   };
 }
 

@@ -165,7 +165,7 @@ Apply package-backed config and managed host updates only through explicit `aiu 
 
 ### M5.3 - Implement Explicit Cleanup For Confirmed Old Assets
 
-Remove only confirmed cleanup candidates and leave unknown files for manual review.
+Remove only confirmed old-asset cleanup candidates through explicit dry-run-first cleanup, preserve unknown files, manifests, host instructions, prompt customizations, state, symlinks, and anything outside conservative inventory evidence.
 
 ### M5.4 - Finalize Runtime Boundaries And No-Fallback Checks
 

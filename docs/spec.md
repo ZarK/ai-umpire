@@ -148,6 +148,7 @@ M4.5 closes the milestone by making idle modes observable through read-only diag
 | FR-09-003 | Migration preserves user-authored prompt text, host configuration outside managed sections, trusted command descriptors, repository policy choices, and durable continuation state where the state schema is recognized. | Required |
 | FR-09-004 | Migration can apply package-backed config and host updates only after explicit user request. It reports changed, preserved, skipped, conflicted, and review-required paths, and must not stage, commit, branch, push, open PRs, merge, close work items, delete cleanup candidates, or mutate provider state. | Required |
 | FR-09-005 | Migration does not add runtime fallback support for copied implementation scripts or old helper semantics. Repositories should end on package-backed host entrypoints and configured trusted commands. | Required |
+| FR-09-006 | Migration cleanup is explicit, dry-run first, and removes only confirmed old-asset candidates backed by conservative inventory evidence. It preserves unknown files, manifests, host instructions, prompts, state files, symlinks, and paths outside safe repository ownership. | Required |
 
 ## FR-10 - Safety, Observability, And Hygiene
 

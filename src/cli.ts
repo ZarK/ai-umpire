@@ -19,7 +19,7 @@ import { formatAiuDoctorReport, formatAiuPaths, getAiuResolvedPaths, runAiuDocto
 import { AIU_HOST_CAPABILITY_SUPPORT, AIU_HOST_SUPPORT_LEVELS, getAllAiuHostCapabilityProfiles } from "./host_policy.js";
 import { formatHookStopJson, readHookStopStdin, runAiuHookStop } from "./hook_stop.js";
 import { applyAiuInitPlan, formatInitPlan, planAiuInit, type AiuInitTool } from "./init.js";
-import { applyAiuMigration, formatMigrationApplyResult, formatMigrationPlan, planAiuMigration } from "./migrate.js";
+import { applyAiuMigration, cleanupAiuMigration, formatMigrationApplyResult, formatMigrationCleanupResult, formatMigrationPlan, planAiuMigration } from "./migrate.js";
 import { AIU_STATUS_ERROR_CODES, formatAiuStatusReport, runAiuStatus } from "./status.js";
 import {
   AIU_REASON_CODE_CATALOG,
@@ -138,6 +138,17 @@ export const aiuCli = createCli({
       };
     }),
     createCommand(migrateCommand, (context) => {
+      const confirmations = readConfirmations(context.flags.confirm);
+      if (context.flags.cleanup === true) {
+        const dryRun = context.flags["dry-run"] === true || confirmations.length === 0;
+        const result = cleanupAiuMigration({ dryRun, confirmations });
+        return {
+          human: formatMigrationCleanupResult(result),
+          json: {
+            migrate: result,
+          },
+        };
+      }
       const apply = context.flags.apply === true && context.flags["dry-run"] !== true;
       const force = context.flags.force === true;
       if (apply) {
@@ -394,6 +405,10 @@ function readHookStopTool(value: unknown): "codex" | "claude-code" | undefined {
 
 function readWhipAction(value: unknown): AiuWhipReport["action"] | undefined {
   return value === "list" || value === "status" || value === "add" || value === "cancel" || value === "complete" ? value : undefined;
+}
+
+function readConfirmations(value: unknown): readonly string[] {
+  return typeof value === "string" ? value.split(",").map((item) => item.trim()).filter((item) => item.length > 0) : [];
 }
 
 runtimeRegistry = aiuCli.registry;

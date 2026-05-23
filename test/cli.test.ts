@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -384,8 +384,11 @@ describe("metadata-backed CLI", () => {
     assert.ok(migrate.flags?.some((flag) => flag.name === "dry-run" && flag.type === "boolean"));
     assert.ok(migrate.flags?.some((flag) => flag.name === "apply" && flag.type === "boolean"));
     assert.ok(migrate.flags?.some((flag) => flag.name === "force" && flag.type === "boolean"));
+    assert.ok(migrate.flags?.some((flag) => flag.name === "cleanup" && flag.type === "boolean"));
+    assert.ok(migrate.flags?.some((flag) => flag.name === "confirm" && flag.type === "string"));
     assert.ok(migrate.examples?.some((example) => example.command === "aiu migrate --dry-run --json"));
     assert.ok(migrate.examples?.some((example) => example.command === "aiu migrate --apply --json"));
+    assert.ok(migrate.examples?.some((example) => example.command === "aiu migrate --cleanup --dry-run --json"));
 
     const schema = parsed.commands.find((command) => command.name === "schema");
     assert.ok(schema);
@@ -516,6 +519,36 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.migrate.changed.some((item) => item.relativePath === "aiu.config.json" && item.action === "create"));
     assert.deepEqual(parsed.migrate.conflicted, []);
     assert.deepEqual(parsed.migrate.reviewRequired, []);
+  });
+
+  it("emits clean JSON for migration cleanup dry-run", async () => {
+    const target = await createRepoRoot();
+    await mkdir(path.join(target, "scripts"), { recursive: true });
+    await writeFile(path.join(target, "scripts", "aiu-stop.js"), "console.log('ai-umpire hook-stop helper');\n", "utf8");
+    const result = await runCli(["migrate", "--cleanup", "--json"], target);
+    const parsed = JSON.parse(result.stdout) as {
+      ok: boolean;
+      command: string;
+      migrate: {
+        ok: boolean;
+        dryRun: boolean;
+        cleanup: boolean;
+        planned: Array<{ relativePath: string }>;
+        removed: unknown[];
+        conflicted: unknown[];
+      };
+    };
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.command, "migrate");
+    assert.equal(parsed.migrate.ok, true);
+    assert.equal(parsed.migrate.cleanup, true);
+    assert.equal(parsed.migrate.dryRun, true);
+    assert.ok(parsed.migrate.planned.some((item) => item.relativePath === path.join("scripts", "aiu-stop.js")));
+    assert.deepEqual(parsed.migrate.removed, []);
+    assert.deepEqual(parsed.migrate.conflicted, []);
   });
 
   it("emits clean JSON for whip status and dry-run mutations", async () => {
