@@ -1,0 +1,64 @@
+test/decision.test.ts
+  s_f8aaaf4fdfe4d6::t_92fcc4750b595b 247-261
+  s_f8aaaf4fdfe4d6::t_c99e758066ce11 211-246,262-272,418-421
+src/config.ts
+  s_f8aaaf4fdfe4d6::t_5d477eac667fcd 29,93-96,163-165,244,271,623-635,935
+src/state.ts
+  s_f8aaaf4fdfe4d6::t_0340463b2c702a 29,90,203-245
+docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md
+  s_f8aaaf4fdfe4d6::t_9ebb032c7a798f 251-252
+test/status.test.ts
+  s_f8aaaf4fdfe4d6::t_c99e758066ce11 130-144,146-161,163-166,209,228-231,325-337
+  s_f8aaaf4fdfe4d6::t_3857b28a0d3dba 145,162
+src/decision.ts
+  s_f8aaaf4fdfe4d6::t_cc833c5bee5e07 150,155-156,331-360
+  s_f8aaaf4fdfe4d6::t_935740e5579158 318-324,328-330,361-364
+  s_f8aaaf4fdfe4d6::t_cd4a4660c75306 490
+  s_f8aaaf4fdfe4d6::t_967653153d55e4 6-8,41,79-83,94,113,140,145,214,239,317,325-327,486-489,491-499,609-667
+  s_f8aaaf4fdfe4d6::t_30196f2bfbfb76 135-139,141-144,146-149,151-154
+src/prompt.ts
+  s_f8aaaf4fdfe4d6::t_b4a0ac73bb4c08 80,94-106,153-154
+src/hook_stop.ts
+  s_f8aaaf4fdfe4d6::t_a546d9fa2c96bc 123
+src/status.ts
+  s_f8aaaf4fdfe4d6::t_3617fdf513de57 118-124,203,260,309-315
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_00697269268882 169-175,270-275
+src/trusted_adapter.ts
+  s_f8aaaf4fdfe4d6::t_ca27deef5d7975 558-565,586-591
+  s_f8aaaf4fdfe4d6::t_648cd1a1fb917a 9,18-22,328,347,354-364,370-372,374-379,382,385-392,397,400-401,404-411,419,423-425,430-435,442-443,447-448,452-465
+  s_f8aaaf4fdfe4d6::t_bd920cb7432f1e 365-369,373,380-381,383-384,393-396,398-399,402-403,412-418,420-422,426-429,436-441,444-446,449-451
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_60051905a2beeb 26,205,280-287
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_1b19c384653dc5 140,216-217,219-220
+  s_f8aaaf4fdfe4d6::t_8e68cdb957eb85 89
+test/trusted_adapter.test.ts
+  s_f8aaaf4fdfe4d6::t_867ade49e8711f 200-244
+test/state.test.ts
+  s_f8aaaf4fdfe4d6::t_1f7ce05de1828d 272-275
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_9ebb032c7a798f 134-135
+test/config.test.ts
+  s_f8aaaf4fdfe4d6::t_906859872bc5b0 38,101-103,129
+README.md
+  s_f8aaaf4fdfe4d6::t_9ebb032c7a798f 73-74,260
+src/opencode.ts
+  s_f8aaaf4fdfe4d6::t_a546d9fa2c96bc 202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "f258c9d0581797ad35dc65286ee886f639322620",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
