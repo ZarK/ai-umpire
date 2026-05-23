@@ -117,6 +117,39 @@ describe("trusted state models", () => {
     assert.equal(Object.isFrozen(result.value.blockers), true);
   });
 
+  it("freezes cyclic nested snapshots without recursing forever", () => {
+    const cyclicBlockers: unknown[] = [];
+    cyclicBlockers.push(cyclicBlockers);
+    const result = createAiuTrustedStateEnvelope({
+      sourceId: "fixture",
+      command: {
+        id: "fixture-command",
+        argv: ["fixture"],
+      },
+      observedAt: "2026-05-23T00:00:00.000Z",
+      trustLevel: "trusted",
+      capabilities: {
+        queue: "supported",
+      },
+      freshness: {
+        kind: "fresh",
+        observedAt: "2026-05-23T00:00:00.000Z",
+      },
+      value: {
+        kind: "work-item",
+        status: "pass",
+        id: "45",
+        lifecycle: "active",
+        blockers: cyclicBlockers as string[],
+      },
+    });
+
+    const clonedBlockers = result.value.blockers as unknown[];
+    assert.equal(clonedBlockers[0], clonedBlockers);
+    assert.notEqual(clonedBlockers, cyclicBlockers);
+    assert.equal(Object.isFrozen(clonedBlockers), true);
+  });
+
   it("fixtures cover valid, failed, missing, stale, unknown, unsupported, untrusted, and malformed states", () => {
     const statuses = collectFixtureStatuses(fixtures());
 

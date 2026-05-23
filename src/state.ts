@@ -266,14 +266,28 @@ function reasonCode(
   });
 }
 
-function deepFreezeClone<TValue>(value: TValue): TValue {
+function deepFreezeClone<TValue>(value: TValue, seen: WeakMap<object, unknown> = new WeakMap()): TValue {
   if (Array.isArray(value)) {
-    return Object.freeze(value.map((item: unknown) => deepFreezeClone(item))) as TValue;
+    const cached = seen.get(value);
+    if (cached !== undefined) {
+      return cached as TValue;
+    }
+    const clone: unknown[] = [];
+    seen.set(value, clone);
+    for (const item of value) {
+      clone.push(deepFreezeClone(item, seen));
+    }
+    return Object.freeze(clone) as TValue;
   }
   if (isRecord(value)) {
+    const cached = seen.get(value);
+    if (cached !== undefined) {
+      return cached as TValue;
+    }
     const clone: Record<string, unknown> = {};
+    seen.set(value, clone);
     for (const [key, nested] of Object.entries(value)) {
-      clone[key] = deepFreezeClone(nested);
+      clone[key] = deepFreezeClone(nested, seen);
     }
     return Object.freeze(clone) as TValue;
   }
