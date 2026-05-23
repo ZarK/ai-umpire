@@ -244,12 +244,14 @@ describe("trusted command adapters", () => {
     assert.equal(value?.kind, "quality");
     assert.equal(value?.kind === "quality" ? value.stages[0]?.command?.argv.join(" ") : "", "pnpm run typecheck");
     assert.equal(value?.kind === "quality" ? value.stages[0]?.command?.timeoutMs : undefined, undefined);
+    assert.equal(value?.kind === "quality" ? value.stages[0]?.command?.maxOutputBytes : undefined, undefined);
     assert.equal(value?.kind === "quality" ? value.stages[0]?.rerunCommand?.timeoutMs : undefined, 1000);
     assert.equal(value?.kind === "quality" ? value.stages[0]?.rerunCommand?.maxOutputBytes : undefined, 16384);
     assert.deepEqual(value?.kind === "quality" ? value.stages[0]?.affectedPaths : [], ["src/state.ts"]);
     assert.equal(value?.kind === "quality" ? value.findings[0]?.supplyChainApprovalRequired : false, true);
     assert.equal(value?.kind === "quality" ? value.selectedTarget?.status : undefined, "unknown");
     assert.deepEqual(value?.kind === "quality" ? value.failingChecks : [], ["typecheck"]);
+    assert.deepEqual(value?.kind === "quality" ? value.affectedPaths : [], ["src/state.ts"]);
   });
 });
 
