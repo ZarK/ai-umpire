@@ -1,0 +1,23 @@
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_aee57919afb45a 142-153
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_0404772a7bd871 657,662
+  s_f8aaaf4fdfe4d6::t_ca270a807fa7b7 656,661
+  s_f8aaaf4fdfe4d6::t_1e5b5988b64262 652-655,658-660,663
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "11c0469223c6c9384245b3618c542851cd2fc3ca",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
