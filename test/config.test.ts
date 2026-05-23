@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
 
-import { loadAiuConfig } from "../src/config.ts";
+import { loadAiuConfig } from "../dist/src/config.js";
 
 const tempRoots: string[] = [];
 
@@ -52,6 +52,10 @@ describe("config foundation", () => {
             stopHook: true,
             promptDelivery: "host",
           },
+        },
+        modes: {
+          opencode: ["continue", "repair", "wait", "stop"],
+          codex: ["stop"],
         },
       },
       trustedStateCommands: {

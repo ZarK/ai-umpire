@@ -45,9 +45,18 @@ export {
   AIU_INIT_TOOLS,
   applyAiuInitPlan,
   formatInitPlan,
-  getAiuHostCapabilityProfiles,
   planAiuInit,
 } from "./init.js";
+export {
+  AIU_HOST_CAPABILITY_SUPPORT,
+  AIU_HOST_SUPPORT_LEVELS,
+  evaluateAiuHostRuntimePolicy,
+  getAiuHostCapabilityProfile,
+  getAiuHostCapabilityProfiles,
+  getAllAiuHostCapabilityProfiles,
+  getDefaultHostCapabilityOverrides,
+  getDefaultHostModes,
+} from "./host_policy.js";
 export {
   formatMigrationPlan,
   planAiuMigration,

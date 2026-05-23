@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
 
-import { loadAiuConfig } from "../src/config.ts";
+import { loadAiuConfig } from "../dist/src/config.js";
 import { AIU_DEFAULT_WHIP_TASKS, decideAiuWhipContinuation, resolveAiuWhipTasks } from "../src/whip.ts";
 
 const tempRoots: string[] = [];

@@ -96,7 +96,7 @@ describe("init planner", () => {
     const result = await runCli(target, ["init", "--tool", "all", "--json"]);
     const parsed = JSON.parse(result.stdout) as InitEnvelope;
     const config = JSON.parse(await readFile(path.join(target, "aiu.config.json"), "utf8")) as {
-      hosts: { enabled: string[]; capabilities: Record<string, unknown> };
+      hosts: { enabled: string[]; capabilities: Record<string, unknown>; modes: Record<string, string[]> };
       trustedStateCommands: Record<string, { argv: string[] }>;
     };
 
@@ -107,6 +107,9 @@ describe("init planner", () => {
     assert.ok(config.hosts.capabilities.opencode);
     assert.ok(config.hosts.capabilities.codex);
     assert.ok(config.hosts.capabilities["claude-code"]);
+    assert.deepEqual(config.hosts.modes.opencode, ["continue", "repair", "wait", "stop"]);
+    assert.deepEqual(config.hosts.modes.codex, ["stop"]);
+    assert.deepEqual(config.hosts.modes["claude-code"], ["stop"]);
     assert.deepEqual(config.trustedStateCommands.work.argv, ["aie", "status", "--json"]);
   });
 

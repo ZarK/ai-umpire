@@ -16,6 +16,7 @@ import {
 import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand, statusCommand } from "./command_registry.js";
 import { AIU_DECISION_MODES, AIU_DECISION_PROMPT_KINDS } from "./decision.js";
 import { formatAiuDoctorReport, formatAiuPaths, getAiuResolvedPaths, runAiuDoctor } from "./doctor.js";
+import { AIU_HOST_CAPABILITY_SUPPORT, AIU_HOST_SUPPORT_LEVELS, getAllAiuHostCapabilityProfiles } from "./host_policy.js";
 import { formatHookStopJson, readHookStopStdin, runAiuHookStop } from "./hook_stop.js";
 import { applyAiuInitPlan, formatInitPlan, planAiuInit, type AiuInitTool } from "./init.js";
 import { formatMigrationPlan, planAiuMigration } from "./migrate.js";
@@ -163,6 +164,10 @@ export const aiuCli = createCli({
           defaultConfig: getDefaultAiuConfig(),
           hostNames: AIU_HOSTS,
           hostCapabilityNames: AIU_HOST_CAPABILITY_NAMES,
+          hostSupportLevels: AIU_HOST_SUPPORT_LEVELS,
+          hostCapabilitySupport: AIU_HOST_CAPABILITY_SUPPORT,
+          hostProfiles: getAllAiuHostCapabilityProfiles(),
+          policyFields: ["hosts.enabled", "hosts.capabilities", "hosts.modes", "hosts.stopHookBlocking", "continuation.modes", "cooldowns.promptMs", "paths.stateDir", "paths.lockDir", "paths.logDir"],
           promptSectionKinds: AIU_PROMPT_SECTION_KINDS,
         },
         trustedState: {

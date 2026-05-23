@@ -78,6 +78,8 @@ OpenCode is the supported v1 host profile. Codex and Claude Code are experimenta
 
 Config can enable or disable continuation modes per host. If a host lacks a required capability for the selected continuation mode, Umpire stops with an actionable diagnostic.
 
+M3.1 implements this as a package-level `host_policy` runtime surface. `getAllAiuHostCapabilityProfiles()` exposes the OpenCode, Codex, and Claude Code profiles; `evaluateAiuHostRuntimePolicy()` validates per-host `hosts.modes` against effective capability support and returns stable `host-mode-supported`, `host-capability-disabled`, `host-capability-experimental`, and `host-capability-unsupported` diagnostics. `aiu init` writes safe defaults: OpenCode receives `continue`, `repair`, `wait`, and `stop`; Codex and Claude Code receive `stop` only until later M3 stop-hook blocking work is implemented.
+
 ---
 
 ## Part 2: OpenCode Plugin Adapter
@@ -198,6 +200,8 @@ Tests cover:
 ### M3.1 - Implement Host Capability Profiles And Runtime Policy
 
 Add typed host capabilities, config validation, schema output, and doctor checks for OpenCode, Codex, and Claude Code.
+
+Status: implemented by the shared `host_policy` module, schema host profile output, config/doctor host policy diagnostics, and fixture tests for supported, experimental, disabled, and unsafe stop-hook blocking states.
 
 ### M3.2 - Rework OpenCode Plugin Around The Decision Engine
 

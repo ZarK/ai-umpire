@@ -19,12 +19,13 @@ describe("doctor diagnostics", () => {
 
     const report = runAiuDoctor({ cwd: repoRoot });
 
-    assert.equal(report.status, "ok");
+    assert.equal(report.status, "warning");
     assert.equal(report.config.found, true);
     assert.equal(report.config.valid, true);
     assert.ok(report.checks.some((check) => check.kind === "node-version-supported"));
     assert.ok(report.checks.some((check) => check.kind === "package-name-valid"));
     assert.ok(report.checks.some((check) => check.kind === "state-path-creatable"));
+    assert.ok(report.checks.some((check) => check.kind === "host-runtime-disabled"));
   });
 
   it("reports missing config without mutating the repository", async () => {
@@ -56,6 +57,9 @@ describe("doctor diagnostics", () => {
       version: 1,
       hosts: {
         enabled: ["codex"],
+        modes: {
+          codex: ["stop"],
+        },
       },
     });
 
@@ -63,6 +67,32 @@ describe("doctor diagnostics", () => {
 
     assert.equal(report.status, "warning");
     assert.ok(report.checks.some((check) => check.kind === "host-file-missing" && check.path?.endsWith(path.join("plugins", "ai-umpire", "hooks", "hooks.json"))));
+  });
+
+  it("reports host capability and policy compatibility", async () => {
+    const repoRoot = await createRepoRoot();
+    await writeConfig(repoRoot, {
+      version: 1,
+      hosts: {
+        enabled: ["opencode", "codex"],
+        capabilities: {
+          opencode: {
+            promptDelivery: "none",
+          },
+        },
+        modes: {
+          opencode: ["continue"],
+          codex: ["continue"],
+        },
+      },
+    });
+
+    const report = runAiuDoctor({ cwd: repoRoot });
+
+    assert.equal(report.status, "error");
+    assert.ok(report.checks.some((check) => check.kind === "host-capability-disabled" && check.category === "host"));
+    assert.ok(report.checks.some((check) => check.kind === "host-capability-experimental" && check.category === "host"));
+    assert.equal(report.checks.filter((check) => check.kind === "host-capability-disabled").length, 1);
   });
 
   it("reports trusted command availability without executing commands", async () => {

@@ -9,7 +9,7 @@ import {
   AIU_HOSTS,
   loadAiuConfig,
 } from "./config.js";
-import { getAiuHostCapabilityProfiles } from "./init.js";
+import { evaluateAiuHostRuntimePolicy, getAiuHostCapabilityProfiles } from "./host_policy.js";
 
 export type AiuHealthStatus = "ok" | "warning" | "error";
 
@@ -108,6 +108,14 @@ interface PackageJson {
   readonly bin?: string | Readonly<Record<string, string>>;
 }
 
+const HOST_POLICY_DIAGNOSTIC_KINDS = new Set([
+  "host-capability-disabled",
+  "host-capability-experimental",
+  "host-capability-unsupported",
+  "host-mode-supported",
+  "host-stop-hook-blocking-unsafe",
+]);
+
 export function getAiuResolvedPaths(options: AiuInspectionOptions = {}): AiuResolvedPaths {
   return redactRecord(buildAiuResolvedPaths(options) as unknown as Readonly<Record<string, unknown>>) as unknown as AiuResolvedPaths;
 }
@@ -162,6 +170,7 @@ export function runAiuDoctor(options: AiuInspectionOptions = {}): AiuDoctorRepor
     checkRepository(configLoad),
     ...checkConfig(configLoad),
     ...checkStatusRuntimePolicy(configLoad),
+    ...checkHostRuntimePolicy(configLoad),
     ...checkStatePaths(paths),
     ...checkHostFiles(configLoad),
     ...checkTrustedCommands(paths),
@@ -283,7 +292,7 @@ function checkConfig(configLoad: AiuConfigLoadResult): readonly AiuDoctorCheck[]
       ? check("config-valid", "config", "ok", "config-valid", "Config validation passed.", configLoad.selectedPath, "Continue using this config.")
       : check("config-valid", "config", "error", "config-invalid", "Config validation reported errors.", configLoad.selectedPath, "Fix config diagnostics before relying on Umpire decisions."),
   );
-  for (const diagnostic of configLoad.diagnostics) {
+  for (const diagnostic of configLoad.diagnostics.filter((item) => !HOST_POLICY_DIAGNOSTIC_KINDS.has(item.kind))) {
     checks.push(check(`config-${diagnostic.kind}-${diagnostic.path}`, "config", diagnostic.severity === "error" ? "error" : "warning", diagnostic.kind, diagnostic.message, diagnostic.path, diagnostic.suggestedNextAction));
   }
   return checks;
@@ -299,6 +308,36 @@ function checkStatusRuntimePolicy(configLoad: AiuConfigLoadResult): readonly Aiu
     checks.push(check("status-stale-state-policy", "config", "warning", "stale-state-policy-relaxed", "Continuation policy allows unknown or unsafe trusted state.", configLoad.selectedPath, "Enable strict continuation policy before relying on autonomous status decisions."));
   }
   return checks;
+}
+
+function checkHostRuntimePolicy(configLoad: AiuConfigLoadResult): readonly AiuDoctorCheck[] {
+  const report = evaluateAiuHostRuntimePolicy(configLoad.config.hosts, configLoad.config.continuation.modes);
+  if (report.enabledHosts.length === 0) {
+    return [
+      check("host-runtime-none", "host", "warning", "host-runtime-disabled", "No host integrations are enabled.", configLoad.selectedPath, "Run aiu init --dry-run --json for the host you intend to use."),
+    ];
+  }
+  const modeChecks = report.modeChecks.map((item) =>
+      check(
+        `host-policy-${item.host}-${item.mode}`,
+        "host",
+        item.status,
+        item.kind,
+        item.message,
+        configLoad.selectedPath,
+        item.suggestedNextAction,
+      ),
+    );
+  const stopHookChecks = (Object.entries(configLoad.config.hosts.stopHookBlocking) as Array<[AiuHost, boolean]>).flatMap(([host, blocking]) => {
+    const profile = report.profiles.find((item) => item.tool === host);
+    if (!blocking || profile?.stopHook.blocksByDefault === true) {
+      return [];
+    }
+    return [
+      check(`host-stop-hook-blocking-${host}`, "host", "error", "host-stop-hook-blocking-unsafe", `${host} stop-hook blocking is not supported by the current runtime profile.`, configLoad.selectedPath, "Set stopHookBlocking to false until M3 stop-hook blocking is fully wired."),
+    ];
+  });
+  return [...modeChecks, ...stopHookChecks];
 }
 
 function checkStatePaths(paths: AiuResolvedPaths): readonly AiuDoctorCheck[] {

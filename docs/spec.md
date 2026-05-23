@@ -95,6 +95,8 @@ M2.4 implements FR-06-007 and FR-06-008 in the host-neutral `renderAiuContinuati
 
 M2.5 implements the agent-facing `aiu status` surface over the trusted adapter, decision, and prompt layers. `aiu status --json` emits typed config metadata, adapter runs, input envelopes, normalized state summaries, decisions, prompt metadata, stale/unknown source lists, stable errors, and warnings without decorative stdout.
 
+M3.1 adds the provider-neutral host policy surface. `host_policy` exposes typed host profiles, support levels, capability support values, safe default per-host modes, and runtime checks for disabled, experimental, unsupported, or unsafe stop-hook behavior. `aiu schema --json` includes host profile and policy fields, config validation records host-policy diagnostics, and `aiu doctor` reports compatibility without mutating host files or provider state.
+
 ## FR-07 - Host Integrations
 
 | ID | Requirement | Status |

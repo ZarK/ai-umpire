@@ -1,10 +1,12 @@
 import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
+import { evaluateAiuHostRuntimePolicy } from "./host_policy.js";
+
 export const AIU_CONFIG_FILENAME = "aiu.config.json";
 export const AIU_CONFIG_SCHEMA_VERSION = 1;
 export const AIU_HOSTS = ["opencode", "codex", "claude-code"] as const;
-export const AIU_HOST_CAPABILITY_NAMES = ["stopHook", "sessionState", "promptDelivery"] as const;
+export const AIU_HOST_CAPABILITY_NAMES = ["idleEvents", "stopHook", "todoRead", "sessionState", "promptDelivery", "selectedSession", "modelTargeting", "userActivity", "projectTrust"] as const;
 export const AIU_CONTINUATION_MODES = ["continue", "repair", "wait", "stop"] as const;
 export const AIU_PROMPT_SECTION_KINDS = ["work", "planning", "quality", "whip"] as const;
 
@@ -30,6 +32,8 @@ export interface AiuConfig {
 export interface AiuHostsConfig {
   readonly enabled: readonly AiuHost[];
   readonly capabilities: Readonly<Partial<Record<AiuHost, Readonly<Partial<Record<AiuHostCapabilityName, boolean | "none" | "stdout" | "host">>>>>>;
+  readonly modes: Readonly<Partial<Record<AiuHost, readonly AiuContinuationMode[]>>>;
+  readonly stopHookBlocking: Readonly<Partial<Record<AiuHost, boolean>>>;
 }
 
 export interface AiuTrustedStateCommandDescriptor {
@@ -120,6 +124,8 @@ const DEFAULT_CONFIG: AiuConfig = Object.freeze({
   hosts: Object.freeze({
     enabled: Object.freeze([]),
     capabilities: Object.freeze({}),
+    modes: Object.freeze({}),
+    stopHookBlocking: Object.freeze({}),
   }),
   trustedStateCommands: Object.freeze({}),
   continuation: Object.freeze({
@@ -234,6 +240,7 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
     validateNoLegacyFallback(raw.continuation, "$.continuation", diagnostics);
   }
   validatePolicy(continuation, supplyChain, diagnostics);
+  validateHostRuntimePolicy(hosts, continuation, diagnostics);
   validateWritablePath("stateDir", pathsConfig.stateDir, repoRoot, diagnostics);
   validateWritablePath("lockDir", pathsConfig.lockDir, repoRoot, diagnostics);
   validateWritablePath("logDir", pathsConfig.logDir, repoRoot, diagnostics);
@@ -280,9 +287,13 @@ function normalizeHosts(value: unknown, diagnostics: AiuConfigDiagnostic[]): Aiu
   const enabled = normalizeStringArray(value.enabled, "$.hosts.enabled", "invalid-hosts", diagnostics)
     .filter((host): host is AiuHost => validateHost(host, "$.hosts.enabled", diagnostics));
   const capabilities = normalizeHostCapabilities(value.capabilities, diagnostics);
+  const modes = normalizeHostModes(value.modes, diagnostics);
+  const stopHookBlocking = normalizeHostStopHookBlocking(value.stopHookBlocking, diagnostics);
   return Object.freeze({
     enabled: Object.freeze([...new Set(enabled)]),
     capabilities,
+    modes,
+    stopHookBlocking,
   });
 }
 
@@ -320,6 +331,51 @@ function normalizeHostCapabilities(value: unknown, diagnostics: AiuConfigDiagnos
     output[host] = Object.freeze(normalized);
   }
 
+  return Object.freeze(output);
+}
+
+function normalizeHostModes(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuHostsConfig["modes"] {
+  if (value === undefined) {
+    return DEFAULT_CONFIG.hosts.modes;
+  }
+  if (!isRecord(value)) {
+    diagnostics.push(diagnostic("invalid-host-modes", "$.hosts.modes", "host modes must be an object keyed by host.", "Use supported host names with arrays of continue, repair, wait, or stop."));
+    return DEFAULT_CONFIG.hosts.modes;
+  }
+
+  const output: Partial<Record<AiuHost, readonly AiuContinuationMode[]>> = {};
+  for (const [host, modes] of Object.entries(value)) {
+    if (!validateHost(host, "$.hosts.modes", diagnostics)) {
+      continue;
+    }
+    const normalizedModes = normalizeStringArray(modes, `$.hosts.modes.${host}`, "unsupported-mode", diagnostics).filter((mode): mode is AiuContinuationMode => {
+      if (isContinuationMode(mode)) {
+        return true;
+      }
+      diagnostics.push(diagnostic("unsupported-mode", `$.hosts.modes.${host}`, `Unsupported continuation mode "${mode}".`, "Use continue, repair, wait, or stop."));
+      return false;
+    });
+    output[host] = Object.freeze([...new Set(normalizedModes)]);
+  }
+  return Object.freeze(output);
+}
+
+function normalizeHostStopHookBlocking(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuHostsConfig["stopHookBlocking"] {
+  if (value === undefined) {
+    return DEFAULT_CONFIG.hosts.stopHookBlocking;
+  }
+  if (!isRecord(value)) {
+    diagnostics.push(diagnostic("invalid-stop-hook-blocking", "$.hosts.stopHookBlocking", "stopHookBlocking must be an object keyed by host.", "Use boolean values for supported host names."));
+    return DEFAULT_CONFIG.hosts.stopHookBlocking;
+  }
+
+  const output: Partial<Record<AiuHost, boolean>> = {};
+  for (const [host, enabled] of Object.entries(value)) {
+    if (!validateHost(host, "$.hosts.stopHookBlocking", diagnostics)) {
+      continue;
+    }
+    output[host] = normalizeBoolean(enabled, false, `$.hosts.stopHookBlocking.${host}`, diagnostics);
+  }
   return Object.freeze(output);
 }
 
@@ -635,6 +691,22 @@ function validatePolicy(continuation: AiuContinuationPolicy, supplyChain: AiuSup
   }
 }
 
+function validateHostRuntimePolicy(hosts: AiuHostsConfig, continuation: AiuContinuationPolicy, diagnostics: AiuConfigDiagnostic[]): void {
+  const report = evaluateAiuHostRuntimePolicy(hosts, continuation.modes);
+  for (const item of report.errors) {
+    diagnostics.push(diagnostic(item.kind, `$.hosts.modes.${item.host}`, item.message, item.suggestedNextAction));
+  }
+  for (const item of report.warnings) {
+    diagnostics.push(diagnostic(item.kind, `$.hosts.modes.${item.host}`, item.message, item.suggestedNextAction, "warning"));
+  }
+  for (const [host, blocking] of Object.entries(hosts.stopHookBlocking) as Array<[AiuHost, boolean]>) {
+    const profile = report.profiles.find((item) => item.tool === host);
+    if (blocking && profile?.stopHook.blocksByDefault !== true) {
+      diagnostics.push(diagnostic("host-stop-hook-blocking-unsafe", `$.hosts.stopHookBlocking.${host}`, `${host} stop-hook blocking is not supported by the current runtime profile.`, "Set stopHookBlocking to false until M3 stop-hook blocking is fully wired."));
+    }
+  }
+}
+
 function validateNoLegacyFallback(value: Record<string, unknown>, fieldPath: string, diagnostics: AiuConfigDiagnostic[]): void {
   for (const key of ["legacyHelperMode", "runtimeFallback", "fallbackCli", "legacyFallback"]) {
     if (key in value) {
@@ -823,6 +895,8 @@ function cloneConfig(config: AiuConfig): AiuConfig {
     hosts: Object.freeze({
       enabled: Object.freeze([...config.hosts.enabled]),
       capabilities: Object.freeze({ ...config.hosts.capabilities }),
+      modes: Object.freeze(Object.fromEntries(Object.entries(config.hosts.modes).map(([host, modes]) => [host, Object.freeze([...(modes ?? [])])]))) as AiuHostsConfig["modes"],
+      stopHookBlocking: Object.freeze({ ...config.hosts.stopHookBlocking }),
     }),
     trustedStateCommands: Object.freeze({ ...config.trustedStateCommands }),
     continuation: Object.freeze({
@@ -854,9 +928,9 @@ function cloneConfig(config: AiuConfig): AiuConfig {
   });
 }
 
-function diagnostic(kind: string, fieldPath: string, message: string, suggestedNextAction: string): AiuConfigDiagnostic {
+function diagnostic(kind: string, fieldPath: string, message: string, suggestedNextAction: string, severity: AiuDiagnosticSeverity = "error"): AiuConfigDiagnostic {
   return Object.freeze({
-    severity: "error",
+    severity,
     kind,
     path: fieldPath,
     message,

@@ -136,6 +136,26 @@ export const doctorCommand = defineCommand({
       description: "A configured host integration file is not installed.",
     },
     {
+      kind: "host-runtime-disabled",
+      description: "No host integration is enabled for runtime policy checks.",
+    },
+    {
+      kind: "host-mode-supported",
+      description: "A configured host supports a selected continuation mode.",
+    },
+    {
+      kind: "host-capability-disabled",
+      description: "A selected continuation mode requires a disabled host capability.",
+    },
+    {
+      kind: "host-capability-unsupported",
+      description: "A selected continuation mode requires an unsupported or unknown host capability.",
+    },
+    {
+      kind: "host-capability-experimental",
+      description: "A selected continuation mode uses an experimental host capability.",
+    },
+    {
       kind: "state-path-not-writable",
       description: "A configured state, lock, or log path cannot be written or created.",
     },
@@ -318,6 +338,38 @@ export const configCommand = defineCommand({
     {
       kind: "invalid-host",
       description: "The selected config references an unsupported host.",
+    },
+    {
+      kind: "invalid-host-capability",
+      description: "The selected config references an unsupported or invalid host capability override.",
+    },
+    {
+      kind: "invalid-host-modes",
+      description: "The selected config has invalid per-host continuation mode policy.",
+    },
+    {
+      kind: "invalid-stop-hook-blocking",
+      description: "The selected config has invalid per-host stop-hook blocking policy.",
+    },
+    {
+      kind: "host-capability-disabled",
+      description: "A selected continuation mode requires a disabled host capability.",
+    },
+    {
+      kind: "host-capability-unsupported",
+      description: "A selected continuation mode requires an unsupported or unknown host capability.",
+    },
+    {
+      kind: "host-capability-experimental",
+      description: "A selected continuation mode uses an experimental host capability.",
+    },
+    {
+      kind: "host-mode-supported",
+      description: "A configured host supports a selected continuation mode.",
+    },
+    {
+      kind: "host-stop-hook-blocking-unsafe",
+      description: "A config enables stop-hook blocking for a host that must safe-allow stopping.",
     },
     {
       kind: "unsafe-command-descriptor",

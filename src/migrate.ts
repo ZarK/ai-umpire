@@ -3,7 +3,7 @@ import type { Dirent } from "node:fs";
 import path from "node:path";
 
 import { loadAiuConfig } from "./config.js";
-import { getAiuHostCapabilityProfiles } from "./init.js";
+import { getAllAiuHostCapabilityProfiles } from "./host_policy.js";
 
 export interface AiuMigrationOptions {
   readonly cwd?: string;
@@ -115,7 +115,7 @@ export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigratio
       action: "preserve" as const,
       reason: "Migration preserves durable continuation state and does not delete .umpire data.",
     }),
-    requiredTrustSteps: Object.freeze([...new Set(getAiuHostCapabilityProfiles().flatMap((profile) => profile.trustSteps))]),
+    requiredTrustSteps: Object.freeze([...new Set(getAllAiuHostCapabilityProfiles().flatMap((profile) => profile.trustSteps))]),
     plannedCommands: Object.freeze(["aiu init --dry-run --json", "aiu init --tool all"]),
     recommendedNextCommand: "aiu init --dry-run --json",
   });

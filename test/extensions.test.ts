@@ -6,7 +6,7 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { promisify } from "node:util";
 
-import { getDefaultAiuConfig } from "../src/config.ts";
+import { getDefaultAiuConfig } from "../dist/src/config.js";
 import type * as AiuExtensions from "../src/extensions.ts";
 import type * as AiuOpenCode from "../src/opencode.ts";
 
