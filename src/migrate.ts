@@ -60,6 +60,18 @@ export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigratio
   const dryRun = options.dryRun !== false;
   const repoLocalHooks = findRepoLocalHooks(repoRoot);
   const localCheckoutReferences = findLocalCheckoutReferences(repoRoot);
+  const conflicts = [
+    ...repoLocalHooks.map((finding) => ({
+      relativePath: finding.relativePath,
+      category: "migration-review-required",
+      reason: `Review ${finding.category} before replacing it with package-managed content.`,
+    })),
+    ...localCheckoutReferences.map((finding) => ({
+      relativePath: finding.relativePath,
+      category: "migration-review-required",
+      reason: `Review ${finding.category} before replacing it with the package-backed aiu dependency.`,
+    })),
+  ];
   const cleanupCandidates = [...repoLocalHooks, ...localCheckoutReferences].map((finding) => ({
     relativePath: finding.relativePath,
     category: "cleanup-candidate",
@@ -74,7 +86,7 @@ export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigratio
   const stateDir = configLoad.config.paths.stateDir;
 
   return Object.freeze({
-    ok: true,
+    ok: conflicts.length === 0,
     dryRun,
     repoRoot,
     repoLocalHooks: Object.freeze(repoLocalHooks),
@@ -87,10 +99,10 @@ export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigratio
       "prompt text outside package-managed sections",
       ".umpire/ durable state",
     ]),
-    conflicts: Object.freeze([]),
+    conflicts: Object.freeze(conflicts),
     statePreservation: Object.freeze({
       stateDir,
-      exists: existsSync(path.join(repoRoot, stateDir)),
+      exists: existsSync(path.resolve(repoRoot, stateDir)),
       action: "preserve" as const,
       reason: "Migration preserves durable continuation state and does not delete .umpire data.",
     }),
@@ -202,7 +214,7 @@ function safeStat(absolutePath: string) {
 function readText(absolutePath: string): string {
   try {
     const stat = statSync(absolutePath);
-    if (!stat.isFile() || stat.size > 1_048_576) {
+    if (!stat.isFile()) {
       return "";
     }
     return readFileSync(absolutePath, "utf8");

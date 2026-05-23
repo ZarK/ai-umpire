@@ -42,12 +42,14 @@ describe("migration planner", () => {
     assert.equal(result.exitCode, 0);
     assert.equal(result.stderr, "");
     assert.equal(parsed.ok, true);
+    assert.equal(parsed.migrate.ok, false);
     assert.equal(parsed.migrate.dryRun, true);
     assert.deepEqual(parsed.migrate.repoLocalHooks.map((finding) => finding.relativePath), [
       path.join(".opencode", "plugins", "ai-umpire-continuation.ts"),
     ]);
     assert.deepEqual(parsed.migrate.localCheckoutReferences.map((finding) => finding.relativePath), ["package.json"]);
     assert.ok(parsed.migrate.cleanupCandidates.length >= 2);
+    assert.ok(parsed.migrate.conflicts.length >= 2);
     assert.equal(parsed.migrate.statePreservation.action, "preserve");
     assert.equal(parsed.migrate.recommendedNextCommand, "aiu init --dry-run --json");
   });
@@ -57,9 +59,11 @@ interface MigrationEnvelope {
   readonly ok: boolean;
   readonly migrate: {
     readonly dryRun: boolean;
+    readonly ok: boolean;
     readonly repoLocalHooks: Array<{ relativePath: string }>;
     readonly localCheckoutReferences: Array<{ relativePath: string }>;
     readonly cleanupCandidates: unknown[];
+    readonly conflicts: unknown[];
     readonly statePreservation: { action: string };
     readonly recommendedNextCommand: string;
   };
