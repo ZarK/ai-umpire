@@ -253,6 +253,8 @@ Use `pnpm exec aiu doctor --json` as the first diagnostic command. Stable check 
 
 Use `pnpm exec aiu paths --json` to inspect the resolved package root, config path, `.umpire/` state paths, host install paths, and trusted command executable paths. Diagnostic output redacts token-like values where practical.
 
+Idle-mode troubleshooting stays local and read-only until you run an explicit mutating command. `aiu doctor --json` reports planning and quality mode enablement, matching trusted command availability, whip state validity, disabled idle modes, and stale or orphaned whip task ownership. `aiu status --json` shows the selected decision, selected target metadata, rendered prompt metadata, and whip summary. Inspect `.umpire/logs/continuation.jsonl` only as local diagnostic evidence; logs, agent narration, issue prose, and comments are never trusted pass/fail evidence for quality or planning.
+
 ## Package Surfaces
 
 - `@tjalve/aiu` - public package asset helpers

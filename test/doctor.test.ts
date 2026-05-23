@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -185,6 +185,67 @@ describe("doctor diagnostics", () => {
     assert.ok(trustedChecks.some((check) => check.kind === "trusted-command-missing" && check.path === "definitely-not-aiu-test-command"));
   });
 
+  it("reports idle mode readiness and whip ownership diagnostics without mutating state", async () => {
+    const repoRoot = await createRepoRoot();
+    const whipPath = path.join(repoRoot, ".umpire", "whip.json");
+    await mkdir(path.dirname(whipPath), { recursive: true });
+    const whipState = {
+      schemaVersion: 1,
+      tasks: [{
+        id: "owned",
+        title: "Owned idle task",
+        prompt: "Inspect one stale doc example and update it only if incorrect.",
+        priority: 1,
+        status: "prompted",
+        source: "cli",
+        ownerSessionId: "ses_old",
+        promptedAt: "2026-05-20T00:00:00.000Z",
+      }],
+    };
+    await writeFile(whipPath, `${JSON.stringify(whipState, null, 2)}\n`, "utf8");
+    await writeConfig(repoRoot, {
+      version: 1,
+      trustedStateCommands: {
+        planning: { argv: [process.execPath, "--version"] },
+        quality: { argv: [process.execPath, "--version"] },
+      },
+    });
+
+    const before = await readText(whipPath);
+    const report = runAiuDoctor({ cwd: repoRoot });
+    const after = await readText(whipPath);
+    const kinds = report.checks.map((check) => check.kind);
+
+    assert.equal(after, before);
+    assert.ok(kinds.includes("planning-mode-enabled"));
+    assert.ok(kinds.includes("planning-trusted-command-found"));
+    assert.ok(kinds.includes("quality-mode-enabled"));
+    assert.ok(kinds.includes("quality-trusted-command-found"));
+    assert.ok(kinds.includes("whip-state-valid"));
+    assert.ok(kinds.includes("whip-stale-ownership"));
+    assert.ok(kinds.includes("whip-orphaned-ownership"));
+  });
+
+  it("reports disabled idle modes without validating disabled whip state", async () => {
+    const repoRoot = await createRepoRoot();
+    await mkdir(path.join(repoRoot, ".umpire"), { recursive: true });
+    await writeFile(path.join(repoRoot, ".umpire", "whip.json"), "{", "utf8");
+    await writeConfig(repoRoot, {
+      version: 1,
+      planning: { enabled: false },
+      quality: { enabled: false },
+      whip: { enabled: false },
+    });
+
+    const report = runAiuDoctor({ cwd: repoRoot });
+    const kinds = report.checks.map((check) => check.kind);
+
+    assert.ok(kinds.includes("planning-mode-disabled"));
+    assert.ok(kinds.includes("quality-mode-disabled"));
+    assert.ok(kinds.includes("whip-mode-disabled"));
+    assert.equal(kinds.includes("whip-state-malformed"), false);
+  });
+
   it("treats backslash executable tokens as direct trusted command paths", async () => {
     const repoRoot = await createRepoRoot();
     const executableToken = ".\\local-tool.exe";
@@ -258,6 +319,10 @@ async function createRepoRoot(prefix = "aiu-doctor-"): Promise<string> {
 
 async function writeConfig(repoRoot: string, config: unknown): Promise<void> {
   await writeFile(path.join(repoRoot, "aiu.config.json"), `${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+async function readText(pathValue: string): Promise<string> {
+  return await readFile(pathValue, "utf8");
 }
 
 async function writeManagedHostFiles(repoRoot: string, host: "opencode" | "codex" | "claude-code"): Promise<void> {

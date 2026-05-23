@@ -128,6 +128,7 @@ describe("metadata-backed CLI", () => {
           hostProfiles?: Array<{ tool: string; supportLevel: string; stopHook?: { support?: string; blocksByDefault?: boolean } }>;
           policyFields?: string[];
           promptSectionKinds?: string[];
+          promptCustomizationFields?: string[];
         };
         trustedState?: {
           schemaVersion?: number;
@@ -143,6 +144,7 @@ describe("metadata-backed CLI", () => {
           promptKinds?: string[];
           modes?: string[];
           reasonCodes?: Array<{ code: string; category: string; decision: string; description: string }>;
+          selectedItemFields?: string[];
         };
         hookStop?: {
           tools?: string[];
@@ -187,6 +189,8 @@ describe("metadata-backed CLI", () => {
           taskSources?: string[];
           statePathDefault?: string;
           taskFields?: string[];
+          selectedTaskFields?: string[];
+          statusFields?: string[];
           errorCodes?: string[];
         };
         doctor?: {
@@ -225,7 +229,10 @@ describe("metadata-backed CLI", () => {
     assert.deepEqual(parsed.sections?.config?.hostProfiles?.map((profile) => profile.supportLevel), ["supported", "experimental", "experimental"]);
     assert.equal(parsed.sections?.config?.hostProfiles?.find((profile) => profile.tool === "codex")?.stopHook?.blocksByDefault, true);
     assert.ok(parsed.sections?.config?.policyFields?.includes("hosts.stopHookBlocking"));
+    assert.ok(parsed.sections?.config?.policyFields?.includes("planning.enabled"));
+    assert.ok(parsed.sections?.config?.policyFields?.includes("whip.enabled"));
     assert.deepEqual(parsed.sections?.config?.promptSectionKinds, ["work", "planning", "quality", "whip"]);
+    assert.ok(parsed.sections?.config?.promptCustomizationFields?.includes("prompts.sections.whip"));
     assert.equal(parsed.sections?.trustedState?.schemaVersion, 1);
     assert.deepEqual(parsed.sections?.trustedState?.stateKinds, [
       "work-queue",
@@ -249,6 +256,8 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.sections?.trustedState?.reasonCodes?.some((reason) => reason.code === "stop-unsupported-input" && reason.category === "input"));
     assert.deepEqual(parsed.sections?.decision?.modes, ["continue", "repair", "wait", "stop"]);
     assert.deepEqual(parsed.sections?.decision?.promptKinds, ["work", "review", "repair", "planning", "quality", "whip", "wait", "stop"]);
+    assert.ok(parsed.sections?.decision?.selectedItemFields?.includes("promptFingerprint"));
+    assert.ok(parsed.sections?.decision?.selectedItemFields?.includes("expectedEvidence"));
     assert.ok(parsed.sections?.decision?.reasonCodes?.some((reason) => reason.code === "stop-supply-chain-approval" && reason.category === "safety"));
     assert.deepEqual(parsed.sections?.hookStop?.tools, ["codex", "claude-code"]);
     assert.deepEqual(parsed.sections?.hookStop?.outputKinds, ["allow", "block"]);
@@ -264,6 +273,8 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.sections?.continuationState?.ownershipFields?.includes("pendingPromptFingerprint"));
     assert.ok(parsed.sections?.continuationState?.lockFields?.includes("acquiredAt"));
     assert.ok(parsed.sections?.continuationState?.logFields?.includes("decisionId"));
+    assert.ok(parsed.sections?.continuationState?.logFields?.includes("promptKind"));
+    assert.ok(parsed.sections?.continuationState?.logFields?.includes("selectedItem"));
     assert.equal(parsed.sections?.continuationState?.rotation?.maxLogBytes, 65536);
     assert.deepEqual(parsed.sections?.promptRendering?.fingerprintInputs, ["decisionKind", "selectedItem", "reasonCodes", "sourceTimestamps", "body"]);
     assert.deepEqual(parsed.sections?.promptRendering?.customizableSections, ["work", "planning", "quality", "whip"]);
@@ -272,6 +283,7 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.sections?.status?.outputShape?.includes("continuationState"));
     assert.ok(parsed.sections?.status?.outputShape?.includes("decision"));
     assert.ok(parsed.sections?.status?.outputShape?.includes("prompt"));
+    assert.ok(parsed.sections?.status?.outputShape?.includes("whip"));
     assert.ok(parsed.sections?.status?.errorCodes?.includes("trusted-command-malformed-json"));
     assert.ok(parsed.sections?.status?.errorCodes?.includes("status-config-invalid"));
     assert.equal(parsed.sections?.planning?.enabledDefault, true);
@@ -291,6 +303,8 @@ describe("metadata-backed CLI", () => {
     assert.deepEqual(parsed.sections?.whip?.taskSources, ["package-default", "repo-config", "cli"]);
     assert.equal(parsed.sections?.whip?.statePathDefault, ".umpire/whip.json");
     assert.ok(parsed.sections?.whip?.taskFields?.includes("completionEvidence"));
+    assert.ok(parsed.sections?.whip?.selectedTaskFields?.includes("promptFingerprint"));
+    assert.ok(parsed.sections?.whip?.statusFields?.includes("staleOwnership"));
     assert.ok(parsed.sections?.whip?.errorCodes?.includes("whip-state-malformed"));
     assert.ok(parsed.sections?.whip?.errorCodes?.includes("whip-evidence-required"));
     assert.ok(parsed.sections?.doctor?.checkCategories?.includes("host"));
@@ -300,6 +314,10 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("host-entrypoint-package-backed"));
     assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("host-entrypoint-unmanaged"));
     assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("trusted-command-compatible"));
+    assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("planning-trusted-command-found"));
+    assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("quality-trusted-command-missing"));
+    assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("whip-stale-ownership"));
+    assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("whip-orphaned-ownership"));
 
     const init = parsed.commands.find((command) => command.name === "init");
     assert.ok(init);

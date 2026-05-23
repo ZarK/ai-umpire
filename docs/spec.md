@@ -137,6 +137,8 @@ M4.3 adds Bootstrap planning continuation from structured trusted state. The `pl
 
 M4.4 integrates planning, ready work, quality, and whip selection into one shared decision path. Active work/review repair and continuation still outrank idle modes. Concrete planning continuation outranks starting ready work, ready work outranks quality and whip, and quality outranks whip. Whip task selection is read from durable whip policy/state and is represented as selected prompt metadata for status, OpenCode, and stop-hook delivery; prompt delivery does not complete the task.
 
+M4.5 closes the milestone by making idle modes observable through read-only diagnostics and stable schema output. Doctor reports planning and quality mode readiness, matching trusted command availability, disabled idle modes, whip state validity, and stale or orphaned whip ownership without executing trusted commands or mutating state. Schema output includes idle commands, state shapes, selected target metadata, prompt customization fields, and continuation log metadata. Documentation keeps idle work concrete, pinned to trusted commands or explicit task state, and rejects agent narration as evidence.
+
 ## FR-09 - Existing Repository Migration
 
 | ID | Requirement | Status |

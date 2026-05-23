@@ -10,6 +10,7 @@ import {
   loadAiuConfig,
 } from "./config.js";
 import { evaluateAiuHostRuntimePolicy, getAiuHostCapabilityProfiles } from "./host_policy.js";
+import { runAiuWhipCommand, type AiuWhipReport } from "./whip.js";
 
 export type AiuHealthStatus = "ok" | "warning" | "error";
 
@@ -170,6 +171,7 @@ export function runAiuDoctor(options: AiuInspectionOptions = {}): AiuDoctorRepor
     checkRepository(configLoad),
     ...checkConfig(configLoad),
     ...checkStatusRuntimePolicy(configLoad),
+    ...checkIdleModeDiagnostics(configLoad, paths),
     ...checkHostRuntimePolicy(configLoad),
     ...checkStatePaths(paths),
     ...checkHostFiles(configLoad),
@@ -309,6 +311,72 @@ function checkStatusRuntimePolicy(configLoad: AiuConfigLoadResult): readonly Aiu
     checks.push(check("status-stale-state-policy", "config", "warning", "stale-state-policy-relaxed", "Continuation policy allows unknown or unsafe trusted state.", configLoad.selectedPath, "Enable strict continuation policy before relying on autonomous status decisions."));
   }
   return checks;
+}
+
+function checkIdleModeDiagnostics(configLoad: AiuConfigLoadResult, paths: AiuResolvedPaths): readonly AiuDoctorCheck[] {
+  return [
+    ...checkModeReadiness("planning", configLoad.config.planning.enabled, paths, configLoad.selectedPath),
+    ...checkModeReadiness("quality", configLoad.config.quality.enabled, paths, configLoad.selectedPath),
+    ...checkWhipReadiness(configLoad),
+  ];
+}
+
+function checkModeReadiness(mode: "planning" | "quality", enabled: boolean, paths: AiuResolvedPaths, configPath: string): readonly AiuDoctorCheck[] {
+  const checks: AiuDoctorCheck[] = [];
+  checks.push(enabled
+    ? check(`${mode}-mode-enabled`, "config", "ok", `${mode}-mode-enabled`, `${mode} idle mode is enabled.`, configPath, `Configure a trusted ${mode} state command before relying on ${mode} continuation.`)
+    : check(`${mode}-mode-disabled`, "config", "ok", `${mode}-mode-disabled`, `${mode} idle mode is disabled.`, configPath, `Set ${mode}.enabled to true only after trusted ${mode} state is configured.`));
+  if (!enabled) {
+    return checks;
+  }
+
+  const commands = paths.trustedCommands.filter((command) => command.sourceId.toLowerCase().includes(mode));
+  if (commands.length === 0) {
+    checks.push(check(`${mode}-trusted-command-configured`, "trusted-command", "warning", `${mode}-trusted-command-missing`, `No configured trusted state command is named for ${mode} state.`, configPath, `Add a deterministic trustedStateCommands entry for ${mode} state or disable ${mode}.enabled.`));
+    return checks;
+  }
+  for (const command of commands) {
+    checks.push(command.found
+      ? check(`${mode}-trusted-command-${command.sourceId}`, "trusted-command", "ok", `${mode}-trusted-command-found`, `Trusted ${mode} command ${command.sourceId} executable is available.`, command.resolvedPath ?? command.executable, `Continue using this trusted ${mode} command descriptor.`)
+      : check(`${mode}-trusted-command-${command.sourceId}`, "trusted-command", "error", `${mode}-trusted-command-missing`, `Trusted ${mode} command ${command.sourceId} executable is not available.`, command.executable, `Install the executable, update the trusted command argv descriptor, or disable ${mode}.enabled.`));
+  }
+  return checks;
+}
+
+function checkWhipReadiness(configLoad: AiuConfigLoadResult): readonly AiuDoctorCheck[] {
+  if (!configLoad.config.whip.enabled) {
+    return [
+      check("whip-mode-disabled", "config", "ok", "whip-mode-disabled", "Whip idle mode is disabled.", configLoad.selectedPath, "Existing whip state is preserved; enable whip only when idle tasks are desired."),
+    ];
+  }
+  const report = runAiuWhipCommand({
+    action: "status",
+    repoRoot: configLoad.repoRoot,
+    config: configLoad.config,
+  });
+  const checks: AiuDoctorCheck[] = [
+    report.stateOk
+      ? check("whip-state-valid", "state", "ok", "whip-state-valid", "Whip state is readable and schema-valid.", report.statePath, "Continue using this whip state path.")
+      : check("whip-state-valid", "state", "error", "whip-state-malformed", "Whip state is malformed.", report.statePath, "Fix or remove the malformed whip state file before relying on idle whip prompts."),
+  ];
+  if (report.staleOwnership.length > 0) {
+    checks.push(check("whip-stale-ownership", "state", "warning", "whip-stale-ownership", `Whip state has ${report.staleOwnership.length} stale prompted task owner(s).`, report.statePath, "Inspect aiu whip status and explicitly cancel, complete, or reassign stale prompted tasks."));
+  } else {
+    checks.push(check("whip-stale-ownership", "state", "ok", "whip-ownership-current", "No stale whip task ownership was found.", report.statePath, "Continue using explicit whip task transitions."));
+  }
+  const orphaned = findOrphanedWhipOwnership(report);
+  if (orphaned.length > 0) {
+    checks.push(check("whip-orphaned-ownership", "state", "warning", "whip-orphaned-ownership", `Whip state has ${orphaned.length} prompted task owner(s) without a selected session.`, report.statePath, "Inspect aiu whip status and clear or complete orphaned prompted tasks explicitly."));
+  } else {
+    checks.push(check("whip-orphaned-ownership", "state", "ok", "whip-ownership-linked", "No orphaned whip task ownership was found.", report.statePath, "Continue using explicit whip task ownership."));
+  }
+  return checks;
+}
+
+function findOrphanedWhipOwnership(report: AiuWhipReport): readonly string[] {
+  return report.tasks
+    .filter((task) => task.status === "prompted" && Boolean(task.ownerSessionId) && !task.selectedSessionId)
+    .map((task) => task.id);
 }
 
 function checkHostRuntimePolicy(configLoad: AiuConfigLoadResult): readonly AiuDoctorCheck[] {

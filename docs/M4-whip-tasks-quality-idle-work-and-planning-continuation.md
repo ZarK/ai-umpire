@@ -266,6 +266,8 @@ Status: implemented by feeding planning, quality, ready work, and durable whip t
 
 Document and test idle continuation modes without requiring companion packages in normal fixtures.
 
+Status: implemented by extending `aiu doctor --json` with read-only planning, quality, and whip readiness diagnostics; exposing selected target metadata, prompt customization fields, idle mode state shapes, continuation log fields, and idle reason codes through `aiu schema --json`; and documenting idle setup, safety stops, task transitions, local log inspection, and troubleshooting in README. Tests remain hermetic and cover whip task transitions, no prompt auto-complete, stale and orphaned ownership diagnostics, quality and planning continuation, human-question stops, priority ordering, hard safety stops, and clean JSON output.
+
 ---
 
 ## Exit Criteria
