@@ -93,6 +93,8 @@ M2.3 implements FR-06-001 through FR-06-006 in the pure `decideAiuContinuation` 
 
 M2.4 implements FR-06-007 and FR-06-008 in the host-neutral `renderAiuContinuationPrompt` service. It emits prompt metadata, trusted source timestamps, concrete prompt bodies, and stable fingerprints while leaving host delivery to later integration milestones.
 
+M2.5 implements the agent-facing `aiu status` surface over the trusted adapter, decision, and prompt layers. `aiu status --json` emits typed config metadata, adapter runs, input envelopes, normalized state summaries, decisions, prompt metadata, stale/unknown source lists, stable errors, and warnings without decorative stdout.
+
 ## FR-07 - Host Integrations
 
 | ID | Requirement | Status |

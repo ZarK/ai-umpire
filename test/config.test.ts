@@ -139,6 +139,14 @@ describe("config foundation", () => {
         missing: {
           argv: [],
         },
+        whitespace: {
+          argv: ["   "],
+        },
+        floatLimit: {
+          argv: ["aie"],
+          timeoutMs: 10.5,
+          maxOutputBytes: 1.5,
+        },
       },
       continuation: {
         modes: ["continue"],
@@ -188,6 +196,7 @@ describe("config foundation", () => {
     assert.ok(kinds.includes("unsafe-command-descriptor"));
     assert.ok(kinds.includes("missing-command-path"));
     assert.ok(kinds.includes("invalid-duration"));
+    assert.ok(kinds.includes("invalid-output-limit"));
     assert.ok(kinds.includes("contradictory-policy"));
     assert.ok(kinds.includes("path-not-directory"));
     assert.ok(kinds.includes("unsafe-policy"));

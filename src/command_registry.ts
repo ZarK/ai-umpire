@@ -143,12 +143,118 @@ export const doctorCommand = defineCommand({
       kind: "trusted-command-missing",
       description: "A configured trusted command executable is not available.",
     },
+    {
+      kind: "stale-state-policy-relaxed",
+      description: "Continuation policy allows unknown or unsafe trusted state.",
+    },
   ],
   exitCodes: [
     {
       code: 0,
       category: "success",
       description: "Doctor completed and reported health diagnostics.",
+    },
+    {
+      code: 2,
+      category: "usage",
+      description: "Command usage was invalid.",
+    },
+    {
+      code: 1,
+      category: "unexpected",
+      description: "Command failed unexpectedly.",
+    },
+  ],
+});
+
+export const statusCommand = defineCommand({
+  kind: "command",
+  name: "status",
+  description: "Render trusted state, continuation decision, prompt metadata, and next action.",
+  flags: [
+    jsonFlag,
+    defineFlag({
+      name: "config",
+      description: `Use an explicit ${AIU_CONFIG_FILENAME} path instead of repository-root discovery.`,
+      type: "string",
+      short: "c",
+    }),
+  ],
+  examples: [
+    defineExample({
+      description: "Show the current Umpire continuation status.",
+      command: "aiu status",
+    }),
+    defineExample({
+      description: "Show continuation status as clean JSON.",
+      command: "aiu status --json",
+    }),
+  ],
+  output: {
+    formats: ["human", "json"],
+    defaultFormat: "human",
+  },
+  interactions: {
+    json: true,
+    dryRun: {
+      supported: false,
+      reason: "Status reads trusted state and reports a decision without mutating state.",
+    },
+    noColor: true,
+    nonInteractive: true,
+    ttyPrompt: false,
+  },
+  errors: [
+    {
+      kind: "status-config-invalid",
+      description: "The selected config has validation errors.",
+    },
+    {
+      kind: "status-trusted-command-failed",
+      description: "A configured trusted state command could not produce usable state.",
+    },
+    {
+      kind: "trusted-command-malformed-json",
+      description: "A configured trusted command emitted malformed JSON.",
+    },
+    {
+      kind: "trusted-command-spawn-failed",
+      description: "A configured trusted command could not be spawned.",
+    },
+    {
+      kind: "trusted-command-timeout",
+      description: "A configured trusted command timed out.",
+    },
+    {
+      kind: "trusted-command-non-zero-exit",
+      description: "A configured trusted command exited with a non-zero code.",
+    },
+    {
+      kind: "trusted-command-output-limit",
+      description: "A configured trusted command exceeded its output limit.",
+    },
+    {
+      kind: "trusted-command-unknown-schema",
+      description: "A configured trusted command emitted an unsupported schema version.",
+    },
+    {
+      kind: "trusted-command-unsupported-capability",
+      description: "A configured trusted command reported an unsupported capability.",
+    },
+    {
+      kind: "trusted-command-stale-state",
+      description: "A configured trusted command emitted stale state.",
+    },
+    {
+      kind: "trusted-command-invalid-state",
+      description: "A configured trusted command emitted an invalid state payload.",
+    },
+  ],
+  exitCodes: [
+    {
+      code: 0,
+      category: "success",
+      description: "Status was rendered successfully.",
     },
     {
       code: 2,
@@ -452,5 +558,5 @@ export const migrateCommand = defineCommand({
 });
 
 export const AIU_COMMAND_REGISTRY = createCommandRegistry({
-  commands: [configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand],
+  commands: [configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand, statusCommand],
 });

@@ -14,6 +14,7 @@ export {
   initCommand,
   migrateCommand,
   pathsCommand,
+  statusCommand,
 } from "./command_registry.js";
 export {
   AIU_CONFIG_FILENAME,
@@ -54,6 +55,12 @@ export {
 export {
   renderAiuContinuationPrompt,
 } from "./prompt.js";
+export {
+  AIU_STATUS_ERROR_CODES,
+  createAiuStatusReport,
+  formatAiuStatusReport,
+  runAiuStatus,
+} from "./status.js";
 export {
   AIU_REASON_CODES,
   AIU_REASON_CODE_CATALOG,
@@ -145,6 +152,17 @@ export type {
   AiuContinuationPromptInput,
   AiuPromptSourceTimestamp,
 } from "./prompt.js";
+export type {
+  AiuStatusAdapterRun,
+  AiuStatusError,
+  AiuStatusErrorCode,
+  AiuStatusOptions,
+  AiuStatusReport,
+  AiuStatusSourceRef,
+  AiuStatusSourceSummary,
+  AiuStatusStateSummary,
+  AiuStatusWarning,
+} from "./status.js";
 export type {
   AiuBaseState,
   AiuContinuationDecisionKind,

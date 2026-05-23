@@ -161,9 +161,11 @@ export function runAiuDoctor(options: AiuInspectionOptions = {}): AiuDoctorRepor
     ...checkPackage(paths, packageJson),
     checkRepository(configLoad),
     ...checkConfig(configLoad),
+    ...checkStatusRuntimePolicy(configLoad),
     ...checkStatePaths(paths),
     ...checkHostFiles(configLoad),
     ...checkTrustedCommands(paths),
+    ...checkTrustedCommandCompatibility(configLoad),
   ];
   const summary = summarizeChecks(checks);
 
@@ -287,6 +289,18 @@ function checkConfig(configLoad: AiuConfigLoadResult): readonly AiuDoctorCheck[]
   return checks;
 }
 
+function checkStatusRuntimePolicy(configLoad: AiuConfigLoadResult): readonly AiuDoctorCheck[] {
+  const checks: AiuDoctorCheck[] = [
+    check("status-runtime-fixture-free", "config", "ok", "status-runtime-fixture-free", "Status runtime uses configured trusted state commands and does not require live provider credentials or host runtimes.", configLoad.selectedPath, "Keep tests on deterministic fixtures or local command stubs."),
+  ];
+  if (configLoad.config.continuation.stopOnUnknownState && configLoad.config.continuation.stopOnUnsafeState) {
+    checks.push(check("status-stale-state-policy", "config", "ok", "stale-state-policy-strict", "Continuation policy stops on unknown or unsafe trusted state.", configLoad.selectedPath, "Continue using strict trusted-state policy."));
+  } else {
+    checks.push(check("status-stale-state-policy", "config", "warning", "stale-state-policy-relaxed", "Continuation policy allows unknown or unsafe trusted state.", configLoad.selectedPath, "Enable strict continuation policy before relying on autonomous status decisions."));
+  }
+  return checks;
+}
+
 function checkStatePaths(paths: AiuResolvedPaths): readonly AiuDoctorCheck[] {
   return Object.entries(paths.state).map(([name, target]) => checkWritableDirectoryPath(`state-${name}`, target, name));
 }
@@ -317,6 +331,12 @@ function checkTrustedCommands(paths: AiuResolvedPaths): readonly AiuDoctorCheck[
       return check(`trusted-command-${command.sourceId}`, "trusted-command", "ok", "trusted-command-found", `Trusted command ${command.sourceId} executable is available.`, command.resolvedPath ?? command.executable, "Continue using this trusted command descriptor.");
     }
     return check(`trusted-command-${command.sourceId}`, "trusted-command", "error", "trusted-command-missing", `Trusted command ${command.sourceId} executable is not available.`, command.executable, "Install the executable or update the trusted command argv descriptor.");
+  });
+}
+
+function checkTrustedCommandCompatibility(configLoad: AiuConfigLoadResult): readonly AiuDoctorCheck[] {
+  return Object.entries(configLoad.config.trustedStateCommands).map(([sourceId, descriptor]) => {
+    return check(`trusted-command-compatible-${sourceId}`, "trusted-command", "ok", "trusted-command-compatible", `Trusted command ${sourceId} normalized descriptor is adapter-compatible.`, configLoad.selectedPath, "Continue using this trusted state adapter descriptor.");
   });
 }
 

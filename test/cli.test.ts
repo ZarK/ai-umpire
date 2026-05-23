@@ -29,6 +29,8 @@ describe("metadata-backed CLI", () => {
       ["paths", "--help"],
       ["help", "schema"],
       ["schema", "help"],
+      ["help", "status"],
+      ["status", "--help"],
     ];
 
     for (const form of forms) {
@@ -133,6 +135,11 @@ describe("metadata-backed CLI", () => {
         promptRendering?: {
           fingerprintInputs?: string[];
           customizableSections?: string[];
+          metadataShape?: string[];
+        };
+        status?: {
+          outputShape?: string[];
+          errorCodes?: string[];
         };
       };
       package: { name: string };
@@ -144,7 +151,7 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.package.name, "@tjalve/aiu");
 
     const commandNames = parsed.commands.map((command) => command.name);
-    assert.deepEqual(commandNames, ["config", "doctor", "hook-stop", "init", "migrate", "paths", "schema"]);
+    assert.deepEqual(commandNames, ["config", "doctor", "hook-stop", "init", "migrate", "paths", "schema", "status"]);
 
     const config = parsed.commands.find((command) => command.name === "config");
     assert.ok(config);
@@ -186,6 +193,11 @@ describe("metadata-backed CLI", () => {
     assert.deepEqual(parsed.sections?.decision?.promptKinds, ["work", "review", "repair", "planning", "quality", "whip", "wait", "stop"]);
     assert.deepEqual(parsed.sections?.promptRendering?.fingerprintInputs, ["decisionKind", "selectedItem", "reasonCodes", "sourceTimestamps", "body"]);
     assert.deepEqual(parsed.sections?.promptRendering?.customizableSections, ["work", "planning", "quality", "whip"]);
+    assert.deepEqual(parsed.sections?.promptRendering?.metadataShape, ["kind", "decisionKind", "selectedItem", "reasonCodes", "sourceTimestamps", "body", "fingerprint"]);
+    assert.ok(parsed.sections?.status?.outputShape?.includes("decision"));
+    assert.ok(parsed.sections?.status?.outputShape?.includes("prompt"));
+    assert.ok(parsed.sections?.status?.errorCodes?.includes("trusted-command-malformed-json"));
+    assert.ok(parsed.sections?.status?.errorCodes?.includes("status-config-invalid"));
 
     const init = parsed.commands.find((command) => command.name === "init");
     assert.ok(init);
@@ -228,6 +240,18 @@ describe("metadata-backed CLI", () => {
     assert.ok(paths.examples?.some((example) => example.command === "aiu paths --json"));
     assert.ok(paths.errors?.some((error) => error.kind === "asset-paths-unavailable"));
     assert.deepEqual(paths.exitCodes?.map((exitCode) => exitCode.code), [0, 1, 2]);
+
+    const status = parsed.commands.find((command) => command.name === "status");
+    assert.ok(status);
+    assert.deepEqual(status.output?.formats, ["human", "json"]);
+    assert.equal(status.interactions?.json, true);
+    assert.equal(status.dryRun?.supported, false);
+    assert.equal(status.mutation?.mutates, false);
+    assert.ok(status.flags?.some((flag) => flag.name === "json" && flag.type === "boolean"));
+    assert.ok(status.flags?.some((flag) => flag.name === "config" && flag.type === "string"));
+    assert.ok(status.errors?.some((error) => error.kind === "trusted-command-stale-state"));
+    assert.ok(status.errors?.some((error) => error.kind === "trusted-command-timeout"));
+    assert.ok(status.errors?.some((error) => error.kind === "trusted-command-invalid-state"));
 
     const migrate = parsed.commands.find((command) => command.name === "migrate");
     assert.ok(migrate);

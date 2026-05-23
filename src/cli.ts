@@ -13,12 +13,13 @@ import {
   getDefaultAiuConfig,
   loadAiuConfig,
 } from "./config.js";
-import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand } from "./command_registry.js";
+import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand, statusCommand } from "./command_registry.js";
 import { AIU_DECISION_MODES, AIU_DECISION_PROMPT_KINDS } from "./decision.js";
 import { formatAiuDoctorReport, formatAiuPaths, getAiuResolvedPaths, runAiuDoctor } from "./doctor.js";
 import { formatHookStopJson, readHookStopStdin, runAiuHookStop } from "./hook_stop.js";
 import { applyAiuInitPlan, formatInitPlan, planAiuInit, type AiuInitTool } from "./init.js";
 import { formatMigrationPlan, planAiuMigration } from "./migrate.js";
+import { AIU_STATUS_ERROR_CODES, formatAiuStatusReport, runAiuStatus } from "./status.js";
 import {
   AIU_REASON_CODE_CATALOG,
   AIU_STATE_CAPABILITY_SUPPORT,
@@ -79,6 +80,16 @@ export const aiuCli = createCli({
         human: formatAiuDoctorReport(report),
         json: {
           doctor: report,
+        },
+      };
+    }),
+    createCommand(statusCommand, async (context) => {
+      const configPath = typeof context.flags.config === "string" ? context.flags.config : undefined;
+      const report = await runAiuStatus(configPath ? { configPath } : {});
+      return {
+        human: formatAiuStatusReport(report),
+        json: {
+          status: report,
         },
       };
     }),
@@ -171,6 +182,11 @@ export const aiuCli = createCli({
         promptRendering: {
           fingerprintInputs: ["decisionKind", "selectedItem", "reasonCodes", "sourceTimestamps", "body"],
           customizableSections: ["work", "planning", "quality", "whip"],
+          metadataShape: ["kind", "decisionKind", "selectedItem", "reasonCodes", "sourceTimestamps", "body", "fingerprint"],
+        },
+        status: {
+          outputShape: ["config", "inputEnvelopes", "adapterRuns", "normalizedStateSummary", "decision", "prompt", "reasonLabels", "staleSources", "unknownSources", "errors", "warnings"],
+          errorCodes: AIU_STATUS_ERROR_CODES,
         },
       },
     }),

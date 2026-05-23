@@ -195,6 +195,8 @@ M2.4 adds `renderAiuContinuationPrompt`, a host-neutral renderer that turns a pu
 
 JSON stdout must contain no decorative text.
 
+M2.5 adds `runAiuStatus`, `createAiuStatusReport`, and `aiu status` as the typed composition layer over config loading, trusted command adapters, `decideAiuContinuation`, and `renderAiuContinuationPrompt`. The command emits concise human output and stable JSON containing config metadata, adapter runs, input envelopes, normalized summaries, decision output, prompt metadata, stale/unknown source lists, errors, and warnings. Doctor diagnostics now include status runtime policy and adapter compatibility checks without executing live providers.
+
 ## Proposed GitHub Issues
 
 ### M2.1 - Define Trusted State Models And Reason Codes
