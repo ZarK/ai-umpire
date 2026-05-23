@@ -9,6 +9,7 @@
 - typed `aiu.config.json` discovery, defaults, and validation diagnostics
 - dry-runnable `aiu init` plans for OpenCode plus experimental Codex and Claude Code host files
 - non-mutating `aiu doctor` diagnostics for package, config, host, state, and trusted command health
+- durable `.umpire/` continuation state, host-event locks, and bounded redacted continuation logs for OpenCode prompts
 - package metadata for the `@tjalve/aiu` npm package
 - a package-backed `aiu` executable
 - TypeScript source, build, typecheck, test, and package dry-run checks
@@ -114,6 +115,8 @@ pnpm exec aiu migrate --dry-run --json
 The migration plan is expected to report repo-local hook wrappers, local-checkout command paths, managed sections, customization points, conflicts, cleanup candidates, state preservation, and required host trust steps before any apply step. Runtime fallback behavior is not supported: migrated repositories should point host integrations at the package-backed `aiu` executable and keep custom policy in `aiu.config.json` or host-owned files outside package-managed sections.
 
 Package-owned managed sections are the files and content emitted by `aiu init` or future migration apply commands. Repo-local customization points are repository policy, trusted state command argv arrays, host trust settings, prompts outside managed sections, and durable `.umpire/` state. If package-owned content conflicts with local content, review the diff and choose an explicit apply or `--force` path only when replacement is intentional.
+
+OpenCode continuation uses `.umpire/state/continuation.json`, `.umpire/locks/continuation.lock`, and `.umpire/logs/continuation.jsonl` by default. These paths are configurable in `aiu.config.json`, exposed by `aiu paths` and `aiu status --json`, and remain local state that should not be committed or uploaded as provider truth.
 
 ## Whip Tasks
 

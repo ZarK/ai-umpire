@@ -1,5 +1,6 @@
 import { AIU_REASON_CODE_CATALOG, createAiuTrustedStateEnvelope, type AiuReasonCodeDefinition, type AiuStateValueKind, type AiuTrustedStateEnvelope } from "./state.js";
 import { type AiuConfigLoadResult, loadAiuConfig } from "./config.js";
+import { readAiuContinuationState, resolveAiuContinuationPaths, type AiuContinuationState } from "./continuation_store.js";
 import { decideAiuContinuation, type AiuContinuationDecision } from "./decision.js";
 import { renderAiuContinuationPrompt, type AiuContinuationPrompt } from "./prompt.js";
 import {
@@ -36,11 +37,22 @@ export interface AiuStatusReport {
   readonly normalizedStateSummary: AiuStatusStateSummary;
   readonly decision: AiuContinuationDecision;
   readonly prompt: AiuContinuationPrompt;
+  readonly paths: AiuStatusPaths;
+  readonly continuationState?: AiuContinuationState;
   readonly reasonLabels: readonly AiuReasonCodeDefinition[];
   readonly staleSources: readonly AiuStatusSourceRef[];
   readonly unknownSources: readonly AiuStatusSourceRef[];
   readonly errors: readonly AiuStatusError[];
   readonly warnings: readonly AiuStatusWarning[];
+}
+
+export interface AiuStatusPaths {
+  readonly stateDir: string;
+  readonly lockDir: string;
+  readonly logDir: string;
+  readonly continuationState: string;
+  readonly continuationLock: string;
+  readonly continuationLog: string;
 }
 
 export interface AiuStatusAdapterRun {
@@ -172,6 +184,8 @@ export function createAiuStatusReport(
       path: diagnostic.path,
     }));
   const decisionStates = [...inputEnvelopes, ...adapterErrors.map(adapterFailureEnvelope)];
+  const continuationPaths = resolveAiuContinuationPaths(configLoad.repoRoot, configLoad.config);
+  const continuationState = readAiuContinuationState(continuationPaths);
   const decision = decideAiuContinuation({
     states: decisionStates,
     policy: {
@@ -196,6 +210,15 @@ export function createAiuStatusReport(
     normalizedStateSummary: summarizeStates(inputEnvelopes),
     decision,
     prompt,
+    paths: Object.freeze({
+      stateDir: continuationPaths.stateDir,
+      lockDir: continuationPaths.lockDir,
+      logDir: continuationPaths.logDir,
+      continuationState: continuationPaths.statePath,
+      continuationLock: continuationPaths.lockPath,
+      continuationLog: continuationPaths.logPath,
+    }),
+    ...(continuationState ? { continuationState } : {}),
     reasonLabels: Object.freeze(decision.reasonCodes.map((code) => AIU_REASON_CODE_CATALOG.find((item) => item.code === code)).filter((item): item is AiuReasonCodeDefinition => item !== undefined)),
     staleSources: Object.freeze(inputEnvelopes.filter((state) => state.freshness.kind === "stale" || state.value.status === "stale").map(sourceRef)),
     unknownSources: Object.freeze(inputEnvelopes.filter((state) => state.value.status === "unknown" || state.unknownFields.length > 0).map(sourceRef)),
@@ -212,6 +235,11 @@ export function formatAiuStatusReport(report: AiuStatusReport): string {
     `mode: ${report.decision.selectedMode}`,
     `prompt: ${report.prompt.kind} ${report.prompt.fingerprint}`,
     `selected: ${selected.trim() || "none"}`,
+    `stateDir: ${report.paths.stateDir}`,
+    `lockDir: ${report.paths.lockDir}`,
+    `logDir: ${report.paths.logDir}`,
+    `owner: ${report.continuationState?.ownerSessionId ?? "none"}`,
+    `pendingPrompt: ${report.continuationState?.pendingPromptFingerprint ?? "none"}`,
     `reasons: ${report.reasonLabels.map((reason) => `${reason.code} (${reason.description})`).join(", ") || "none"}`,
     `next: ${report.decision.recommendedNextAction}`,
     "",

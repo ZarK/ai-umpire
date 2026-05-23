@@ -101,6 +101,8 @@ M3.2 wires the `@tjalve/aiu/opencode` runtime around trusted state adapters, the
 
 M3.3 wires `aiu hook-stop --tool codex|claude-code` into the same trusted-state decision runtime. Stop hooks parse host payloads, normalize host-session state, load configured trusted state commands, render concrete prompts, and emit clean host JSON. They block only when trusted state loads successfully, the decision is `continue` or safe `repair`, the prompt is concrete, and `hosts.stopHookBlocking.<tool>` is explicitly enabled; all unavailable, malformed, stale, unknown, unsupported, blocked, wait, stop, human-question, and safety-block states allow the host to stop.
 
+M3.4 adds durable continuation state for host integrations. OpenCode continuation serializes host events with `.umpire/` locks, recovers stale locks after the configured host timeout, persists prompt ownership, selected target, mode, fingerprints, timestamps, and source summaries, suppresses duplicate or competing prompts, and writes bounded redacted continuation logs. `aiu status --json` exposes the configured state, lock, and log paths plus any persisted continuation state.
+
 ## FR-07 - Host Integrations
 
 | ID | Requirement | Status |

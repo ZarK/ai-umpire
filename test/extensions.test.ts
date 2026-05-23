@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -64,25 +64,30 @@ describe("extension API", () => {
 
   it("composes OpenCode handlers around the package runtime delegate", async () => {
     const { createAiuOpenCodePlugin } = await import(path.join(repoRoot, "dist/src/opencode.js")) as typeof AiuOpenCode;
-    const calls: string[] = [];
-    const before: AiuOpenCode.AiuOpenCodeHandler = async (_event, _context, next) => {
-      calls.push("before");
-      const result = await next();
-      calls.push("after-next");
-      return result;
-    };
-    const after: AiuOpenCode.AiuOpenCodeHandler = async (_event, context, next) => {
-      calls.push(`after:${context.previousResult?.metadata?.eventType ?? "none"}`);
-      return next();
-    };
-    const plugin = createAiuOpenCodePlugin({ before: [before], after: [after] });
+    const target = await mkdtemp(path.join(tmpdir(), "aiu-opencode-extension-"));
+    try {
+      const calls: string[] = [];
+      const before: AiuOpenCode.AiuOpenCodeHandler = async (_event, _context, next) => {
+        calls.push("before");
+        const result = await next();
+        calls.push("after-next");
+        return result;
+      };
+      const after: AiuOpenCode.AiuOpenCodeHandler = async (_event, context, next) => {
+        calls.push(`after:${context.previousResult?.metadata?.eventType ?? "none"}`);
+        return next();
+      };
+      const plugin = createAiuOpenCodePlugin({ before: [before], after: [after] });
 
-    const result = await plugin.handle({ type: "idle" }, { cwd: "/repo" });
+      const result = await plugin.handle({ type: "idle" }, { cwd: target });
 
-    assert.deepEqual(calls, ["before", "after-next", "after:idle"]);
-    assert.equal(result.handled, true);
-    assert.equal(result.metadata?.eventType, "idle");
-    assert.ok(result.metadata?.suppressions?.includes("host-disabled"));
+      assert.deepEqual(calls, ["before", "after-next", "after:idle"]);
+      assert.equal(result.handled, true);
+      assert.equal(result.metadata?.eventType, "idle");
+      assert.ok(result.metadata?.suppressions?.includes("host-disabled"));
+    } finally {
+      await rm(target, { recursive: true, force: true });
+    }
   });
 
   it("allows after OpenCode handlers to override the package delegate result", async () => {
@@ -115,31 +120,35 @@ describe("extension API", () => {
   it("compiles examples against exported package types only", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "aiu-extension-example-"));
     const tsconfigPath = path.join(tempRoot, "tsconfig.json");
-    await writeFile(
-      tsconfigPath,
-      `${JSON.stringify(
-        {
-          compilerOptions: {
-            module: "NodeNext",
-            moduleResolution: "NodeNext",
-            noEmit: true,
-            strict: true,
-            target: "ES2022",
-            types: ["node"],
-            typeRoots: [path.join(repoRoot, "node_modules/@types")],
-            paths: {
-              "@tjalve/aiu": [path.join(repoRoot, "dist/src/index.d.ts")],
-              "@tjalve/aiu/opencode": [path.join(repoRoot, "dist/src/opencode.d.ts")],
+    try {
+      await writeFile(
+        tsconfigPath,
+        `${JSON.stringify(
+          {
+            compilerOptions: {
+              module: "NodeNext",
+              moduleResolution: "NodeNext",
+              noEmit: true,
+              strict: true,
+              target: "ES2022",
+              types: ["node"],
+              typeRoots: [path.join(repoRoot, "node_modules/@types")],
+              paths: {
+                "@tjalve/aiu": [path.join(repoRoot, "dist/src/index.d.ts")],
+                "@tjalve/aiu/opencode": [path.join(repoRoot, "dist/src/opencode.d.ts")],
+              },
             },
+            files: [path.join(repoRoot, "examples/opencode-extension.ts")],
           },
-          files: [path.join(repoRoot, "examples/opencode-extension.ts")],
-        },
-        null,
-        2,
-      )}\n`,
-      "utf8",
-    );
+          null,
+          2,
+        )}\n`,
+        "utf8",
+      );
 
-    await execFileAsync("pnpm", ["exec", "tsc", "-p", tsconfigPath], { cwd: repoRoot });
+      await execFileAsync("pnpm", ["exec", "tsc", "-p", tsconfigPath], { cwd: repoRoot });
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 });

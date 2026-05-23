@@ -147,6 +147,8 @@ Umpire uses `.umpire/` by default for:
 - continuation logs
 Paths are configurable and surfaced by `aiu paths`, `aiu status --json`, and `aiu doctor`.
 
+M3.4 implements this through a package continuation store that keeps state in `continuation.json`, the active host-event lock in `continuation.lock`, and bounded decision logs in `continuation.jsonl` under the configured state, lock, and log directories.
+
 ### 4.2 - Prompt Ownership
 
 Continuation state records:
@@ -158,14 +160,19 @@ Continuation state records:
 - prompt target
 - timestamps
 - active mode
+- trusted source summaries
 
 ### 4.3 - Locking
 
 Host events are serialized with a lock. Stale locks are recoverable after a configured timeout and must be logged.
 
+OpenCode continuation acquires the configured lock before trusted-state loading, decision-making, and prompt delivery. A live lock suppresses delivery with `lock-held`; a stale lock is recovered only after the configured host timeout and is logged without completing or discarding work.
+
 ### 4.4 - Logging
 
 Logs include decision ids, reason codes, host event types, selected sessions, command summaries, and elapsed timings. Logs are capped or rotated according to config.
+
+Decision logs include decision ids, reason codes, host event type, selected session, prompt fingerprint, trusted source summaries, adapter errors, suppressions, and elapsed timings. Log entries redact token-like values and rotate before the active log grows beyond the package cap.
 
 ---
 
@@ -218,6 +225,8 @@ Status: implemented by `aiu hook-stop --tool codex|claude-code`. The command par
 ### M3.4 - Implement Durable State, Locking, Logging, And Rotation
 
 Add robust `.umpire/` state handling, stale lock recovery, log redaction, and log caps.
+
+Status: implemented by the shared `continuation_store` module and OpenCode runtime integration. The runtime persists prompt ownership and fingerprints after successful delivery, suppresses duplicate or competing prompts, serializes host events with stale lock recovery, logs redacted bounded decision records, and exposes continuation state, lock, and log paths through `aiu status`.
 
 ### M3.5 - Extend Doctor, Schema, And Host Integration Tests
 

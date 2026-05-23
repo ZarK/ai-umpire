@@ -118,6 +118,10 @@ describe("status reporting", () => {
       assert.ok(parsed.status.errors.some((error) => error.code === "trusted-command-malformed-json"));
       assert.deepEqual(parsed.status.decision.reasonCodes, ["stop-malformed-input"]);
       assert.equal(parsed.status.inputEnvelopes.length, 0);
+      assert.equal(parsed.status.paths.stateDir, path.join(repoRoot, ".umpire", "state"));
+      assert.equal(parsed.status.paths.lockDir, path.join(repoRoot, ".umpire", "locks"));
+      assert.equal(parsed.status.paths.logDir, path.join(repoRoot, ".umpire", "logs"));
+      assert.match(parsed.status.paths.continuationState, /continuation\.json$/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -130,6 +134,8 @@ describe("status reporting", () => {
     assert.equal(result.stderr, "");
     assert.match(result.stdout, /decision: stop/);
     assert.match(result.stdout, /mode: stop/);
+    assert.match(result.stdout, /stateDir: /);
+    assert.match(result.stdout, /pendingPrompt: /);
     assert.match(result.stdout, /reasons: stop-clean/);
     assert.match(result.stdout, /next: Stop: no continuation, repair, or wait condition remains\./);
   });

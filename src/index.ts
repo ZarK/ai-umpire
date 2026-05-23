@@ -28,6 +28,18 @@ export {
   loadAiuConfig,
 } from "./config.js";
 export {
+  acquireAiuContinuationLock,
+  appendAiuContinuationLog,
+  buildAiuContinuationState,
+  continuationPromptIsDuplicate,
+  continuationPromptOwnedByOtherSession,
+  continuationPromptTargetsSameItem,
+  readAiuContinuationState,
+  releaseAiuContinuationLock,
+  resolveAiuContinuationPaths,
+  writeAiuContinuationState,
+} from "./continuation_store.js";
+export {
   AIU_DECISION_MODES,
   AIU_DECISION_PROMPT_KINDS,
   decideAiuContinuation,
@@ -118,6 +130,15 @@ export type {
   AiuWhipPolicy,
   AiuWhipTaskDefinition,
 } from "./config.js";
+export type {
+  AiuContinuationLock,
+  AiuContinuationLockBlocked,
+  AiuContinuationLockHandle,
+  AiuContinuationLockResult,
+  AiuContinuationLogEntry,
+  AiuContinuationPaths,
+  AiuContinuationState,
+} from "./continuation_store.js";
 export type {
   AiuContinuationDecision,
   AiuContinuationDecisionInput,
