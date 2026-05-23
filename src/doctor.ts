@@ -312,10 +312,11 @@ function checkStatusRuntimePolicy(configLoad: AiuConfigLoadResult): readonly Aiu
 
 function checkHostRuntimePolicy(configLoad: AiuConfigLoadResult): readonly AiuDoctorCheck[] {
   const report = evaluateAiuHostRuntimePolicy(configLoad.config.hosts, configLoad.config.continuation.modes);
+  const checks: AiuDoctorCheck[] = [];
   if (report.enabledHosts.length === 0) {
-    return [
+    checks.push(
       check("host-runtime-none", "host", "warning", "host-runtime-disabled", "No host integrations are enabled.", configLoad.selectedPath, "Run aiu init --dry-run --json for the host you intend to use."),
-    ];
+    );
   }
   const modeChecks = report.modeChecks.map((item) =>
       check(
@@ -337,7 +338,7 @@ function checkHostRuntimePolicy(configLoad: AiuConfigLoadResult): readonly AiuDo
       check(`host-stop-hook-blocking-${host}`, "host", "error", "host-stop-hook-blocking-unsafe", `${host} stop-hook blocking is not supported by the current runtime profile.`, configLoad.selectedPath, "Set stopHookBlocking to false until M3 stop-hook blocking is fully wired."),
     ];
   });
-  return [...modeChecks, ...stopHookChecks];
+  return [...checks, ...modeChecks, ...stopHookChecks];
 }
 
 function checkStatePaths(paths: AiuResolvedPaths): readonly AiuDoctorCheck[] {

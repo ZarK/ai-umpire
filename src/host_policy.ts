@@ -269,7 +269,14 @@ export function getAllAiuHostCapabilityProfiles(): readonly AiuHostCapabilityPro
 
 export function getDefaultHostCapabilityOverrides(tool: AiuHost): Readonly<Partial<Record<AiuHostCapabilityName, boolean | "none" | "stdout" | "host">>> {
   const profile = getAiuHostCapabilityProfile(tool);
-  return Object.freeze(Object.fromEntries(Object.entries(profile.capabilities).map(([name, capability]) => [name, capabilityOverrideValue(capability)])));
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(profile.capabilities).flatMap(([name, capability]) => {
+        const value = capabilityOverrideValue(capability);
+        return value === undefined ? [] : [[name, value]];
+      }),
+    ),
+  );
 }
 
 export function getDefaultHostModes(tool: AiuHost): readonly AiuContinuationMode[] {
@@ -362,11 +369,14 @@ function effectiveSupport(capability: AiuHostCapabilityDescriptor, override: boo
   return capability.support;
 }
 
-function capabilityOverrideValue(capability: AiuHostCapabilityDescriptor): boolean | "none" | "stdout" | "host" {
+function capabilityOverrideValue(capability: AiuHostCapabilityDescriptor): boolean | "none" | "stdout" | "host" | undefined {
   if (capability.delivery !== undefined) {
     return capability.delivery;
   }
-  return capability.support === "supported" || capability.support === "experimental";
+  if (capability.support === "supported" || capability.support === "experimental") {
+    return true;
+  }
+  return undefined;
 }
 
 function stableJson(value: unknown): string {

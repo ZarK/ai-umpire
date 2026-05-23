@@ -95,6 +95,25 @@ describe("doctor diagnostics", () => {
     assert.equal(report.checks.filter((check) => check.kind === "host-capability-disabled").length, 1);
   });
 
+  it("reports unsafe stop-hook blocking even when no host is enabled", async () => {
+    const repoRoot = await createRepoRoot();
+    await writeConfig(repoRoot, {
+      version: 1,
+      hosts: {
+        enabled: [],
+        stopHookBlocking: {
+          codex: true,
+        },
+      },
+    });
+
+    const report = runAiuDoctor({ cwd: repoRoot });
+
+    assert.equal(report.status, "error");
+    assert.ok(report.checks.some((check) => check.kind === "host-runtime-disabled" && check.category === "host"));
+    assert.ok(report.checks.some((check) => check.kind === "host-stop-hook-blocking-unsafe" && check.category === "host"));
+  });
+
   it("reports trusted command availability without executing commands", async () => {
     const repoRoot = await createRepoRoot();
     await writeConfig(repoRoot, {

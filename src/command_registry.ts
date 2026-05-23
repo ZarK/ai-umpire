@@ -156,6 +156,10 @@ export const doctorCommand = defineCommand({
       description: "A selected continuation mode uses an experimental host capability.",
     },
     {
+      kind: "host-stop-hook-blocking-unsafe",
+      description: "A config enables stop-hook blocking for a host that must safe-allow stopping.",
+    },
+    {
       kind: "state-path-not-writable",
       description: "A configured state, lock, or log path cannot be written or created.",
     },

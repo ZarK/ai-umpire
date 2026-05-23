@@ -205,11 +205,21 @@ function mergeConfig(config: AiuConfig, raw: Record<string, unknown>, tools: rea
   const enabled = [...new Set([...config.hosts.enabled, ...tools])];
   const capabilities = {
     ...config.hosts.capabilities,
-    ...Object.fromEntries(tools.map((tool) => [tool, getDefaultHostCapabilityOverrides(tool)])),
+    ...Object.fromEntries(
+      tools.map((tool) => [
+        tool,
+        {
+          ...getDefaultHostCapabilityOverrides(tool),
+          ...(config.hosts.capabilities[tool] ?? {}),
+        },
+      ]),
+    ),
   };
   const modes = {
     ...config.hosts.modes,
-    ...Object.fromEntries(tools.map((tool) => [tool, getDefaultHostModes(tool)])),
+    ...Object.fromEntries(
+      tools.map((tool) => [tool, config.hosts.modes[tool] ?? getDefaultHostModes(tool)]),
+    ),
   };
 
   return {

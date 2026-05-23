@@ -29,6 +29,7 @@ describe("host runtime policy", () => {
     assert.deepEqual(getDefaultHostModes("codex"), ["stop"]);
     assert.equal(getDefaultHostCapabilityOverrides("opencode").promptDelivery, "host");
     assert.equal(getDefaultHostCapabilityOverrides("codex").promptDelivery, "stdout");
+    assert.equal(Object.hasOwn(getDefaultHostCapabilityOverrides("codex"), "userActivity"), false);
   });
 
   it("reports disabled and experimental host mode policy distinctly", () => {

@@ -173,6 +173,7 @@ describe("metadata-backed CLI", () => {
     assert.deepEqual(parsed.sections?.config?.hostCapabilityNames, ["idleEvents", "stopHook", "todoRead", "sessionState", "promptDelivery", "selectedSession", "modelTargeting", "userActivity", "projectTrust"]);
     assert.deepEqual(parsed.sections?.config?.hostSupportLevels, ["supported", "experimental", "recipe-only", "unsupported"]);
     assert.deepEqual(parsed.sections?.config?.hostCapabilitySupport, ["supported", "experimental", "disabled", "unsupported", "unknown"]);
+    assert.deepEqual(parsed.sections?.config?.hostProfiles?.map((profile) => profile.tool), ["opencode", "codex", "claude-code"]);
     assert.deepEqual(parsed.sections?.config?.hostProfiles?.map((profile) => profile.supportLevel), ["supported", "experimental", "experimental"]);
     assert.equal(parsed.sections?.config?.hostProfiles?.find((profile) => profile.tool === "codex")?.stopHook?.blocksByDefault, false);
     assert.ok(parsed.sections?.config?.policyFields?.includes("hosts.stopHookBlocking"));
@@ -232,6 +233,7 @@ describe("metadata-backed CLI", () => {
     assert.ok(doctor.flags?.some((flag) => flag.name === "json" && flag.type === "boolean"));
     assert.ok(doctor.flags?.some((flag) => flag.name === "config" && flag.type === "string"));
     assert.ok(doctor.errors?.some((error) => error.kind === "config-missing"));
+    assert.ok(doctor.errors?.some((error) => error.kind === "host-stop-hook-blocking-unsafe"));
     assert.ok(doctor.errors?.some((error) => error.kind === "trusted-command-missing"));
 
     const paths = parsed.commands.find((command) => command.name === "paths");

@@ -113,6 +113,39 @@ describe("init planner", () => {
     assert.deepEqual(config.trustedStateCommands.work.argv, ["aie", "status", "--json"]);
   });
 
+  it("preserves existing host overrides while seeding missing init defaults", async () => {
+    const target = await createRepoRoot();
+    await writeFile(path.join(target, "aiu.config.json"), JSON.stringify({
+      version: 1,
+      hosts: {
+        enabled: ["codex"],
+        capabilities: {
+          codex: {
+            promptDelivery: "none",
+          },
+        },
+        modes: {
+          codex: [],
+        },
+      },
+    }), "utf8");
+
+    const result = await runCli(target, ["init", "--tool", "codex", "--force", "--json"]);
+    const parsed = JSON.parse(result.stdout) as InitEnvelope;
+    const config = JSON.parse(await readFile(path.join(target, "aiu.config.json"), "utf8")) as {
+      hosts: {
+        capabilities: { codex: { promptDelivery?: string; stopHook?: boolean } };
+        modes: { codex: string[] };
+      };
+    };
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(parsed.init.ok, true);
+    assert.equal(config.hosts.capabilities.codex.promptDelivery, "none");
+    assert.equal(config.hosts.capabilities.codex.stopHook, true);
+    assert.deepEqual(config.hosts.modes.codex, []);
+  });
+
   it("preserves conflicting host files unless --force is explicit", async () => {
     const target = await createRepoRoot();
     const wrapper = path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts");
