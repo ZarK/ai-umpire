@@ -246,6 +246,26 @@ describe("doctor diagnostics", () => {
     assert.equal(kinds.includes("whip-state-malformed"), false);
   });
 
+  it("requires exact idle mode trusted command source ids", async () => {
+    const repoRoot = await createRepoRoot();
+    await writeConfig(repoRoot, {
+      version: 1,
+      trustedStateCommands: {
+        preplanning: { argv: [process.execPath, "--version"] },
+        qualityish: { argv: [process.execPath, "--version"] },
+      },
+    });
+
+    const report = runAiuDoctor({ cwd: repoRoot });
+    const planningChecks = report.checks.filter((check) => check.id.startsWith("planning-trusted-command"));
+    const qualityChecks = report.checks.filter((check) => check.id.startsWith("quality-trusted-command"));
+
+    assert.equal(planningChecks.length, 1);
+    assert.equal(planningChecks[0]?.kind, "planning-trusted-command-missing");
+    assert.equal(qualityChecks.length, 1);
+    assert.equal(qualityChecks[0]?.kind, "quality-trusted-command-missing");
+  });
+
   it("treats backslash executable tokens as direct trusted command paths", async () => {
     const repoRoot = await createRepoRoot();
     const executableToken = ".\\local-tool.exe";

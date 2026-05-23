@@ -330,7 +330,7 @@ function checkModeReadiness(mode: "planning" | "quality", enabled: boolean, path
     return checks;
   }
 
-  const commands = paths.trustedCommands.filter((command) => command.sourceId.toLowerCase().includes(mode));
+  const commands = paths.trustedCommands.filter((command) => command.sourceId === mode);
   if (commands.length === 0) {
     checks.push(check(`${mode}-trusted-command-configured`, "trusted-command", "warning", `${mode}-trusted-command-missing`, `No configured trusted state command is named for ${mode} state.`, configPath, `Add a deterministic trustedStateCommands entry for ${mode} state or disable ${mode}.enabled.`));
     return checks;
