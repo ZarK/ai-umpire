@@ -104,6 +104,7 @@ describe("package foundation", () => {
 
     assert.match(publishWorkflow, /id-token:\s*write/);
     assert.match(publishWorkflow, /environment:\s*npm-publish/);
+    assert.match(publishWorkflow, /git merge-base --is-ancestor "\$tag_commit" origin\/main/);
     assert.match(publishWorkflow, /pnpm publish --access public --provenance --no-git-checks/);
     assert.doesNotMatch(publishWorkflow, /NPM_TOKEN/);
   });
