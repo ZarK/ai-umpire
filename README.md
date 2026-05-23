@@ -16,7 +16,7 @@
 
 It does not bundle companion CLIs or keep copied helper scripts as a runtime fallback path. Repositories configure trusted commands explicitly.
 
-## Install
+## Human Install
 
 ```bash
 pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.0
@@ -25,10 +25,34 @@ pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.0
 System requirements:
 
 - Node.js 24+
-- pnpm for development and documented local workflows
-- host tool trust/enablement for project hooks where required
+- pnpm for documented install and local development workflows
+- host tool trust/enablement for project hooks where required by OpenCode, Codex, or Claude Code
+- repository policy that allows explicit trusted state commands
 
-Install companion tools separately only when repository policy uses their commands as trusted state inputs.
+Keep installs exact and lifecycle scripts disabled. Umpire does not require copied helper scripts, postinstall setup, or companion fallback packages. Install companion tools separately only when repository policy uses their commands as trusted state inputs.
+
+Prefer the project-local executable after install:
+
+```bash
+pnpm exec aiu --help
+pnpm exec aiu doctor --json
+```
+
+## Agent Install
+
+Agents should use deterministic commands and inspect JSON before mutating repository files:
+
+```bash
+pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.0
+pnpm exec aiu doctor --json
+pnpm exec aiu init --dry-run --json
+```
+
+Expected first-run signals:
+
+- `aiu doctor --json` returns `ok: true` and may report `config-missing` until init is applied.
+- `aiu init --dry-run --json` returns `command: "init"`, `init.dryRun: true`, `init.config.operation: "create"`, and planned host files without writing them.
+- Existing host files that differ from package-managed content are reported as `conflict`; agents must not replace them unless `--force` is explicitly chosen after review.
 
 ## Quick Start
 
@@ -45,7 +69,12 @@ pnpm exec aiu schema --json
 
 If `aiu.config.json` is missing, Umpire reports typed conservative defaults. Configured trusted state commands use argv arrays instead of shell strings, and state, lock, and log paths default under `.umpire/`.
 
-`aiu init` defaults to `--tool all` and produces the same plan shape in dry-run and apply mode. Existing managed files that differ are reported as conflicts unless `--force` is provided explicitly.
+`aiu init` defaults to `--tool all` and produces the same plan shape in dry-run and apply mode. Existing managed files that differ are reported as conflicts unless `--force` is provided explicitly. Init writes only these managed assets:
+
+- `aiu.config.json`
+- `.opencode/plugins/ai-umpire-continuation.ts`
+- `.codex/hooks/ai-umpire-stop.json`
+- `.claude/hooks/ai-umpire-stop.json`
 
 Apply a reviewed init plan:
 
@@ -55,6 +84,35 @@ pnpm exec aiu doctor
 ```
 
 After init writes host files, review and enable the host-specific trust step named in the init output. OpenCode, Codex, and Claude Code integrations delegate to the package-backed `aiu` command; Umpire does not install fallback scripts.
+
+Review generated assets with normal git tooling before trusting host hooks:
+
+```bash
+git diff -- aiu.config.json .opencode .codex .claude
+pnpm exec aiu doctor --json
+```
+
+Revert an uncommitted init with:
+
+```bash
+git restore -- aiu.config.json .opencode .codex .claude
+```
+
+Remove untracked init files only after reviewing `git status --short`; Umpire never stages, commits, pushes, or deletes repository files for you.
+
+## Migration
+
+Existing repositories that used repo-local Umpire hooks, copied helper scripts, or local-checkout references should inspect migration first:
+
+```bash
+pnpm exec aiu migrate --dry-run --json
+```
+
+The migration plan is expected to report repo-local hook wrappers, local-checkout command paths, managed sections, customization points, conflicts, cleanup candidates, state preservation, and required host trust steps before any apply step. Runtime fallback behavior is not supported: migrated repositories should point host integrations at the package-backed `aiu` executable and keep custom policy in `aiu.config.json` or host-owned files outside package-managed sections.
+
+Package-owned managed sections are the files and content emitted by `aiu init` or future migration apply commands. Repo-local customization points are repository policy, trusted state command argv arrays, host trust settings, prompts outside managed sections, and durable `.umpire/` state. If package-owned content conflicts with local content, review the diff and choose an explicit apply or `--force` path only when replacement is intentional.
+
+## Local Development
 
 Run release checks:
 
