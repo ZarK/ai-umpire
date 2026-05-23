@@ -220,6 +220,7 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
   validateWritablePath("stateDir", pathsConfig.stateDir, repoRoot, diagnostics);
   validateWritablePath("lockDir", pathsConfig.lockDir, repoRoot, diagnostics);
   validateWritablePath("logDir", pathsConfig.logDir, repoRoot, diagnostics);
+  validateWritableFilePath("whip.statePath", whip.statePath, repoRoot, "$.whip.statePath", diagnostics);
 
   return {
     config: Object.freeze({
@@ -612,6 +613,32 @@ function validateWritablePath(name: keyof AiuPathsConfig, configuredPath: string
         `$.paths.${name}`,
         `${name} is not writable or cannot be created: ${error instanceof Error ? error.message : String(error)}`,
         "Choose a writable repository-local path or fix directory permissions.",
+      ),
+    );
+  }
+}
+
+function validateWritableFilePath(name: string, configuredPath: string, repoRoot: string, fieldPath: string, diagnostics: AiuConfigDiagnostic[]): void {
+  const resolved = path.resolve(repoRoot, configuredPath);
+  try {
+    if (existsSync(resolved)) {
+      const stat = statSync(resolved);
+      if (stat.isDirectory()) {
+        diagnostics.push(diagnostic("path-not-writable", fieldPath, `${name} resolves to a directory, not a file.`, "Choose a writable file path for Umpire state."));
+        return;
+      }
+      accessSync(resolved, constants.W_OK);
+      return;
+    }
+
+    accessSync(findExistingDirectoryAncestor(path.dirname(resolved)), constants.W_OK | constants.X_OK);
+  } catch (error) {
+    diagnostics.push(
+      diagnostic(
+        "path-not-writable",
+        fieldPath,
+        `${name} is not writable or cannot be created: ${error instanceof Error ? error.message : String(error)}`,
+        "Choose a writable repository-local file path or fix directory permissions.",
       ),
     );
   }

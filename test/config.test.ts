@@ -210,6 +210,33 @@ describe("config foundation", () => {
       await chmod(blockedDir, 0o700);
     }
   });
+
+  it("rejects whip state paths that cannot be written as files", async () => {
+    const repoRoot = await createRepoRoot();
+    await mkdir(path.join(repoRoot, "whip-state-dir"));
+    await writeFile(path.join(repoRoot, "state-parent-file"), "not a directory\n", "utf8");
+    await writeConfig(repoRoot, {
+      version: 1,
+      whip: {
+        statePath: "whip-state-dir",
+      },
+    });
+    const directoryResult = loadAiuConfig({ cwd: repoRoot });
+
+    assert.equal(directoryResult.ok, false);
+    assert.ok(directoryResult.diagnostics.some((diagnostic) => diagnostic.kind === "path-not-writable" && diagnostic.path === "$.whip.statePath"));
+
+    await writeConfig(repoRoot, {
+      version: 1,
+      whip: {
+        statePath: "state-parent-file/whip.json",
+      },
+    });
+    const fileAncestorResult = loadAiuConfig({ cwd: repoRoot });
+
+    assert.equal(fileAncestorResult.ok, false);
+    assert.ok(fileAncestorResult.diagnostics.some((diagnostic) => diagnostic.kind === "path-not-writable" && diagnostic.path === "$.whip.statePath"));
+  });
 });
 
 async function createRepoRoot(): Promise<string> {

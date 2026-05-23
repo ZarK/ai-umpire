@@ -71,8 +71,8 @@ export function decideAiuWhipContinuation(input: AiuWhipContinuationInput): AiuW
     return decision("disabled", policy.statePath, false, ["whip-disabled"], undefined, "preserve");
   }
 
-  const blockedTaskIds = new Set((input.state?.tasks ?? []).filter((task) => task.status === "completed" || task.status === "cancelled").map((task) => task.id));
-  const task = resolveAiuWhipTasks(policy).find((candidate) => !blockedTaskIds.has(candidate.id));
+  const stateTasks = input.state?.tasks ?? [];
+  const task = resolveAiuWhipTasks(policy).find((candidate) => !stateTasks.some((stateTask) => blocksTask(stateTask, candidate)));
   if (!task) {
     return decision("idle-no-work", policy.statePath, true, ["whip-no-ready-task"]);
   }
@@ -108,4 +108,14 @@ function decision(
 
 function fingerprintWhipPrompt(task: AiuWhipTaskDefinition): string {
   return createHash("sha256").update(`${task.id}\0${task.title}\0${task.prompt}`).digest("hex");
+}
+
+function blocksTask(stateTask: AiuWhipStateTask, candidate: AiuWhipTaskDefinition): boolean {
+  if (stateTask.status !== "completed" && stateTask.status !== "cancelled") {
+    return false;
+  }
+  if (stateTask.id !== candidate.id) {
+    return false;
+  }
+  return stateTask.promptFingerprint === undefined || stateTask.promptFingerprint === fingerprintWhipPrompt(candidate);
 }
