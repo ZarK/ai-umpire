@@ -81,6 +81,43 @@ describe("package foundation", () => {
     assert.doesNotMatch(pnpmLock, /\n\s+postcss@/);
     assert.doesNotMatch(pnpmLock, /\n\s+rolldown@/);
   });
+
+  it("pins CI and publish workflow actions to immutable commits", async () => {
+    const workflowPaths = [
+      path.join(repoRoot, ".github", "workflows", "ci.yml"),
+      path.join(repoRoot, ".github", "workflows", "publish.yml"),
+    ];
+
+    for (const workflowPath of workflowPaths) {
+      const workflow = await readFile(workflowPath, "utf8");
+      const actionRefs = [...workflow.matchAll(/uses:\s*([^\s@]+)@([^\s]+)/g)];
+
+      assert.ok(actionRefs.length > 0, workflowPath);
+      for (const [, action, ref] of actionRefs) {
+        assert.match(ref ?? "", /^[a-f0-9]{40}$/, `${workflowPath} ${action ?? "action"} must use a full commit SHA`);
+      }
+    }
+  });
+
+  it("keeps publish workflow on trusted publishing without long-lived npm tokens", async () => {
+    const publishWorkflow = await readFile(path.join(repoRoot, ".github", "workflows", "publish.yml"), "utf8");
+
+    assert.match(publishWorkflow, /id-token:\s*write/);
+    assert.match(publishWorkflow, /environment:\s*npm-publish/);
+    assert.match(publishWorkflow, /pnpm publish --access public --provenance --no-git-checks/);
+    assert.doesNotMatch(publishWorkflow, /NPM_TOKEN/);
+  });
+
+  it("requires CODEOWNERS review for release-sensitive files", async () => {
+    const codeowners = await readFile(path.join(repoRoot, ".github", "CODEOWNERS"), "utf8");
+
+    assert.match(codeowners, /^\* @ZarK$/m);
+    assert.match(codeowners, /^\.github\/workflows\/ @ZarK$/m);
+    assert.match(codeowners, /^\.github\/CODEOWNERS @ZarK$/m);
+    assert.match(codeowners, /^package\.json @ZarK$/m);
+    assert.match(codeowners, /^pnpm-lock\.yaml @ZarK$/m);
+    assert.match(codeowners, /^\.npmrc @ZarK$/m);
+  });
 });
 
 async function readPackageJson(): Promise<PackageJson> {

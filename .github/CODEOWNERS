@@ -1,0 +1,10 @@
+* @ZarK
+
+.github/workflows/ @ZarK
+.github/CODEOWNERS @ZarK
+.npmrc @ZarK
+package.json @ZarK
+pnpm-lock.yaml @ZarK
+README.md @ZarK
+docs/M5-migration-release-readiness-and-provider-architecture.md @ZarK
+docs/release-controls.md @ZarK

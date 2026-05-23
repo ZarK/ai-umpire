@@ -97,17 +97,30 @@ pnpm exec aiu --help
 - [M3 - Provider Status Integration And Stop Hooks](docs/M3-provider-status-integration-and-stop-hooks.md)
 - [M4 - Whip Tasks, Quality Idle Work, And Planning Continuation](docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md)
 - [M5 - Existing Repository Migration And Release Readiness](docs/M5-migration-release-readiness-and-provider-architecture.md)
+- [Release controls](docs/release-controls.md)
 
 ## Publish Checklist
 
-Before public publish:
+Repository controls before public publish:
 
-- authenticate to npm as the account that owns the `@tjalve` scope
+- the repository is public only after release controls are enabled
+- `main` is protected by GitHub branch protection or a ruleset
+- `main` requires signed commits, PR review, CODEOWNERS review, and the `release-check` CI status
+- force pushes and branch deletion are disabled for `main`
+- GitHub secret scanning and push protection are enabled
+- `.github/CODEOWNERS` owns release-sensitive files
+- workflow permissions default to read-only
+- the `npm-publish` environment requires explicit reviewer approval
+- npm trusted publishing is configured for `ZarK/ai-umpire`, workflow `Publish`, environment `npm-publish`
+- no long-lived `NPM_TOKEN` is required for the primary publish path
+
+Before tagging:
+
+- register the maintainer signing key with GitHub
+- confirm a fresh signed test commit is shown as verified by GitHub
 - confirm the package version
 - keep the working tree clean so the tarball matches git
-- make the GitHub repo public, then enable branch protection or rulesets for `main`
-- configure the `npm-publish` environment with required reviewers
-- configure npm trusted publishing for the `Publish` workflow
+- authenticate to npm only for account/scope administration; publishing uses trusted publishing
 
 Release flow:
 
@@ -117,8 +130,8 @@ git tag v0.1.0
 git push origin main v0.1.0
 ```
 
-The tagged release workflow publishes with npm provenance:
+The tagged release workflow publishes with npm provenance from the protected `npm-publish` environment:
 
 ```bash
-pnpm publish --access public --provenance
+pnpm publish --access public --provenance --no-git-checks
 ```

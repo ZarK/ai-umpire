@@ -141,6 +141,18 @@ README documents:
 
 Publish workflow uses npm provenance or another documented secure publishing path. Docs must not tell users to rely on floating `latest` as the preferred install path.
 
+Repository release controls include:
+
+- pinned GitHub Actions in CI and publish workflows
+- read-only default workflow permissions
+- branch protection or rulesets on `main`
+- required signed commits, pull request review, CODEOWNERS review, and CI before merge
+- disabled force pushes and branch deletion on `main`
+- secret scanning and push protection when repository visibility supports them
+- protected `npm-publish` environment with reviewer approval
+- npm trusted publishing for `ZarK/ai-umpire`, workflow `Publish`, environment `npm-publish`
+- no long-lived `NPM_TOKEN` for the primary publish path
+
 ## Proposed GitHub Issues
 
 ### M5.1 - Implement Migration Inventory And Dry-Run Plan
