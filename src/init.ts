@@ -178,7 +178,7 @@ export function planAiuInit(options: AiuInitOptions = {}): AiuInitPlan {
     config,
     conflicts: Object.freeze(conflicts),
     requiredTrustSteps: Object.freeze([...new Set(hostProfiles.flatMap((profile) => profile.trustSteps))]),
-    recommendedNextCommand: "aiu doctor --json",
+    recommendedNextCommand: "aiu config --json",
   });
 }
 

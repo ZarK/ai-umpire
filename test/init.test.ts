@@ -31,6 +31,7 @@ describe("init planner", () => {
     assert.deepEqual(parsed.init.tools, ["opencode", "codex", "claude-code"]);
     assert.equal(parsed.init.files.length, 3);
     assert.equal(parsed.init.config.operation, "create");
+    assert.equal(parsed.init.recommendedNextCommand, "aiu config --json");
     assert.equal(existsSync(path.join(target, "aiu.config.json")), false);
     assert.equal(existsSync(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts")), false);
   });
@@ -180,6 +181,7 @@ interface InitEnvelope {
     readonly hostProfiles: Array<{ tool: string }>;
     readonly files: Array<{ operation: string; reason?: string }>;
     readonly config: { operation: string; hosts: string[]; trustedStateCommands: string[] };
+    readonly recommendedNextCommand: string;
   };
 }
 
