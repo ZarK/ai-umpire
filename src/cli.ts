@@ -14,6 +14,7 @@ import {
   loadAiuConfig,
 } from "./config.js";
 import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand } from "./command_registry.js";
+import { AIU_DECISION_PROMPT_KINDS } from "./decision.js";
 import { formatAiuDoctorReport, formatAiuPaths, getAiuResolvedPaths, runAiuDoctor } from "./doctor.js";
 import { formatHookStopJson, readHookStopStdin, runAiuHookStop } from "./hook_stop.js";
 import { applyAiuInitPlan, formatInitPlan, planAiuInit, type AiuInitTool } from "./init.js";
@@ -162,6 +163,10 @@ export const aiuCli = createCli({
           capabilitySupport: AIU_STATE_CAPABILITY_SUPPORT,
           reasonCodes: AIU_REASON_CODE_CATALOG,
           adapterErrorCodes: AIU_TRUSTED_ADAPTER_ERROR_CODES,
+        },
+        decision: {
+          promptKinds: AIU_DECISION_PROMPT_KINDS,
+          modes: ["continue", "repair", "wait", "stop"],
         },
       },
     }),

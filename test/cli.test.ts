@@ -126,6 +126,10 @@ describe("metadata-backed CLI", () => {
           adapterErrorCodes?: string[];
           reasonCodes?: Array<{ code: string; category: string; decision: string; description: string }>;
         };
+        decision?: {
+          promptKinds?: string[];
+          modes?: string[];
+        };
       };
       package: { name: string };
     };
@@ -172,7 +176,10 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.sections?.trustedState?.adapterErrorCodes?.includes("trusted-command-malformed-json"));
     assert.ok(parsed.sections?.trustedState?.adapterErrorCodes?.includes("trusted-command-timeout"));
     assert.ok(parsed.sections?.trustedState?.reasonCodes?.some((reason) => reason.code === "continue-active-work" && reason.decision === "continue"));
+    assert.ok(parsed.sections?.trustedState?.reasonCodes?.some((reason) => reason.code === "continue-whip-task" && reason.decision === "continue"));
     assert.ok(parsed.sections?.trustedState?.reasonCodes?.some((reason) => reason.code === "stop-unsupported-input" && reason.category === "input"));
+    assert.deepEqual(parsed.sections?.decision?.modes, ["continue", "repair", "wait", "stop"]);
+    assert.deepEqual(parsed.sections?.decision?.promptKinds, ["work", "review", "repair", "planning", "quality", "whip", "wait", "stop"]);
 
     const init = parsed.commands.find((command) => command.name === "init");
     assert.ok(init);

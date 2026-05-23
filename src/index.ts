@@ -27,6 +27,10 @@ export {
   loadAiuConfig,
 } from "./config.js";
 export {
+  AIU_DECISION_PROMPT_KINDS,
+  decideAiuContinuation,
+} from "./decision.js";
+export {
   formatAiuDoctorReport,
   formatAiuPaths,
   getAiuResolvedPaths,
@@ -94,6 +98,14 @@ export type {
   AiuWhipPolicy,
   AiuWhipTaskDefinition,
 } from "./config.js";
+export type {
+  AiuContinuationDecision,
+  AiuContinuationDecisionInput,
+  AiuContinuationDecisionPolicy,
+  AiuDecisionPromptKind,
+  AiuDecisionSelectedItem,
+  AiuDecisionSourceSummary,
+} from "./decision.js";
 export type {
   AiuDoctorCheck,
   AiuDoctorReport,
