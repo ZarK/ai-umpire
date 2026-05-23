@@ -1,0 +1,33 @@
+test/config.test.ts
+  s_f8aaaf4fdfe4d6::t_3cd95706f8b78f 37-40,87-99,110-113,148-158,174-178
+src/whip.ts
+  s_f8aaaf4fdfe4d6::t_fc4930aa32b807 1-111
+src/config.ts
+  s_f8aaaf4fdfe4d6::t_89e9467e6026bb 454-514
+  s_f8aaaf4fdfe4d6::t_fc4930aa32b807 698-701
+  s_f8aaaf4fdfe4d6::t_168849dfa7ba40 24,68-81,136-141,213,234
+test/whip.test.ts
+  s_f8aaaf4fdfe4d6::t_3cd95706f8b78f 1-153
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_babed627f4fcb5 45-50,63-64,92-100
+docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md
+  s_f8aaaf4fdfe4d6::t_1a65f5976e2ec0 79-91
+README.md
+  s_f8aaaf4fdfe4d6::t_1a65f5976e2ec0 115-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "61b39c45e5ed67f4d356e58dd9d8240ddfdabbde",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
