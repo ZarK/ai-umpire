@@ -61,6 +61,15 @@ export {
   isAiuStateSuccess,
 } from "./state.js";
 export {
+  AIU_TRUSTED_ADAPTER_ERROR_CODES,
+  AIU_TRUSTED_COMMAND_DEFAULT_MAX_OUTPUT_BYTES,
+  AIU_TRUSTED_COMMAND_DEFAULT_TIMEOUT_MS,
+  executeAiuTrustedCommand,
+  parseAiuTrustedStateJson,
+  runAiuTrustedStateAdapter,
+  toAiuTrustedStateCommandRef,
+} from "./trusted_adapter.js";
+export {
   AIU_DEFAULT_WHIP_TASKS,
   AIU_WHIP_TASK_STATUSES,
   decideAiuWhipContinuation,
@@ -142,6 +151,15 @@ export type {
   AiuWorkItemState,
   AiuWorkQueueState,
 } from "./state.js";
+export type {
+  AiuTrustedAdapterError,
+  AiuTrustedAdapterErrorCode,
+  AiuTrustedCommandExecutionOptions,
+  AiuTrustedCommandExecutionRecord,
+  AiuTrustedCommandExecutionResult,
+  AiuTrustedStateAdapterResult,
+  AiuTrustedStateParseInput,
+} from "./trusted_adapter.js";
 export type {
   AiuWhipContinuationDecision,
   AiuWhipContinuationInput,

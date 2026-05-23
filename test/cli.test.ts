@@ -123,6 +123,7 @@ describe("metadata-backed CLI", () => {
           trustLevels?: string[];
           freshnessKinds?: string[];
           capabilitySupport?: string[];
+          adapterErrorCodes?: string[];
           reasonCodes?: Array<{ code: string; category: string; decision: string; description: string }>;
         };
       };
@@ -168,6 +169,8 @@ describe("metadata-backed CLI", () => {
     assert.deepEqual(parsed.sections?.trustedState?.trustLevels, ["trusted", "advisory", "untrusted"]);
     assert.deepEqual(parsed.sections?.trustedState?.freshnessKinds, ["fresh", "stale", "unknown"]);
     assert.deepEqual(parsed.sections?.trustedState?.capabilitySupport, ["supported", "unsupported", "unknown"]);
+    assert.ok(parsed.sections?.trustedState?.adapterErrorCodes?.includes("trusted-command-malformed-json"));
+    assert.ok(parsed.sections?.trustedState?.adapterErrorCodes?.includes("trusted-command-timeout"));
     assert.ok(parsed.sections?.trustedState?.reasonCodes?.some((reason) => reason.code === "continue-active-work" && reason.decision === "continue"));
     assert.ok(parsed.sections?.trustedState?.reasonCodes?.some((reason) => reason.code === "stop-unsupported-input" && reason.category === "input"));
 

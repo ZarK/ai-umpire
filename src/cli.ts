@@ -27,6 +27,7 @@ import {
   AIU_TRUSTED_STATE_SCHEMA_VERSION,
   AIU_TRUST_LEVELS,
 } from "./state.js";
+import { AIU_TRUSTED_ADAPTER_ERROR_CODES } from "./trusted_adapter.js";
 
 interface PackageJson {
   readonly name: string;
@@ -160,6 +161,7 @@ export const aiuCli = createCli({
           freshnessKinds: AIU_STATE_FRESHNESS_KINDS,
           capabilitySupport: AIU_STATE_CAPABILITY_SUPPORT,
           reasonCodes: AIU_REASON_CODE_CATALOG,
+          adapterErrorCodes: AIU_TRUSTED_ADAPTER_ERROR_CODES,
         },
       },
     }),

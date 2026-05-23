@@ -1,0 +1,187 @@
+import assert from "node:assert/strict";
+import path from "node:path";
+import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
+
+import type * as TrustedAdapter from "../src/trusted_adapter.ts";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const observedAt = "2026-05-23T00:00:00.000Z";
+
+describe("trusted command adapters", () => {
+  it("executes explicit argv descriptors and normalizes trusted state envelopes", async () => {
+    const { runAiuTrustedStateAdapter } = await loadTrustedAdapter();
+    const payload = {
+      schemaVersion: 1,
+      sourceId: "work",
+      observedAt,
+      trustLevel: "trusted",
+      capabilities: {
+        work: "supported",
+      },
+      freshness: {
+        kind: "fresh",
+        observedAt,
+      },
+      value: {
+        kind: "work-queue",
+        status: "pass",
+        activeItems: [],
+        readyItems: [],
+        blockedItems: [],
+        unknownItems: [],
+      },
+    };
+    const result = await runAiuTrustedStateAdapter("work", {
+      argv: [process.execPath, "-e", `process.stdout.write(${JSON.stringify(JSON.stringify(payload))})`],
+      timeoutMs: 1_000,
+      maxOutputBytes: 16_384,
+    }, { observedAt });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.record.sourceId, "work");
+    assert.deepEqual(result.record.command.argv.slice(1, 2), ["-e"]);
+    assert.equal(result.record.parsedSchemaVersion, 1);
+    assert.equal(result.states[0]?.stateKind, "work-queue");
+    assert.equal(result.states[0]?.value.status, "pass");
+  });
+
+  it("records non-zero exits and redacts token-like stderr", async () => {
+    const { executeAiuTrustedCommand } = await loadTrustedAdapter();
+    const token = `ghp_${"A".repeat(36)}`;
+    const result = await executeAiuTrustedCommand("work", {
+      argv: [process.execPath, "-e", `process.stderr.write(${JSON.stringify(token)}); process.exit(7)`],
+      timeoutMs: 1_000,
+      maxOutputBytes: 16_384,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, "trusted-command-non-zero-exit");
+    assert.equal(result.record.exitCode, 7);
+    assert.doesNotMatch(result.record.stderrSummary, /ghp_[A-Z0-9_]+/);
+  });
+
+  it("distinguishes spawn failure, timeout, and output limits", async () => {
+    const { executeAiuTrustedCommand } = await loadTrustedAdapter();
+    const spawnFailure = await executeAiuTrustedCommand("missing", {
+      argv: ["/__aiu_missing_executable__"],
+      timeoutMs: 1_000,
+      maxOutputBytes: 16_384,
+    });
+    assert.equal(spawnFailure.ok, false);
+    assert.equal(spawnFailure.error.code, "trusted-command-spawn-failed");
+
+    const timeout = await executeAiuTrustedCommand("slow", {
+      argv: [process.execPath, "-e", "setTimeout(() => {}, 1000)"],
+      timeoutMs: 20,
+      maxOutputBytes: 16_384,
+    });
+    assert.equal(timeout.ok, false);
+    assert.equal(timeout.error.code, "trusted-command-timeout");
+    assert.equal(timeout.record.timedOut, true);
+
+    const outputLimit = await executeAiuTrustedCommand("noisy", {
+      argv: [process.execPath, "-e", "process.stdout.write('x'.repeat(1000))"],
+      timeoutMs: 1_000,
+      maxOutputBytes: 10,
+    });
+    assert.equal(outputLimit.ok, false);
+    assert.equal(outputLimit.error.code, "trusted-command-output-limit");
+    assert.equal(outputLimit.record.outputLimitExceeded, true);
+  });
+
+  it("returns stable parse errors for malformed JSON and unknown schemas", async () => {
+    const { parseAiuTrustedStateJson, toAiuTrustedStateCommandRef } = await loadTrustedAdapter();
+    const command = toAiuTrustedStateCommandRef("work", { argv: ["fixture"] });
+    const malformed = parseAiuTrustedStateJson({
+      sourceId: "work",
+      command,
+      stdout: "{",
+      observedAt,
+    });
+    assert.equal(malformed.ok, false);
+    assert.equal(malformed.error.code, "trusted-command-malformed-json");
+
+    const unknownSchema = parseAiuTrustedStateJson({
+      sourceId: "work",
+      command,
+      stdout: JSON.stringify({ schemaVersion: 999, states: [] }),
+      observedAt,
+    });
+    assert.equal(unknownSchema.ok, false);
+    assert.equal(unknownSchema.error.code, "trusted-command-unknown-schema");
+    assert.equal(unknownSchema.record.parsedSchemaVersion, 999);
+  });
+
+  it("treats unsupported capabilities and stale state as structured errors", async () => {
+    const { parseAiuTrustedStateJson, toAiuTrustedStateCommandRef } = await loadTrustedAdapter();
+    const command = toAiuTrustedStateCommandRef("repository", { argv: ["fixture"] });
+    const unsupported = parseAiuTrustedStateJson({
+      sourceId: "repository",
+      command,
+      stdout: JSON.stringify({
+        schemaVersion: 1,
+        observedAt,
+        capabilities: {
+          repository: "unsupported",
+        },
+        value: repositoryState("pass"),
+      }),
+      observedAt,
+    });
+    assert.equal(unsupported.ok, false);
+    assert.equal(unsupported.error.code, "trusted-command-unsupported-capability");
+
+    const stale = parseAiuTrustedStateJson({
+      sourceId: "repository",
+      command,
+      stdout: JSON.stringify({
+        schemaVersion: 1,
+        observedAt,
+        freshness: {
+          kind: "stale",
+          observedAt,
+        },
+        value: repositoryState("pass"),
+      }),
+      observedAt,
+    });
+    assert.equal(stale.ok, false);
+    assert.equal(stale.error.code, "trusted-command-stale-state");
+  });
+
+  it("normalizes generic core-state JSON shapes into envelopes", async () => {
+    const { parseAiuTrustedStateJson, toAiuTrustedStateCommandRef } = await loadTrustedAdapter();
+    const command = toAiuTrustedStateCommandRef("repository", { argv: ["fixture"] });
+    const result = parseAiuTrustedStateJson({
+      sourceId: "repository",
+      command,
+      stdout: JSON.stringify({
+        schemaVersion: 1,
+        observedAt,
+        ...repositoryState("pass"),
+      }),
+      observedAt,
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.states[0]?.sourceId, "repository");
+    assert.equal(result.states[0]?.stateKind, "repository");
+    assert.equal(result.states[0]?.command.argv[0], "fixture");
+    assert.equal(result.states[0]?.value.status, "pass");
+  });
+});
+
+async function loadTrustedAdapter(): Promise<typeof TrustedAdapter> {
+  return await import(path.join(repoRoot, "dist/src/trusted_adapter.js")) as typeof TrustedAdapter;
+}
+
+function repositoryState(status: "pass" | "stale") {
+  return {
+    kind: "repository",
+    status,
+    dirty: "pass",
+    baseFreshness: status,
+    syncStatus: "in-sync",
+  };
+}
