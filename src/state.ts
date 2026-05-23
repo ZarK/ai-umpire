@@ -202,6 +202,11 @@ export interface AiuQualityState extends AiuBaseState<"quality"> {
 
 export interface AiuHostSessionState extends AiuBaseState<"host-session"> {
   readonly hostId: string;
+  readonly sessionId?: string;
+  readonly selectedSessionId?: string;
+  readonly helperSession?: boolean | "unknown" | "unsupported";
+  readonly userActive?: boolean | "unknown" | "unsupported";
+  readonly todoActive?: boolean | "unknown" | "unsupported";
   readonly sessionStatus: "idle" | "busy" | "waiting" | "stopped" | "unknown" | "unsupported";
   readonly canPrompt: boolean | "unknown" | "unsupported";
 }

@@ -97,6 +97,8 @@ M2.5 implements the agent-facing `aiu status` surface over the trusted adapter, 
 
 M3.1 adds the provider-neutral host policy surface. `host_policy` exposes typed host profiles, support levels, capability support values, safe default per-host modes, and runtime checks for disabled, experimental, unsupported, or unsafe stop-hook behavior. `aiu schema --json` includes host profile and policy fields, config validation records host-policy diagnostics, and `aiu doctor` reports compatibility without mutating host files or provider state.
 
+M3.2 wires the `@tjalve/aiu/opencode` runtime around trusted state adapters, the shared decision engine, and prompt rendering. The OpenCode subpath now builds normalized host-session state from idle, status, todo, message, TUI, and selected-session events; suppresses helper, busy, conflicting, active-user, and todo-active sessions; delivers only concrete `continue` or safe `repair` prompts through an injected host deliverer; and keeps repository wrappers on the public composition API.
+
 ## FR-07 - Host Integrations
 
 | ID | Requirement | Status |

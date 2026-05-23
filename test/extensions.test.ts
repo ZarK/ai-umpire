@@ -62,7 +62,7 @@ describe("extension API", () => {
   });
 
 
-  it("composes OpenCode handlers around the package command delegate", async () => {
+  it("composes OpenCode handlers around the package runtime delegate", async () => {
     const { createAiuOpenCodePlugin } = await import(path.join(repoRoot, "dist/src/opencode.js")) as typeof AiuOpenCode;
     const calls: string[] = [];
     const before: AiuOpenCode.AiuOpenCodeHandler = async (_event, _context, next) => {
@@ -72,30 +72,33 @@ describe("extension API", () => {
       return result;
     };
     const after: AiuOpenCode.AiuOpenCodeHandler = async (_event, context, next) => {
-      calls.push(`after:${context.previousResult?.command?.join(" ") ?? "none"}`);
+      calls.push(`after:${context.previousResult?.metadata?.eventType ?? "none"}`);
       return next();
     };
     const plugin = createAiuOpenCodePlugin({ before: [before], after: [after] });
 
     const result = await plugin.handle({ type: "idle" }, { cwd: "/repo" });
 
-    assert.deepEqual(calls, ["before", "after-next", "after:aiu hook opencode"]);
+    assert.deepEqual(calls, ["before", "after-next", "after:idle"]);
     assert.equal(result.handled, true);
-    assert.deepEqual(result.command, ["aiu", "hook", "opencode"]);
     assert.equal(result.metadata?.eventType, "idle");
+    assert.ok(result.metadata?.suppressions?.includes("host-disabled"));
   });
 
   it("allows after OpenCode handlers to override the package delegate result", async () => {
     const { createAiuOpenCodePlugin } = await import(path.join(repoRoot, "dist/src/opencode.js")) as typeof AiuOpenCode;
     const override: AiuOpenCode.AiuOpenCodeHandler = (_event, context) => ({
       handled: true,
-      command: [...(context.previousResult?.command ?? []), "--repo-custom"],
+      metadata: {
+        ...context.previousResult?.metadata,
+        repoCustom: true,
+      },
     });
     const plugin = createAiuOpenCodePlugin({ after: [override] });
 
     const result = await plugin.handle({ type: "idle" });
 
-    assert.deepEqual(result.command, ["aiu", "hook", "opencode", "--repo-custom"]);
+    assert.equal(result.metadata?.repoCustom, true);
   });
 
   it("rejects handlers that call next more than once", async () => {

@@ -207,6 +207,8 @@ Status: implemented by the shared `host_policy` module, schema host profile outp
 
 Wire OpenCode events through trusted state collection, decision-making, prompt rendering, ownership, cooldowns, and prompt delivery.
 
+Status: implemented by the `@tjalve/aiu/opencode` runtime delegate. It normalizes OpenCode host-session state, loads trusted state through configured adapters or an injected loader, runs the shared decision engine, renders prompt metadata and fingerprints, suppresses unsafe host sessions, and delivers prompts only through the package subpath's typed deliverer API.
+
 ### M3.3 - Implement Provider-Neutral Stop Hooks For Codex And Claude Code
 
 Make `aiu hook stop` use M2 decisions.
