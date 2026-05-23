@@ -22,17 +22,7 @@ describe("packed tarball install smoke", () => {
     const target = await createBlankRepo();
     const tarball = await packPackage(packDir);
 
-    await runPnpm(
-      [
-        "add",
-        "-D",
-        "--save-exact",
-        "--ignore-scripts",
-        "--offline",
-        tarball,
-      ],
-      target,
-    );
+    await runPnpm(["add", "-D", "--save-exact", "--ignore-scripts", tarball], target);
     const result = await runPnpm(["exec", "aiu", "init", "--dry-run", "--json"], target);
     const parsed = JSON.parse(result.stdout) as InitEnvelope;
 
