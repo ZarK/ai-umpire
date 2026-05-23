@@ -6,6 +6,7 @@
 
 - a package-backed `aiu` CLI
 - shared CLI metadata, help, schema, and JSON behavior through `@tjalve/qube-cli`
+- typed `aiu.config.json` discovery, defaults, and validation diagnostics
 - package metadata for the `@tjalve/aiu` npm package
 - a package-backed `aiu` executable
 - TypeScript source, build, typecheck, test, and package dry-run checks
@@ -34,8 +35,11 @@ Inspect package paths:
 ```bash
 pnpm exec aiu paths
 pnpm exec aiu paths --json
+pnpm exec aiu config --json
 pnpm exec aiu schema --json
 ```
+
+If `aiu.config.json` is missing, Umpire reports typed conservative defaults. Configured trusted state commands use argv arrays instead of shell strings, and state, lock, and log paths default under `.umpire/`.
 
 Run release checks:
 
@@ -43,12 +47,13 @@ Run release checks:
 pnpm run release:check
 ```
 
-Host init, doctor, schema, status, and stop-hook commands are planned package functionality. They should be added only as real commands with tests and dry-run behavior where applicable.
+Host init, doctor, status, and stop-hook commands are planned package functionality. They should be added only as real commands with tests and dry-run behavior where applicable.
 
 ## Package Surfaces
 
 - `@tjalve/aiu` - public package asset helpers
 - `aiu` - package CLI foundation
+- `loadAiuConfig` - typed config discovery, defaults, and validation
 
 ## Development
 

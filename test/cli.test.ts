@@ -79,6 +79,14 @@ describe("metadata-backed CLI", () => {
         errors?: Array<{ kind: string }>;
         exitCodes?: Array<{ code: number }>;
       }>;
+      sections?: {
+        config?: {
+          schemaVersion?: number;
+          defaultPath?: string;
+          hostNames?: string[];
+          hostCapabilityNames?: string[];
+        };
+      };
       package: { name: string };
     };
 
@@ -88,7 +96,22 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.package.name, "@tjalve/aiu");
 
     const commandNames = parsed.commands.map((command) => command.name);
-    assert.deepEqual(commandNames, ["paths", "schema"]);
+    assert.deepEqual(commandNames, ["config", "paths", "schema"]);
+
+    const config = parsed.commands.find((command) => command.name === "config");
+    assert.ok(config);
+    assert.deepEqual(config.output?.formats, ["human", "json"]);
+    assert.equal(config.output?.defaultFormat, "human");
+    assert.equal(config.interactions?.json, true);
+    assert.equal(config.dryRun?.supported, false);
+    assert.equal(config.mutation?.mutates, false);
+    assert.ok(config.flags?.some((flag) => flag.name === "json" && flag.type === "boolean"));
+    assert.ok(config.flags?.some((flag) => flag.name === "config" && flag.type === "string"));
+    assert.ok(config.errors?.some((error) => error.kind === "unsafe-command-descriptor"));
+    assert.equal(parsed.sections?.config?.schemaVersion, 1);
+    assert.equal(parsed.sections?.config?.defaultPath, "aiu.config.json");
+    assert.deepEqual(parsed.sections?.config?.hostNames, ["opencode", "codex", "claude-code"]);
+    assert.deepEqual(parsed.sections?.config?.hostCapabilityNames, ["stopHook", "sessionState", "promptDelivery"]);
 
     const paths = parsed.commands.find((command) => command.name === "paths");
     assert.ok(paths);
@@ -114,6 +137,54 @@ describe("metadata-backed CLI", () => {
     assert.equal(schema.mutation?.mutates, false);
     assert.ok(schema.flags?.some((flag) => flag.name === "json" && flag.type === "boolean"));
     assert.ok(schema.examples?.some((example) => example.command === "aiu schema --json"));
+  });
+
+  it("emits clean JSON for discovered config defaults", async () => {
+    const result = await runCli(["config", "--json"]);
+    const parsed = JSON.parse(result.stdout) as {
+      ok: boolean;
+      command: string;
+      config: {
+        found: boolean;
+        defaultsUsed: boolean;
+        valid: boolean;
+        value: {
+          version: number;
+          paths: {
+            stateDir: string;
+            lockDir: string;
+            logDir: string;
+          };
+          continuation: {
+            stopOnUnknownState: boolean;
+            stopOnSupplyChainApprovalBlock: boolean;
+            allowBackgroundScheduling: boolean;
+          };
+          supplyChain: {
+            stopOnApprovalRequired: boolean;
+          };
+        };
+        diagnostics: unknown[];
+      };
+    };
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.command, "config");
+    assert.equal(parsed.config.found, false);
+    assert.equal(parsed.config.defaultsUsed, true);
+    assert.equal(parsed.config.valid, true);
+    assert.deepEqual(parsed.config.value.paths, {
+      stateDir: ".umpire/state",
+      lockDir: ".umpire/locks",
+      logDir: ".umpire/logs",
+    });
+    assert.equal(parsed.config.value.continuation.stopOnUnknownState, true);
+    assert.equal(parsed.config.value.continuation.stopOnSupplyChainApprovalBlock, true);
+    assert.equal(parsed.config.value.continuation.allowBackgroundScheduling, false);
+    assert.equal(parsed.config.value.supplyChain.stopOnApprovalRequired, true);
+    assert.deepEqual(parsed.config.diagnostics, []);
   });
 
   it("suggests unknown commands and flags without executing alternatives", async () => {

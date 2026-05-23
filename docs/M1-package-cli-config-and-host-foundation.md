@@ -107,6 +107,8 @@ Defaults are conservative:
 - no background scheduling
 - `.umpire/` for package state
 
+Trusted state commands are represented as validated `argv` arrays. Runtime shell-string fallback, legacy helper modes, and generated shell command synthesis are not part of the config schema.
+
 ## Part 4: Host Install Planner
 
 `aiu init` creates a plan before writing files. The plan includes:

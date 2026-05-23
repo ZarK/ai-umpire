@@ -3,7 +3,16 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { getAiuPackageAssetPaths, getAiuPackageRoot } from "./assets.js";
-import { AIU_COMMAND_REGISTRY, pathsCommand } from "./command_registry.js";
+import {
+  AIU_CONFIG_FILENAME,
+  AIU_CONFIG_SCHEMA_VERSION,
+  AIU_HOST_CAPABILITY_NAMES,
+  AIU_HOSTS,
+  formatConfigDiagnostics,
+  getDefaultAiuConfig,
+  loadAiuConfig,
+} from "./config.js";
+import { AIU_COMMAND_REGISTRY, configCommand, pathsCommand } from "./command_registry.js";
 
 interface PackageJson {
   readonly name: string;
@@ -21,6 +30,32 @@ export const aiuCli = createCli({
   description: packageJson.description,
   registry: AIU_COMMAND_REGISTRY,
   commands: [
+    createCommand(configCommand, (context) => {
+      const configPath = typeof context.flags.config === "string" ? context.flags.config : undefined;
+      const result = loadAiuConfig(configPath ? { configPath } : {});
+      const human = [
+        `selectedPath: ${result.selectedPath}`,
+        `found: ${String(result.found)}`,
+        `valid: ${String(result.ok)}`,
+        "",
+        formatConfigDiagnostics(result.diagnostics),
+      ].join("\n");
+
+      return {
+        human,
+        json: {
+          config: {
+            selectedPath: result.selectedPath,
+            repoRoot: result.repoRoot,
+            found: result.found,
+            defaultsUsed: result.defaultsUsed,
+            valid: result.ok,
+            value: result.config,
+            diagnostics: result.diagnostics,
+          },
+        },
+      };
+    }),
     createCommand(pathsCommand, () => {
       const assetPaths = getAiuPackageAssetPaths();
       return {
@@ -39,6 +74,15 @@ export const aiuCli = createCli({
       bin: "aiu",
       packageName: packageJson.name,
       packageVersion: packageJson.version,
+      sections: {
+        config: {
+          schemaVersion: AIU_CONFIG_SCHEMA_VERSION,
+          defaultPath: AIU_CONFIG_FILENAME,
+          defaultConfig: getDefaultAiuConfig(),
+          hostNames: AIU_HOSTS,
+          hostCapabilityNames: AIU_HOST_CAPABILITY_NAMES,
+        },
+      },
     }),
   ],
 });
