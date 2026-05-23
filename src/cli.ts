@@ -139,6 +139,18 @@ export const aiuCli = createCli({
     }),
     createCommand(migrateCommand, (context) => {
       const confirmations = readConfirmations(context.flags.confirm);
+      if (context.flags.cleanup === true && (context.flags.apply === true || context.flags.force === true)) {
+        return {
+          stderr: "Invalid migrate flags: --cleanup cannot be combined with --apply or --force.\n",
+          exitCode: 2,
+        };
+      }
+      if (context.flags.cleanup !== true && confirmations.length > 0) {
+        return {
+          stderr: "Invalid migrate flags: --confirm requires --cleanup.\n",
+          exitCode: 2,
+        };
+      }
       if (context.flags.cleanup === true) {
         const dryRun = context.flags["dry-run"] === true || confirmations.length === 0;
         const result = cleanupAiuMigration({ dryRun, confirmations });

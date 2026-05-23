@@ -649,6 +649,18 @@ describe("metadata-backed CLI", () => {
     assert.match(unknownFlag.stderr, /Unknown flag: --jsoon/);
     assert.match(unknownFlag.stderr, /Did you mean "--json"/);
   });
+
+  it("rejects incompatible migration cleanup flag combinations", async () => {
+    const cleanupApply = await runCli(["migrate", "--cleanup", "--apply", "--json"]);
+    assert.equal(cleanupApply.exitCode, 2);
+    assert.match(cleanupApply.stdout, /--cleanup cannot be combined with --apply or --force/);
+    assert.equal(cleanupApply.stderr, "");
+
+    const confirmWithoutCleanup = await runCli(["migrate", "--confirm", "scripts/aiu-stop.js", "--json"]);
+    assert.equal(confirmWithoutCleanup.exitCode, 2);
+    assert.match(confirmWithoutCleanup.stdout, /--confirm requires --cleanup/);
+    assert.equal(confirmWithoutCleanup.stderr, "");
+  });
 });
 
 async function runCli(input: readonly string[], cwd = repoRoot) {
