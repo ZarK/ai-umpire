@@ -109,6 +109,54 @@ describe("init planner", () => {
     assert.match(await readFile(wrapper, "utf8"), /Managed by @tjalve\/aiu/);
   });
 
+  it("does not apply a stale plan over newly conflicting files", async () => {
+    const target = await createRepoRoot();
+    const { applyAiuInitPlan, planAiuInit } = await import(path.join(repoRoot, "dist/src/init.js")) as {
+      applyAiuInitPlan: (plan: InitPlan) => InitPlan;
+      planAiuInit: (options: { cwd: string; tool: string }) => InitPlan;
+    };
+    const plan = planAiuInit({ cwd: target, tool: "opencode" });
+    const wrapper = path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts");
+    await mkdir(path.dirname(wrapper), { recursive: true });
+    await writeFile(wrapper, "late user content\n", "utf8");
+
+    const applied = applyAiuInitPlan(plan);
+
+    assert.equal(applied.ok, false);
+    assert.equal(applied.files[0]?.operation, "conflict");
+    assert.equal(await readFile(wrapper, "utf8"), "late user content\n");
+    assert.equal(existsSync(path.join(target, "aiu.config.json")), false);
+  });
+
+  it("treats unreadable managed paths as conflicts", async () => {
+    const target = await createRepoRoot();
+    const wrapper = path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts");
+    await mkdir(wrapper, { recursive: true });
+
+    const result = await runCli(target, ["init", "--tool", "opencode", "--json"]);
+    const parsed = JSON.parse(result.stdout) as InitEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(parsed.init.ok, false);
+    assert.equal(parsed.init.files[0]?.operation, "conflict");
+    assert.match(parsed.init.files[0]?.reason ?? "", /could not be read/);
+  });
+
+  it("compares existing config semantically and reports merged config details", async () => {
+    const target = await createRepoRoot();
+    await runCli(target, ["init", "--tool", "all", "--json"]);
+    const config = JSON.parse(await readFile(path.join(target, "aiu.config.json"), "utf8"));
+    await writeFile(path.join(target, "aiu.config.json"), JSON.stringify(config), "utf8");
+
+    const result = await runCli(target, ["init", "--tool", "all", "--dry-run", "--json"]);
+    const parsed = JSON.parse(result.stdout) as InitEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(parsed.init.config.operation, "skip");
+    assert.deepEqual(parsed.init.config.hosts, ["opencode", "codex", "claude-code"]);
+    assert.deepEqual(parsed.init.config.trustedStateCommands, ["work"]);
+  });
+
   it("human output names created, updated, skipped, and conflicted files", async () => {
     const target = await createRepoRoot();
     const result = await runCli(target, ["init", "--dry-run"]);
@@ -118,6 +166,7 @@ describe("init planner", () => {
     assert.match(result.stdout, /Updated:/);
     assert.match(result.stdout, /Skipped:/);
     assert.match(result.stdout, /Conflicts:/);
+    assert.match(result.stdout, /Config changes:/);
   });
 });
 
@@ -129,9 +178,14 @@ interface InitEnvelope {
     readonly dryRun: boolean;
     readonly tools: string[];
     readonly hostProfiles: Array<{ tool: string }>;
-    readonly files: Array<{ operation: string }>;
-    readonly config: { operation: string };
+    readonly files: Array<{ operation: string; reason?: string }>;
+    readonly config: { operation: string; hosts: string[]; trustedStateCommands: string[] };
   };
+}
+
+interface InitPlan {
+  readonly ok: boolean;
+  readonly files: Array<{ operation: string }>;
 }
 
 async function createRepoRoot(): Promise<string> {

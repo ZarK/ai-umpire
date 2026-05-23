@@ -187,14 +187,23 @@ export function applyAiuInitPlan(plan: AiuInitPlan): AiuInitPlan {
     return plan;
   }
 
-  for (const file of [...plan.files, plan.config]) {
+  const refreshed = planAiuInit({
+    cwd: plan.repoRoot,
+    tool: toolForPlan(plan.tools),
+    force: plan.force,
+  });
+  if (!refreshed.ok) {
+    return refreshed;
+  }
+
+  for (const file of [...refreshed.files, refreshed.config]) {
     if (file.operation === "create" || file.operation === "update") {
       mkdirSync(path.dirname(file.absolutePath), { recursive: true });
       writeFileSync(file.absolutePath, file.content, "utf8");
     }
   }
 
-  return plan;
+  return refreshed;
 }
 
 export function formatInitPlan(plan: AiuInitPlan): string {
@@ -207,6 +216,9 @@ export function formatInitPlan(plan: AiuInitPlan): string {
     formatFileGroup("Updated", plan, "update"),
     formatFileGroup("Skipped", plan, "skip"),
     formatFileGroup("Conflicts", plan, "conflict"),
+    "Config changes:",
+    `- ${plan.config.relativePath}: hosts=${plan.config.hosts.join(", ") || "none"}; trustedStateCommands=${plan.config.trustedStateCommands.join(", ") || "none"}`,
+    "",
     "Required trust steps:",
     ...plan.requiredTrustSteps.map((step) => `- ${step}`),
     "",
@@ -220,35 +232,40 @@ function expandInitTools(tool: AiuInitTool): readonly AiuHost[] {
   return tool === "all" ? ["opencode", "codex", "claude-code"] : [tool];
 }
 
+function toolForPlan(tools: readonly AiuHost[]): AiuInitTool {
+  return tools.length === 3 ? "all" : tools[0] ?? "all";
+}
+
 function planFile(repoRoot: string, file: AiuManagedHostFile, force: boolean): AiuInitFileAction {
   const absolutePath = path.join(repoRoot, file.relativePath);
-  const existing = existsSync(absolutePath) ? readFileSync(absolutePath, "utf8") : undefined;
-  const operation = classifyWrite(existing, file.content, force);
+  const existing = readExistingText(absolutePath);
+  const planned = classifyTextWrite(existing, file.content, force);
   return Object.freeze({
     relativePath: file.relativePath,
     absolutePath,
     description: file.description,
-    operation,
-    reason: reasonForOperation(operation),
+    operation: planned.operation,
+    reason: planned.reason,
     content: file.content,
   });
 }
 
 function planConfig(repoRoot: string, configPath: string, loadedConfig: AiuConfig, tools: readonly AiuHost[], force: boolean): AiuInitConfigAction {
   const relativePath = path.relative(repoRoot, configPath) || AIU_CONFIG_FILENAME;
-  const existing = existsSync(configPath) ? readFileSync(configPath, "utf8") : undefined;
-  const existingRaw = existing ? parseJsonObject(existing) : { ok: true, value: {} };
-  const content = stableJson(mergeConfig(loadedConfig, existingRaw.ok ? existingRaw.value : {}, tools));
-  const operation = existingRaw.ok ? classifyWrite(existing, content, force) : force ? "update" : "conflict";
+  const existing = readExistingText(configPath);
+  const existingRaw = existing.exists && existing.content !== undefined ? parseJsonObject(existing.content) : { ok: true, value: {} };
+  const mergedConfig = mergeConfig(loadedConfig, existingRaw.ok ? existingRaw.value : {}, tools);
+  const content = stableJson(mergedConfig);
+  const planned = classifyConfigWrite(existing, existingRaw, content, force);
 
   return Object.freeze({
     relativePath,
     absolutePath: configPath,
-    operation,
-    reason: existingRaw.ok ? reasonForOperation(operation) : "Existing config is not valid JSON.",
+    operation: planned.operation,
+    reason: planned.reason,
     content,
-    hosts: Object.freeze(tools),
-    trustedStateCommands: Object.freeze(["work"]),
+    hosts: Object.freeze(readMergedHosts(mergedConfig)),
+    trustedStateCommands: Object.freeze(readMergedTrustedStateCommandNames(mergedConfig)),
   });
 }
 
@@ -296,14 +313,61 @@ function mergeConfig(config: AiuConfig, raw: Record<string, unknown>, tools: rea
   };
 }
 
-function classifyWrite(existing: string | undefined, desired: string, force: boolean): AiuInitFileOperation {
-  if (existing === undefined) {
-    return "create";
+interface ExistingText {
+  readonly exists: boolean;
+  readonly content?: string;
+  readonly error?: string;
+}
+
+function readExistingText(absolutePath: string): ExistingText {
+  if (!existsSync(absolutePath)) {
+    return { exists: false };
   }
-  if (normalizeText(existing) === normalizeText(desired)) {
-    return "skip";
+  try {
+    return { exists: true, content: readFileSync(absolutePath, "utf8") };
+  } catch (error) {
+    return {
+      exists: true,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
-  return force ? "update" : "conflict";
+}
+
+function classifyTextWrite(existing: ExistingText, desired: string, force: boolean): { readonly operation: AiuInitFileOperation; readonly reason: string } {
+  if (!existing.exists) {
+    return { operation: "create", reason: reasonForOperation("create") };
+  }
+  if (existing.error !== undefined) {
+    return { operation: "conflict", reason: `Existing path could not be read: ${existing.error}` };
+  }
+  if (normalizeText(existing.content ?? "") === normalizeText(desired)) {
+    return { operation: "skip", reason: reasonForOperation("skip") };
+  }
+  const operation = force ? "update" : "conflict";
+  return { operation, reason: reasonForOperation(operation) };
+}
+
+function classifyConfigWrite(
+  existing: ExistingText,
+  existingRaw: ReturnType<typeof parseJsonObject>,
+  desired: string,
+  force: boolean,
+): { readonly operation: AiuInitFileOperation; readonly reason: string } {
+  if (!existing.exists) {
+    return { operation: "create", reason: reasonForOperation("create") };
+  }
+  if (existing.error !== undefined) {
+    return { operation: "conflict", reason: `Existing config could not be read: ${existing.error}` };
+  }
+  if (!existingRaw.ok) {
+    const operation = force ? "update" : "conflict";
+    return { operation, reason: operation === "update" ? "Existing config is invalid JSON and --force was provided." : "Existing config is not valid JSON." };
+  }
+  if (stableJson(existingRaw.value) === desired) {
+    return { operation: "skip", reason: reasonForOperation("skip") };
+  }
+  const operation = force ? "update" : "conflict";
+  return { operation, reason: reasonForOperation(operation) };
 }
 
 function reasonForOperation(operation: AiuInitFileOperation): string {
@@ -325,6 +389,15 @@ function parseJsonObject(raw: string): { readonly ok: true; readonly value: Reco
   } catch {
     return { ok: false };
   }
+}
+
+function readMergedHosts(config: Record<string, unknown>): readonly AiuHost[] {
+  const hosts = isRecord(config.hosts) && Array.isArray(config.hosts.enabled) ? config.hosts.enabled : [];
+  return hosts.filter((host): host is AiuHost => typeof host === "string" && ["opencode", "codex", "claude-code"].includes(host));
+}
+
+function readMergedTrustedStateCommandNames(config: Record<string, unknown>): readonly string[] {
+  return isRecord(config.trustedStateCommands) ? Object.keys(config.trustedStateCommands).sort() : [];
 }
 
 function stableJson(value: unknown): string {
