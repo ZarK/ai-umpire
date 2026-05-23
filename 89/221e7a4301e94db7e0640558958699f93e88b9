@@ -1,0 +1,24 @@
+src/migrate.ts
+  s_f8aaaf4fdfe4d6::t_f361b2a1f91015 193-199
+  s_f8aaaf4fdfe4d6::t_62ea7187cdceb7 2,192
+test/install-smoke.test.ts
+  s_f8aaaf4fdfe4d6::t_f361b2a1f91015 42-44,76,104,110,143-146
+test/migrate.test.ts
+  s_f8aaaf4fdfe4d6::t_f361b2a1f91015 3,61-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "89221e7a4301e94db7e0640558958699f93e88b9",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
