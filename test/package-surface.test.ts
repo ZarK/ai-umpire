@@ -109,6 +109,19 @@ describe("package foundation", () => {
     assert.doesNotMatch(publishWorkflow, /NPM_TOKEN/);
   });
 
+  it("does not persist checkout credentials in workflows", async () => {
+    const workflowPaths = [
+      path.join(repoRoot, ".github", "workflows", "ci.yml"),
+      path.join(repoRoot, ".github", "workflows", "publish.yml"),
+    ];
+
+    for (const workflowPath of workflowPaths) {
+      const workflow = await readFile(workflowPath, "utf8");
+
+      assert.match(workflow, /persist-credentials:\s*false/, workflowPath);
+    }
+  });
+
   it("requires CODEOWNERS review for release-sensitive files", async () => {
     const codeowners = await readFile(path.join(repoRoot, ".github", "CODEOWNERS"), "utf8");
 
