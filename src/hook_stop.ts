@@ -36,6 +36,7 @@ export async function readHookStopStdin(timeoutMs = 250): Promise<string> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
     const cleanup = () => {
       process.stdin.off("data", onData);
       process.stdin.off("end", onEnd);
@@ -51,9 +52,11 @@ export async function readHookStopStdin(timeoutMs = 250): Promise<string> {
     };
     const onData = (chunk: Buffer | string) => {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      clearTimeout(timer);
+      timer = setTimeout(finish, timeoutMs);
     };
     const onEnd = () => finish();
-    const timer = setTimeout(finish, timeoutMs);
+    timer = setTimeout(finish, timeoutMs);
 
     process.stdin.on("data", onData);
     process.stdin.once("end", onEnd);

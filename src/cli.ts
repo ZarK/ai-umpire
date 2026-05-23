@@ -84,7 +84,13 @@ export const aiuCli = createCli({
       };
     }),
     createCommand(hookStopCommand, async (context) => {
-      const tool = context.flags.tool === "claude-code" ? "claude-code" : "codex";
+      const tool = readHookStopTool(context.flags.tool);
+      if (tool === undefined) {
+        return {
+          stderr: `Invalid --tool value: ${String(context.flags.tool)}\n`,
+          exitCode: 2,
+        };
+      }
       const result = runAiuHookStop({ tool, stdin: await readHookStopStdin() });
       if (context.flags.json === true) {
         return {
@@ -141,6 +147,10 @@ export const aiuCli = createCli({
     }),
   ],
 });
+
+function readHookStopTool(value: unknown): "codex" | "claude-code" | undefined {
+  return value === "codex" || value === "claude-code" ? value : undefined;
+}
 
 runtimeRegistry = aiuCli.registry;
 

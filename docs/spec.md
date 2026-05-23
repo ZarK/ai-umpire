@@ -96,7 +96,7 @@ Requirements use stable identifiers (`FR-XX-NNN`) so milestones and issues can r
 | FR-07-002 | Codex and Claude Code support includes stop-hook commands where those hosts provide project-level stop hooks. | Required |
 | FR-07-003 | Host adapters provide session state, selected-session information where available, prompt delivery capability, trust requirements, and busy/idle signals. | Required |
 | FR-07-004 | Host adapters respect active user typing, selected-session changes, helper sessions, prompt ownership, cooldowns, and locks to avoid duplicate or competing prompts. | Required |
-| FR-07-005 | `aiu hook-stop --tool codex|claude-code` reads host stop-hook input and writes the host's expected JSON response to stdout. | Required |
+| FR-07-005 | `aiu hook-stop --tool codex\|claude-code` reads host stop-hook input and writes the host's expected JSON response to stdout. | Required |
 | FR-07-006 | Stop hooks block stopping only when trusted state loaded successfully, the decision is safe `continue` or `repair`, the prompt is concrete, and host policy allows blocking. | Required |
 | FR-07-007 | `@tjalve/aiu/opencode` exposes typed OpenCode wrapper composition without requiring repositories to import package internals. | Required |
 | FR-07-008 | Prototype stop-hook installers must call a real package-backed command that safely allows stopping until the trusted-state decision engine is wired, instead of installing fake blocking behavior. | Required |
