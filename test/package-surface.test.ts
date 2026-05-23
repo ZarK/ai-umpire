@@ -9,6 +9,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 type PackageJson = {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  exports?: Record<string, { import?: string; types?: string }>;
   files?: string[];
   packageManager?: string;
   scripts?: Record<string, string>;
@@ -42,6 +43,14 @@ describe("package foundation", () => {
     assert.deepEqual(packageJson.files, ["dist/src", "README.md"]);
     assert.equal(packageJson.files?.includes("scripts"), false);
     assert.equal(packageJson.files?.includes("queue-policy.json"), false);
+  });
+
+  it("exports only documented stable package entrypoints", async () => {
+    const packageJson = await readPackageJson();
+
+    assert.deepEqual(Object.keys(packageJson.exports ?? {}).sort(), [".", "./opencode"]);
+    assert.equal(packageJson.exports?.["."]?.types, "./dist/src/index.d.ts");
+    assert.equal(packageJson.exports?.["./opencode"]?.types, "./dist/src/opencode.d.ts");
   });
 
   it("keeps durable pnpm safety defaults in the repository", async () => {

@@ -6,10 +6,12 @@ export const AIU_CONFIG_SCHEMA_VERSION = 1;
 export const AIU_HOSTS = ["opencode", "codex", "claude-code"] as const;
 export const AIU_HOST_CAPABILITY_NAMES = ["stopHook", "sessionState", "promptDelivery"] as const;
 export const AIU_CONTINUATION_MODES = ["continue", "repair", "wait", "stop"] as const;
+export const AIU_PROMPT_SECTION_KINDS = ["work", "planning", "quality", "whip"] as const;
 
 export type AiuHost = (typeof AIU_HOSTS)[number];
 export type AiuHostCapabilityName = (typeof AIU_HOST_CAPABILITY_NAMES)[number];
 export type AiuContinuationMode = (typeof AIU_CONTINUATION_MODES)[number];
+export type AiuPromptSectionKind = (typeof AIU_PROMPT_SECTION_KINDS)[number];
 export type AiuDiagnosticSeverity = "error" | "warning";
 
 export interface AiuConfig {
@@ -21,6 +23,7 @@ export interface AiuConfig {
   readonly cooldowns: AiuCooldownsConfig;
   readonly paths: AiuPathsConfig;
   readonly supplyChain: AiuSupplyChainPolicy;
+  readonly prompts: AiuPromptPolicy;
   readonly whip: AiuWhipPolicy;
 }
 
@@ -63,6 +66,16 @@ export interface AiuPathsConfig {
 
 export interface AiuSupplyChainPolicy {
   readonly stopOnApprovalRequired: boolean;
+}
+
+export interface AiuPromptPolicy {
+  readonly sections: Readonly<Partial<Record<AiuPromptSectionKind, AiuPromptSectionCustomization>>>;
+}
+
+export interface AiuPromptSectionCustomization {
+  readonly prepend: readonly string[];
+  readonly append: readonly string[];
+  readonly replacement?: string;
 }
 
 export interface AiuWhipPolicy {
@@ -132,6 +145,9 @@ const DEFAULT_CONFIG: AiuConfig = Object.freeze({
   }),
   supplyChain: Object.freeze({
     stopOnApprovalRequired: true,
+  }),
+  prompts: Object.freeze({
+    sections: Object.freeze({}),
   }),
   whip: Object.freeze({
     enabled: true,
@@ -210,6 +226,7 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
   const cooldowns = normalizeCooldowns(raw.cooldowns, diagnostics);
   const pathsConfig = normalizePaths(raw.paths, diagnostics);
   const supplyChain = normalizeSupplyChain(raw.supplyChain, diagnostics);
+  const prompts = normalizePrompts(raw.prompts, diagnostics);
   const whip = normalizeWhip(raw.whip, diagnostics);
 
   validateNoLegacyFallback(raw, "$", diagnostics);
@@ -234,6 +251,7 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
       cooldowns,
       paths: pathsConfig,
       supplyChain,
+      prompts,
       whip,
     }),
     diagnostics: Object.freeze(diagnostics),
@@ -452,6 +470,88 @@ function normalizeSupplyChain(value: unknown, diagnostics: AiuConfigDiagnostic[]
   return Object.freeze({
     stopOnApprovalRequired: normalizeBoolean(value.stopOnApprovalRequired, DEFAULT_CONFIG.supplyChain.stopOnApprovalRequired, "$.supplyChain.stopOnApprovalRequired", diagnostics),
   });
+}
+
+function normalizePrompts(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuPromptPolicy {
+  if (value === undefined) {
+    return DEFAULT_CONFIG.prompts;
+  }
+  if (!isRecord(value)) {
+    diagnostics.push(diagnostic("invalid-prompts", "$.prompts", "prompts must be an object.", "Use { \"sections\": { ... } } with supported prompt section names."));
+    return DEFAULT_CONFIG.prompts;
+  }
+  const sections = normalizePromptSections(value.sections, diagnostics);
+  return Object.freeze({
+    sections: Object.freeze(sections),
+  });
+}
+
+function normalizePromptSections(value: unknown, diagnostics: AiuConfigDiagnostic[]): Partial<Record<AiuPromptSectionKind, AiuPromptSectionCustomization>> {
+  if (value === undefined) {
+    return {};
+  }
+  if (!isRecord(value)) {
+    diagnostics.push(diagnostic("invalid-prompt-sections", "$.prompts.sections", "prompts.sections must be an object.", "Use work, planning, quality, or whip section customization objects."));
+    return {};
+  }
+
+  const sections: Partial<Record<AiuPromptSectionKind, AiuPromptSectionCustomization>> = {};
+  for (const [kind, section] of Object.entries(value)) {
+    const fieldPath = `$.prompts.sections.${kind}`;
+    if (!isPromptSectionKind(kind)) {
+      diagnostics.push(diagnostic("invalid-prompt-section-kind", fieldPath, `Unsupported prompt section "${kind}".`, "Use work, planning, quality, or whip."));
+      continue;
+    }
+    const normalized = normalizePromptSection(section, fieldPath, diagnostics);
+    if (normalized !== undefined) {
+      sections[kind] = normalized;
+    }
+  }
+  return sections;
+}
+
+function normalizePromptSection(value: unknown, fieldPath: string, diagnostics: AiuConfigDiagnostic[]): AiuPromptSectionCustomization | undefined {
+  if (!isRecord(value)) {
+    diagnostics.push(diagnostic("invalid-prompt-section", fieldPath, "Prompt section customizations must be objects.", "Use prepend, append, and optional replacement string fields."));
+    return undefined;
+  }
+  const prepend = normalizePromptTextList(value.prepend, `${fieldPath}.prepend`, diagnostics);
+  const append = normalizePromptTextList(value.append, `${fieldPath}.append`, diagnostics);
+  const replacement = normalizeOptionalPromptText(value.replacement, `${fieldPath}.replacement`, diagnostics);
+  return Object.freeze({
+    prepend: Object.freeze(prepend),
+    append: Object.freeze(append),
+    ...(replacement !== undefined ? { replacement } : {}),
+  });
+}
+
+function normalizePromptTextList(value: unknown, fieldPath: string, diagnostics: AiuConfigDiagnostic[]): string[] {
+  if (value === undefined) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    diagnostics.push(diagnostic("invalid-prompt-text-list", fieldPath, "Prompt additions must be string arrays.", "Use an array of non-empty prompt section strings."));
+    return [];
+  }
+  const output: string[] = [];
+  value.forEach((item, index) => {
+    const normalized = normalizeOptionalPromptText(item, `${fieldPath}[${index}]`, diagnostics);
+    if (normalized !== undefined) {
+      output.push(normalized);
+    }
+  });
+  return output;
+}
+
+function normalizeOptionalPromptText(value: unknown, fieldPath: string, diagnostics: AiuConfigDiagnostic[]): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string" || value.trim().length === 0 || value.includes("\0")) {
+    diagnostics.push(diagnostic("invalid-prompt-text", fieldPath, "Prompt text must be a non-empty string without NUL bytes.", "Use concrete repository-owned prompt text."));
+    return undefined;
+  }
+  return value.trim();
 }
 
 function normalizeWhip(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuWhipPolicy {
@@ -713,6 +813,10 @@ function isContinuationMode(value: string): value is AiuContinuationMode {
   return (AIU_CONTINUATION_MODES as readonly string[]).includes(value);
 }
 
+function isPromptSectionKind(value: string): value is AiuPromptSectionKind {
+  return (AIU_PROMPT_SECTION_KINDS as readonly string[]).includes(value);
+}
+
 function cloneConfig(config: AiuConfig): AiuConfig {
   return Object.freeze({
     version: config.version,
@@ -729,6 +833,20 @@ function cloneConfig(config: AiuConfig): AiuConfig {
     cooldowns: Object.freeze({ ...config.cooldowns }),
     paths: Object.freeze({ ...config.paths }),
     supplyChain: Object.freeze({ ...config.supplyChain }),
+    prompts: Object.freeze({
+      sections: Object.freeze(
+        Object.fromEntries(
+          Object.entries(config.prompts.sections).map(([kind, section]) => [
+            kind,
+            Object.freeze({
+              prepend: Object.freeze([...(section?.prepend ?? [])]),
+              append: Object.freeze([...(section?.append ?? [])]),
+              ...(section?.replacement !== undefined ? { replacement: section.replacement } : {}),
+            }),
+          ]),
+        ),
+      ),
+    }),
     whip: Object.freeze({
       ...config.whip,
       tasks: Object.freeze(config.whip.tasks.map((task) => Object.freeze({ ...task }))),

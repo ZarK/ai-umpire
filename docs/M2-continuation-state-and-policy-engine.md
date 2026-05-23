@@ -146,6 +146,8 @@ Render prompts for:
 
 Prompt renderers return a stable fingerprint based on decision kind, selected item, reason codes, trusted source timestamps, and prompt body.
 
+Repo-owned prompt text is supported through `aiu.config.json` prompt sections. The stable section names are `work`, `planning`, `quality`, and `whip`; repositories can prepend, append, or replace those sections without importing renderer internals.
+
 ## Part 5: `aiu status`
 
 `aiu status` shows:

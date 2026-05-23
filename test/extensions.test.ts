@@ -1,0 +1,102 @@
+import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { describe, it } from "node:test";
+import { promisify } from "node:util";
+
+import { getDefaultAiuConfig } from "../src/config.ts";
+import type * as AiuExtensions from "../src/extensions.ts";
+import type * as AiuOpenCode from "../src/opencode.ts";
+
+const execFileAsync = promisify(execFile);
+const repoRoot = path.resolve(process.cwd());
+
+describe("extension API", () => {
+  it("renders repo-level prompt section customizations without private internals", async () => {
+    const { renderAiuPromptSection } = await import(path.join(repoRoot, "dist/src/extensions.js")) as typeof AiuExtensions;
+    const config = {
+      ...getDefaultAiuConfig(),
+      prompts: {
+        sections: {
+          work: {
+            prepend: ["Check trusted state first."],
+            append: ["Keep the next action bounded."],
+          },
+        },
+      },
+    };
+
+    const rendered = renderAiuPromptSection({
+      kind: "work",
+      defaultText: "Continue the next ready issue.",
+      config,
+    });
+
+    assert.equal(rendered.customized, true);
+    assert.equal(rendered.source, "repo-config");
+    assert.equal(rendered.text, "Check trusted state first.\n\nContinue the next ready issue.\n\nKeep the next action bounded.");
+  });
+
+  it("composes OpenCode handlers around the package command delegate", async () => {
+    const { createAiuOpenCodePlugin } = await import(path.join(repoRoot, "dist/src/opencode.js")) as typeof AiuOpenCode;
+    const calls: string[] = [];
+    const before: AiuOpenCode.AiuOpenCodeHandler = async (_event, _context, next) => {
+      calls.push("before");
+      const result = await next();
+      calls.push("after-next");
+      return result;
+    };
+    const plugin = createAiuOpenCodePlugin({ before: [before] });
+
+    const result = await plugin.handle({ type: "idle" }, { cwd: "/repo" });
+
+    assert.deepEqual(calls, ["before", "after-next"]);
+    assert.equal(result.handled, true);
+    assert.deepEqual(result.command, ["aiu", "hook", "opencode"]);
+    assert.equal(result.metadata?.eventType, "idle");
+  });
+
+  it("rejects handlers that call next more than once", async () => {
+    const { composeAiuOpenCodeHandlers } = await import(path.join(repoRoot, "dist/src/opencode.js")) as typeof AiuOpenCode;
+    const invalid: AiuOpenCode.AiuOpenCodeHandler = async (_event, _context, next) => {
+      await next();
+      return next();
+    };
+    const handler = composeAiuOpenCodeHandlers([invalid]);
+
+    await assert.rejects(async () => handler({ type: "idle" }, {}, async () => ({ handled: false })), /next\(\) was called more than once/);
+  });
+
+  it("compiles examples against exported package types only", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "aiu-extension-example-"));
+    const tsconfigPath = path.join(tempRoot, "tsconfig.json");
+    await writeFile(
+      tsconfigPath,
+      `${JSON.stringify(
+        {
+          compilerOptions: {
+            module: "NodeNext",
+            moduleResolution: "NodeNext",
+            noEmit: true,
+            strict: true,
+            target: "ES2022",
+            types: ["node"],
+            typeRoots: [path.join(repoRoot, "node_modules/@types")],
+            paths: {
+              "@tjalve/aiu": [path.join(repoRoot, "dist/src/index.d.ts")],
+              "@tjalve/aiu/opencode": [path.join(repoRoot, "dist/src/opencode.d.ts")],
+            },
+          },
+          files: [path.join(repoRoot, "examples/opencode-extension.ts")],
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    await execFileAsync("pnpm", ["exec", "tsc", "-p", tsconfigPath], { cwd: repoRoot });
+  });
+});

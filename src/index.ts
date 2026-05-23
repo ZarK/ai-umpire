@@ -21,6 +21,7 @@ export {
   AIU_CONTINUATION_MODES,
   AIU_HOST_CAPABILITY_NAMES,
   AIU_HOSTS,
+  AIU_PROMPT_SECTION_KINDS,
   formatConfigDiagnostics,
   getDefaultAiuConfig,
   loadAiuConfig,
@@ -31,6 +32,9 @@ export {
   getAiuResolvedPaths,
   runAiuDoctor,
 } from "./doctor.js";
+export {
+  renderAiuPromptSection,
+} from "./extensions.js";
 export {
   AIU_INIT_TOOLS,
   applyAiuInitPlan,
@@ -59,6 +63,9 @@ export type {
   AiuContinuationPolicy,
   AiuHost,
   AiuHostCapabilityName,
+  AiuPromptPolicy,
+  AiuPromptSectionCustomization,
+  AiuPromptSectionKind,
   AiuTrustedStateCommandDescriptor,
   AiuWhipPolicy,
   AiuWhipTaskDefinition,
@@ -74,6 +81,10 @@ export type {
   AiuResolvedPaths,
   AiuTrustedCommandPath,
 } from "./doctor.js";
+export type {
+  AiuPromptSectionInput,
+  AiuPromptSectionRender,
+} from "./extensions.js";
 export type {
   AiuHostCapabilityProfile,
   AiuInitFileAction,

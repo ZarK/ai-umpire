@@ -34,6 +34,7 @@ describe("config foundation", () => {
     assert.equal(result.config.continuation.allowBackgroundScheduling, false);
     assert.equal(result.config.continuation.trustUnstructuredProse, false);
     assert.equal(result.config.supplyChain.stopOnApprovalRequired, true);
+    assert.deepEqual(result.config.prompts.sections, {});
     assert.equal(result.config.whip.enabled, true);
     assert.equal(result.config.whip.usePackageDefaults, true);
     assert.deepEqual(result.config.whip.tasks, []);
@@ -84,6 +85,14 @@ describe("config foundation", () => {
       supplyChain: {
         stopOnApprovalRequired: true,
       },
+      prompts: {
+        sections: {
+          work: {
+            prepend: ["Check trusted state first."],
+            append: ["Keep the prompt bounded."],
+          },
+        },
+      },
       whip: {
         enabled: false,
         usePackageDefaults: false,
@@ -107,6 +116,8 @@ describe("config foundation", () => {
     assert.deepEqual(result.config.hosts.enabled, ["opencode", "codex"]);
     assert.deepEqual(result.config.trustedStateCommands.work?.argv, ["aie", "status", "--json"]);
     assert.equal(result.config.timeouts.commandMs, 10_000);
+    assert.deepEqual(result.config.prompts.sections.work?.prepend, ["Check trusted state first."]);
+    assert.deepEqual(result.config.prompts.sections.work?.append, ["Keep the prompt bounded."]);
     assert.equal(result.config.whip.enabled, false);
     assert.equal(result.config.whip.usePackageDefaults, false);
     assert.equal(result.config.whip.statePath, ".umpire/custom-whip.json");
@@ -156,6 +167,16 @@ describe("config foundation", () => {
           },
         ],
       },
+      prompts: {
+        sections: {
+          unknown: {},
+          work: {
+            prepend: ["valid"],
+            append: "not an array",
+            replacement: "",
+          },
+        },
+      },
       runtimeFallback: true,
     });
 
@@ -176,6 +197,9 @@ describe("config foundation", () => {
     assert.ok(kinds.includes("invalid-whip-task-title"));
     assert.ok(kinds.includes("invalid-whip-task-prompt"));
     assert.ok(kinds.includes("invalid-whip-task-priority"));
+    assert.ok(kinds.includes("invalid-prompt-section-kind"));
+    assert.ok(kinds.includes("invalid-prompt-text-list"));
+    assert.ok(kinds.includes("invalid-prompt-text"));
   });
 
   it("rejects state paths below file ancestors and non-searchable directories", async (t) => {
