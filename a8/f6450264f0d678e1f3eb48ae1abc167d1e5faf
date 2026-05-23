@@ -1,0 +1,30 @@
+docs/M2-continuation-state-and-policy-engine.md
+  s_f8aaaf4fdfe4d6::t_383edf1afa35fa 156
+docs/M5-migration-release-readiness-and-provider-architecture.md
+  s_f8aaaf4fdfe4d6::t_e0fe837ecaf72a 5,11,139,160
+README.md
+  s_f8aaaf4fdfe4d6::t_383edf1afa35fa 119
+  s_f8aaaf4fdfe4d6::t_e0fe837ecaf72a 113
+test/architecture-boundaries.test.ts
+  s_f8aaaf4fdfe4d6::t_fe74482492e474 1-230
+test/whip.test.ts
+  s_f8aaaf4fdfe4d6::t_383edf1afa35fa 377-379,383,395
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_e0fe837ecaf72a 146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "a8f6450264f0d678e1f3eb48ae1abc167d1e5faf",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
