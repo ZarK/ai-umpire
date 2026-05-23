@@ -18,6 +18,15 @@ import { formatAiuDoctorReport, formatAiuPaths, getAiuResolvedPaths, runAiuDocto
 import { formatHookStopJson, readHookStopStdin, runAiuHookStop } from "./hook_stop.js";
 import { applyAiuInitPlan, formatInitPlan, planAiuInit, type AiuInitTool } from "./init.js";
 import { formatMigrationPlan, planAiuMigration } from "./migrate.js";
+import {
+  AIU_REASON_CODE_CATALOG,
+  AIU_STATE_CAPABILITY_SUPPORT,
+  AIU_STATE_FRESHNESS_KINDS,
+  AIU_STATE_VALUE_KINDS,
+  AIU_TRUSTED_STATE_KINDS,
+  AIU_TRUSTED_STATE_SCHEMA_VERSION,
+  AIU_TRUST_LEVELS,
+} from "./state.js";
 
 interface PackageJson {
   readonly name: string;
@@ -142,6 +151,15 @@ export const aiuCli = createCli({
           hostNames: AIU_HOSTS,
           hostCapabilityNames: AIU_HOST_CAPABILITY_NAMES,
           promptSectionKinds: AIU_PROMPT_SECTION_KINDS,
+        },
+        trustedState: {
+          schemaVersion: AIU_TRUSTED_STATE_SCHEMA_VERSION,
+          stateKinds: AIU_TRUSTED_STATE_KINDS,
+          stateValueKinds: AIU_STATE_VALUE_KINDS,
+          trustLevels: AIU_TRUST_LEVELS,
+          freshnessKinds: AIU_STATE_FRESHNESS_KINDS,
+          capabilitySupport: AIU_STATE_CAPABILITY_SUPPORT,
+          reasonCodes: AIU_REASON_CODE_CATALOG,
         },
       },
     }),

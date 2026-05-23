@@ -46,6 +46,7 @@ Define provider-neutral input models:
 - `PlanningState`
 - `QualityState`
 - `HostSessionState`
+- `ContinuationPolicyState`
 - `TrustedStateEnvelope`
 
 Every trusted state envelope includes:
@@ -69,6 +70,16 @@ Models distinguish:
 - untrusted
 
 Unknown and unsupported are not success. They stop or repair unless repository policy explicitly treats the state as advisory.
+
+M2.1 exposes this vocabulary from the package entrypoint and from `aiu schema --json` under `trustedState`:
+
+- schema version `1`
+- trusted state kinds: `work-queue`, `work-item`, `review`, `repository`, `gate-evidence`, `planning`, `quality`, `host-session`, `continuation-policy`
+- state values: `pass`, `fail`, `missing`, `stale`, `unknown`, `unsupported`, `untrusted`, `malformed`
+- trust levels: `trusted`, `advisory`, `untrusted`
+- reason-code catalog grouped by continuation, repair, wait, stop, input, and safety outcomes
+
+The M2.1 model module is intentionally pure. It defines types, constants, fixtures, and small value helpers only; it does not import host plugin APIs, filesystem APIs, child-process APIs, CLI command classes, provider-specific scripts, or live provider field names.
 
 ## Part 2: Trusted Command Adapters
 
