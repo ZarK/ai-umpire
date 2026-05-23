@@ -107,6 +107,26 @@ describe("doctor diagnostics", () => {
     assert.ok(report.checks.some((check) => check.kind === "trusted-command-found" && check.path === executablePath));
   });
 
+  it("does not report executable directories as trusted command executables", async () => {
+    const repoRoot = await createRepoRoot();
+    const directoryToken = "./local-tool-dir";
+    const directoryPath = path.resolve(repoRoot, directoryToken);
+    await mkdir(directoryPath);
+    await chmod(directoryPath, 0o700);
+    await writeConfig(repoRoot, {
+      version: 1,
+      trustedStateCommands: {
+        local: {
+          argv: [directoryToken],
+        },
+      },
+    });
+
+    const report = runAiuDoctor({ cwd: repoRoot });
+
+    assert.ok(report.checks.some((check) => check.kind === "trusted-command-missing" && check.path === directoryToken));
+  });
+
   it("reports package, config, state, host, and trusted command paths as redacted data", async () => {
     const tokenLikePrefix = `aiu-doctor-ghp_${"A".repeat(36)}-`;
     const repoRoot = await createRepoRoot(tokenLikePrefix);

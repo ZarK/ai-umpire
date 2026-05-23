@@ -128,6 +128,10 @@ export const doctorCommand = defineCommand({
       description: "The selected config has validation diagnostics.",
     },
     {
+      kind: "config-missing",
+      description: "No repository config file was found, so conservative defaults are in use.",
+    },
+    {
       kind: "host-file-missing",
       description: "A configured host integration file is not installed.",
     },

@@ -354,7 +354,7 @@ function resolveTrustedCommandPaths(configLoad: AiuConfigLoadResult): readonly A
 
 function resolveExecutablePath(executable: string, cwd: string): string | undefined {
   const candidates = isDirectExecutablePath(executable) ? [path.resolve(cwd, executable)] : (process.env.PATH ?? "").split(path.delimiter).filter(Boolean).map((entry) => path.join(entry, executable));
-  return candidates.find((candidate) => canAccess(candidate, constants.X_OK));
+  return candidates.find((candidate) => isExecutableFile(candidate));
 }
 
 function isDirectExecutablePath(executable: string): boolean {
@@ -452,6 +452,14 @@ function canAccess(targetPath: string, mode: number): boolean {
   try {
     accessSync(targetPath, mode);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+function isExecutableFile(targetPath: string): boolean {
+  try {
+    return statSync(targetPath).isFile() && canAccess(targetPath, constants.X_OK);
   } catch {
     return false;
   }
