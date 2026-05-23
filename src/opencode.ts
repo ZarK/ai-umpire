@@ -9,6 +9,7 @@ export interface AiuOpenCodeEvent {
 export interface AiuOpenCodeContext {
   readonly cwd?: string;
   readonly config?: AiuConfig;
+  readonly previousResult?: AiuOpenCodeHandlerResult;
 }
 
 export interface AiuOpenCodeHandlerResult {
@@ -33,10 +34,15 @@ export interface AiuOpenCodePluginOptions {
 const AIU_OPENCODE_COMMAND = Object.freeze(["aiu", "hook", "opencode"] as const);
 
 export function createAiuOpenCodePlugin(options: AiuOpenCodePluginOptions = {}): AiuOpenCodePlugin {
-  const handler = composeAiuOpenCodeHandlers([...(options.before ?? []), delegateToAiuOpenCodeCommand, ...(options.after ?? [])]);
+  const before = composeAiuOpenCodeHandlers(options.before ?? []);
+  const after = composeAiuOpenCodeHandlers(options.after ?? []);
   return Object.freeze({
     name: "@tjalve/aiu/opencode" as const,
-    handle: async (event: AiuOpenCodeEvent, context: AiuOpenCodeContext = {}) => handler(event, withDefaultContext(context), terminalOpenCodeHandler),
+    handle: async (event: AiuOpenCodeEvent, context: AiuOpenCodeContext = {}) => {
+      const normalizedContext = withDefaultContext(context);
+      const result = await before(event, normalizedContext, async () => delegateToAiuOpenCodeCommand(event, normalizedContext));
+      return after(event, Object.freeze({ ...normalizedContext, previousResult: result }), async () => result);
+    },
   });
 }
 

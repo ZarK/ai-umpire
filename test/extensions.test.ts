@@ -48,11 +48,15 @@ describe("extension API", () => {
       calls.push("after-next");
       return result;
     };
-    const plugin = createAiuOpenCodePlugin({ before: [before] });
+    const after: AiuOpenCode.AiuOpenCodeHandler = async (_event, context, next) => {
+      calls.push(`after:${context.previousResult?.command?.join(" ") ?? "none"}`);
+      return next();
+    };
+    const plugin = createAiuOpenCodePlugin({ before: [before], after: [after] });
 
     const result = await plugin.handle({ type: "idle" }, { cwd: "/repo" });
 
-    assert.deepEqual(calls, ["before", "after-next"]);
+    assert.deepEqual(calls, ["before", "after-next", "after:aiu hook opencode"]);
     assert.equal(result.handled, true);
     assert.deepEqual(result.command, ["aiu", "hook", "opencode"]);
     assert.equal(result.metadata?.eventType, "idle");
