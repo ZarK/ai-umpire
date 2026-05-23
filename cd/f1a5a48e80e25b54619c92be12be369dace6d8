@@ -1,0 +1,40 @@
+src/state.ts
+  s_f8aaaf4fdfe4d6::t_a63304f481cfa7 36,63
+src/decision.ts
+  s_f8aaaf4fdfe4d6::t_db4608ddfd280d 156,160
+  s_f8aaaf4fdfe4d6::t_3f3ca9a3a29ede 114,119,124,129,134,139,143,148,153,157,161,166,171,176,180,183,401,409,423-424
+  s_f8aaaf4fdfe4d6::t_18e5184cf59ff8 267,275,320,336,343,410,413,482-488
+  s_f8aaaf4fdfe4d6::t_7749f2ec8ba6c0 6,8,61-62
+  s_f8aaaf4fdfe4d6::t_1bc95832f3f021 1-5,7,9-60,63-113,115-118,120-123,125-128,130-133,135-138,140-142,144-147,149-152,154-155,158-159,162-165,167-170,172-175,177-179,181-182,184-266,268-274,276-319,321-335,337-342,344-400,402-408,411-412,414-422,425-481,489
+docs/M2-continuation-state-and-policy-engine.md
+  s_f8aaaf4fdfe4d6::t_0b782140f8bd11 135-136
+test/decision.test.ts
+  s_f8aaaf4fdfe4d6::t_c6b9b8d2f73fbd 1-6,8-23,25-80,90-118,128-179,184,186-313
+  s_f8aaaf4fdfe4d6::t_7bdcf5806a89ee 81-89
+  s_f8aaaf4fdfe4d6::t_7d74310c52feab 119-127
+  s_f8aaaf4fdfe4d6::t_c52e23a43b201a 7,24,180-183,185
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_dc368e8993e66c 17,167-169
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_a47dc2d1b27d58 129-132,179,181-182
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_5a90e252665b5c 30-32,101-108
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_048a67d4974aec 92-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "cdf1a5a48e80e25b54619c92be12be369dace6d8",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
