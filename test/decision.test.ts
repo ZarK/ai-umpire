@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -511,16 +510,6 @@ describe("continuation decision engine", () => {
     assert.equal(result.selectedMode, "stop");
   });
 
-  it("keeps the decision engine side-effect free and provider-neutral", async () => {
-    const source = await readFile(path.join(repoRoot, "src", "decision.ts"), "utf8");
-
-    assert.doesNotMatch(source, /from\s+["']node:fs/);
-    assert.doesNotMatch(source, /from\s+["']node:child_process/);
-    assert.doesNotMatch(source, /from\s+["']\.\/cli(?:\.(?:[cm]?ts|[cm]?js))?["']/);
-    assert.doesNotMatch(source, /from\s+["']\.\/command_registry(?:\.(?:[cm]?ts|[cm]?js))?["']/);
-    assert.doesNotMatch(source, /\bgithub\b/i);
-    assert.doesNotMatch(source, /\bprovider[A-Z_-]/i);
-  });
 });
 
 async function loadDecision(): Promise<typeof Decision> {

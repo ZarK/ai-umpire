@@ -153,7 +153,7 @@ Continuation prompts must be:
 - product-language only
 - explicit about trusted commands or state sources to inspect first
 - explicit about untrusted task input boundaries
-- independent of local paths, implementation history, or source-provenance wording
+- independent of local paths, migration history, or implementation-specific wording
 
 Render prompts for:
 

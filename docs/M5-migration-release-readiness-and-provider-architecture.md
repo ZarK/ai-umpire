@@ -2,13 +2,13 @@
 
 ## Strategic Goal
 
-M5 makes Umpire ready for package adoption in real repositories. It provides a safe migration path for repositories that previously used repo-local Umpire hooks, copied helper scripts, or local-checkout package references, while keeping the Umpire runtime package clean and package-backed.
+M5 makes Umpire ready for package adoption in real repositories. It provides a safe migration path for repositories that previously used repo-local Umpire hooks, copied helper scripts, or repo-local package references, while keeping the Umpire runtime package clean and package-backed.
 
 Migration is an adoption tool, not a runtime fallback system. After migration, repositories should call the published package entrypoints and configured trusted commands. Umpire must not keep old copied helper semantics alive inside the core runtime.
 
 M5 delivers five things:
 
-1. **Migration inventory** - detect repo-local hooks, plugin wrappers, copied helper scripts, local-checkout references, old stop-hook entries, prompt customizations, and `.umpire/` state.
+1. **Migration inventory** - detect repo-local hooks, plugin wrappers, copied helper scripts, repo-local package references, old stop-hook entries, prompt customizations, and `.umpire/` state.
 2. **Migration planner** - dry-runnable plan for package-backed config, host updates, state preservation, cleanup candidates, and required confirmations.
 3. **Migration apply** - explicit apply mode that updates managed sections and package-backed entrypoints without staging, committing, pushing, or deleting unknown files.
 4. **Architecture finalization** - provider-neutral core, command adapters, host adapters, renderers, config, and support modules separated clearly.
@@ -136,7 +136,7 @@ README documents:
 - init and host trust steps
 - status/doctor/schema flows
 - stop-hook behavior
-- migration from repo-local hooks and local-checkout references
+- migration from repo-local hooks and repo-local package references
 - troubleshooting and logs
 
 Publish workflow uses npm provenance or another documented secure publishing path. Docs must not tell users to rely on floating `latest` as the preferred install path.
@@ -157,7 +157,7 @@ Repository release controls include:
 
 ### M5.1 - Implement Migration Inventory And Dry-Run Plan
 
-Detect repo-local hooks, local-checkout references, copied helpers, config, host files, and state; produce a dry-runnable plan with conflicts and confirmations.
+Detect repo-local hooks, repo-local package references, copied helpers, config, host files, and state; produce a dry-runnable plan with conflicts and confirmations.
 
 ### M5.2 - Implement Migration Apply And State Preservation
 

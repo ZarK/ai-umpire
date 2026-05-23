@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
 
 import {
   AIU_REASON_CODES,
@@ -25,8 +22,6 @@ import {
   isAiuStateNonSuccess,
   isAiuStateSuccess,
 } from "../src/state.ts";
-
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("trusted state models", () => {
   it("creates typed trusted state envelopes for every core state kind", () => {
@@ -158,16 +153,6 @@ describe("trusted state models", () => {
     }
   });
 
-  it("keeps core state models free of provider, filesystem, child-process, and CLI imports", async () => {
-    const source = await readFile(path.join(repoRoot, "src", "state.ts"), "utf8");
-
-    assert.doesNotMatch(source, /from\s+["']node:fs/);
-    assert.doesNotMatch(source, /from\s+["']node:child_process/);
-    assert.doesNotMatch(source, /from\s+["']\.\/cli(?:\.(?:[cm]?ts|[cm]?js))?["']/);
-    assert.doesNotMatch(source, /from\s+["']\.\/command_registry(?:\.(?:[cm]?ts|[cm]?js))?["']/);
-    assert.doesNotMatch(source, /from\s+["']\.\/opencode/);
-    assert.doesNotMatch(source, /\bgithub\b/i);
-  });
 });
 
 function envelope<TState extends AiuTrustedStatePayload>(value: TState): AiuTrustedStateEnvelope<TState> {

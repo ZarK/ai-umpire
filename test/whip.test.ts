@@ -374,13 +374,13 @@ describe("whip policy", () => {
           source: "cli",
         },
         {
-          id: "fallback-owned",
-          title: "Fallback owned task",
-          prompt: "Continue the fallback owned task.",
+          id: "stale-owned",
+          title: "Stale owned task",
+          prompt: "Continue the stale owned task.",
           priority: 3,
           status: "prompted",
           source: "cli",
-          ownerSessionId: "ses_fallback",
+          ownerSessionId: "ses_stale",
           promptedAt: "not-a-date",
           updatedAt: "2026-05-22T00:00:00.000Z",
         },
@@ -392,7 +392,7 @@ describe("whip policy", () => {
     const unknown = runAiuWhipCommand({ action: "cancel", repoRoot, config, id: "missing" });
     const invalid = runAiuWhipCommand({ action: "complete", repoRoot, config, id: "done", evidence: "already done" });
 
-    assert.deepEqual(stale.staleOwnership.map((task) => task.id), ["owned", "fallback-owned"]);
+    assert.deepEqual(stale.staleOwnership.map((task) => task.id), ["owned", "stale-owned"]);
     assert.deepEqual(invalidCommand.errors.map((error) => error.code), ["whip-invalid-command"]);
     assert.deepEqual(unknown.errors.map((error) => error.code), ["whip-task-not-found"]);
     assert.deepEqual(invalid.errors.map((error) => error.code), ["whip-invalid-transition"]);

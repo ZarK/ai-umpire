@@ -110,13 +110,13 @@ Remove untracked init files only after reviewing `git status --short`; Umpire ne
 
 ## Migration
 
-Existing repositories that used repo-local Umpire hooks, copied helper scripts, or local-checkout references should inspect migration first:
+Existing repositories that used repo-local Umpire hooks, copied helper scripts, or repo-local package references should inspect migration first:
 
 ```bash
 pnpm exec aiu migrate --dry-run --json
 ```
 
-The migration plan is expected to report repo-local hook wrappers, local-checkout command paths, managed sections, customization points, conflicts, cleanup candidates, state preservation, and required host trust steps before any apply step. Runtime fallback behavior is not supported: migrated repositories should point host integrations at the package-backed `aiu` executable and keep custom policy in `aiu.config.json` or host-owned files outside package-managed sections.
+The migration plan is expected to report repo-local hook wrappers, repo-local command paths, managed sections, customization points, conflicts, cleanup candidates, state preservation, and required host trust steps before any apply step. Runtime fallback behavior is not supported: migrated repositories should point host integrations at the package-backed `aiu` executable and keep custom policy in `aiu.config.json` or host-owned files outside package-managed sections.
 
 Package-owned managed sections are the files and content emitted by `aiu init` or future migration apply commands. Repo-local customization points are repository policy, trusted state command argv arrays, host trust settings, prompts outside managed sections, and durable `.umpire/` state. If package-owned content conflicts with local content, review the diff and choose an explicit apply or `--force` path only when replacement is intentional.
 
