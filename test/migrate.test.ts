@@ -18,10 +18,67 @@ describe("migration planner", () => {
     await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
-  it("detects repo-local hooks and local-checkout references without writing files", async () => {
+  it("defaults to non-mutating dry-run behavior for empty repositories", async () => {
+    const target = await createRepoRoot();
+
+    const result = await runCli(target, ["migrate", "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.migrate.ok, true);
+    assert.equal(parsed.migrate.dryRun, true);
+    assert.deepEqual(parsed.migrate.inventory, []);
+    assert.equal(parsed.migrate.filesToCreate.length >= 3, true);
+    assert.equal(existsSync(path.join(target, "aiu.config.json")), false);
+    assert.equal(existsSync(path.join(target, ".umpire")), false);
+  });
+
+  it("preserves already package-backed host files without conflicts", async () => {
     const target = await createRepoRoot();
     await mkdir(path.join(target, ".opencode", "plugins"), { recursive: true });
+    await writeFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), [
+      "// Managed by @tjalve/aiu.",
+      "// Compose custom behavior outside this package-managed file.",
+      "import { createAiuOpenCodePlugin } from \"@tjalve/aiu/opencode\";",
+      "",
+      "export default createAiuOpenCodePlugin();",
+      "",
+    ].join("\n"), "utf8");
+
+    const result = await runCli(target, ["migrate", "--dry-run", "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(parsed.migrate.ok, true);
+    assert.deepEqual(parsed.migrate.repoLocalHooks, []);
+    assert.ok(parsed.migrate.filesToPreserve.some((item) => item.relativePath === path.join(".opencode", "plugins", "ai-umpire-continuation.ts") && item.category === "package-backed-host-file"));
+  });
+
+  it("detects migration inventory and full dry-run plan without writing files", async () => {
+    const target = await createRepoRoot();
+    await mkdir(path.join(target, ".opencode", "plugins"), { recursive: true });
+    await mkdir(path.join(target, ".opencode", "commands"), { recursive: true });
+    await mkdir(path.join(target, ".codex", "hooks"), { recursive: true });
+    await mkdir(path.join(target, "plugins", "ai-umpire", "hooks"), { recursive: true });
+    await mkdir(path.join(target, "scripts"), { recursive: true });
+    await mkdir(path.join(target, ".umpire"), { recursive: true });
     await writeFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "export const local = true;\n", "utf8");
+    await writeFile(path.join(target, ".codex", "hooks", "ai-umpire-stop.json"), JSON.stringify({ Stop: [{ hooks: [{ type: "command", command: "node scripts/aiu-stop.js" }] }] }), "utf8");
+    await writeFile(path.join(target, "plugins", "ai-umpire", "hooks", "hooks.json"), JSON.stringify({ Stop: [{ hooks: [{ type: "command", command: "node scripts/aiu-stop.js" }] }] }), "utf8");
+    await writeFile(path.join(target, "scripts", "aiu-stop.js"), "console.log('ai-umpire hook-stop helper');\n", "utf8");
+    await writeFile(path.join(target, ".opencode", "commands", "make-it-so.md"), "Run the local AI Umpire continuation prompt.\n", "utf8");
+    await writeFile(path.join(target, ".opencode", "mystery.md"), "Umpire notes from an unknown local customization.\n", "utf8");
+    await writeFile(path.join(target, ".umpire", "whip.json"), JSON.stringify({ schemaVersion: 1, tasks: [] }), "utf8");
+    await writeFile(path.join(target, "AGENTS.md"), "Use ../ai-umpire local command paths until migrated.\n", "utf8");
+    await writeFile(path.join(target, "aiu.config.json"), JSON.stringify({
+      version: 1,
+      prompts: { sections: { work: { prepend: "Repo prompt." } } },
+      trustedStateCommands: {
+        work: { argv: ["aie", "status", "--json"] },
+      },
+    }, null, 2), "utf8");
     await writeFile(
       path.join(target, "package.json"),
       JSON.stringify(
@@ -45,21 +102,38 @@ describe("migration planner", () => {
     assert.equal(parsed.ok, true);
     assert.equal(parsed.migrate.ok, false);
     assert.equal(parsed.migrate.dryRun, true);
-    assert.deepEqual(parsed.migrate.repoLocalHooks.map((finding) => finding.relativePath), [
+    assert.equal(parsed.migrate.configPath.endsWith("aiu.config.json"), true);
+    assert.deepEqual(parsed.migrate.repoLocalHooks.map((finding) => finding.relativePath).sort(), [
+      ".codex/hooks/ai-umpire-stop.json",
       path.join(".opencode", "plugins", "ai-umpire-continuation.ts"),
+      path.join("plugins", "ai-umpire", "hooks", "hooks.json"),
     ]);
-    assert.deepEqual(parsed.migrate.localCheckoutReferences.map((finding) => finding.relativePath), ["package.json"]);
-    assert.ok(parsed.migrate.cleanupCandidates.length >= 2);
-    assert.ok(parsed.migrate.conflicts.length >= 2);
+    assert.deepEqual(parsed.migrate.localCheckoutReferences.map((finding) => finding.relativePath).sort(), ["AGENTS.md", "package.json"]);
+    assert.ok(parsed.migrate.copiedHelpers.some((finding) => finding.relativePath === path.join("scripts", "aiu-stop.js")));
+    assert.ok(parsed.migrate.commandWrappers.some((finding) => finding.relativePath === path.join(".opencode", "commands", "make-it-so.md")));
+    assert.ok(parsed.migrate.promptCustomizations.some((finding) => finding.relativePath === "aiu.config.json"));
+    assert.ok(parsed.migrate.stateFindings.some((finding) => finding.relativePath === path.join(".umpire", "whip.json")));
+    assert.ok(parsed.migrate.hostInstructionReferences.some((finding) => finding.relativePath === "AGENTS.md"));
+    assert.ok(parsed.migrate.trustedCommandDescriptors.some((finding) => finding.sourceCommandSummary === "aie status --json"));
+    assert.ok(parsed.migrate.reviewRequired.some((finding) => finding.category === "unknown-aiu-file" && finding.relativePath === path.join(".opencode", "mystery.md")));
+    assert.ok(parsed.migrate.cleanupCandidates.length >= 4);
+    assert.ok(parsed.migrate.conflicts.length >= 6);
+    assert.ok(parsed.migrate.filesToCreate.length >= 1);
+    assert.ok(parsed.migrate.filesToUpdate.some((item) => item.relativePath === "package.json"));
+    assert.ok(parsed.migrate.filesToPreserve.some((item) => item.relativePath === path.join(".umpire", "whip.json")));
+    assert.ok(parsed.migrate.packageBackedCommandPaths.some((command) => command.command === "pnpm exec aiu hook-stop --tool codex"));
     assert.equal(parsed.migrate.statePreservation.action, "preserve");
+    assert.ok(parsed.migrate.stateMigrations.some((item) => item.relativePath === path.join(".umpire", "whip.json") && item.recognized));
+    assert.ok(parsed.migrate.requiredConfirmations.length >= 3);
+    assert.ok(parsed.migrate.hostTrustSteps.length >= 3);
     assert.equal(parsed.migrate.recommendedNextCommand, "aiu init --dry-run --json");
 
     const human = await runCli(target, ["migrate", "--dry-run"]);
     assert.equal(human.exitCode, 0);
     assert.match(human.stdout, /Conflicts/);
     assert.match(human.stdout, /migration-review-required/);
-    assert.equal(existsSync(path.join(target, ".umpire")), false);
-    assert.equal(existsSync(path.join(target, "aiu.config.json")), false);
+    assert.equal(existsSync(path.join(target, ".umpire", "whip.json")), true);
+    assert.equal(existsSync(path.join(target, "aiu.config.json")), true);
   });
 });
 
@@ -68,12 +142,28 @@ interface MigrationEnvelope {
   readonly migrate: {
     readonly dryRun: boolean;
     readonly ok: boolean;
+    readonly configPath: string;
+    readonly inventory: unknown[];
+    readonly packageBackedCommandPaths: Array<{ command: string }>;
     readonly repoLocalHooks: Array<{ relativePath: string }>;
     readonly localCheckoutReferences: Array<{ relativePath: string }>;
+    readonly copiedHelpers: Array<{ relativePath: string }>;
+    readonly commandWrappers: Array<{ relativePath: string }>;
+    readonly promptCustomizations: Array<{ relativePath: string }>;
+    readonly stateFindings: Array<{ relativePath: string }>;
+    readonly hostInstructionReferences: Array<{ relativePath: string }>;
+    readonly trustedCommandDescriptors: Array<{ relativePath: string; sourceCommandSummary?: string }>;
+    readonly reviewRequired: Array<{ relativePath: string; category: string }>;
     readonly scanErrors: unknown[];
     readonly cleanupCandidates: unknown[];
     readonly conflicts: unknown[];
+    readonly filesToCreate: Array<{ relativePath: string; category: string }>;
+    readonly filesToUpdate: Array<{ relativePath: string; category: string }>;
+    readonly filesToPreserve: Array<{ relativePath: string; category: string }>;
     readonly statePreservation: { action: string };
+    readonly stateMigrations: Array<{ relativePath: string; recognized: boolean }>;
+    readonly requiredConfirmations: string[];
+    readonly hostTrustSteps: string[];
     readonly recommendedNextCommand: string;
   };
 }

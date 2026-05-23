@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import type { Dirent } from "node:fs";
 import path from "node:path";
@@ -14,15 +15,34 @@ export interface AiuMigrationPlan {
   readonly ok: boolean;
   readonly dryRun: boolean;
   readonly repoRoot: string;
+  readonly configPath: string;
+  readonly packageBackedCommandPaths: readonly AiuMigrationPackageCommand[];
+  readonly inventory: readonly AiuMigrationFinding[];
+  readonly detectedCategories: readonly string[];
   readonly repoLocalHooks: readonly AiuMigrationFinding[];
   readonly localCheckoutReferences: readonly AiuMigrationFinding[];
+  readonly copiedHelpers: readonly AiuMigrationFinding[];
+  readonly commandWrappers: readonly AiuMigrationFinding[];
+  readonly promptCustomizations: readonly AiuMigrationFinding[];
+  readonly existingConfig: readonly AiuMigrationFinding[];
+  readonly stateFindings: readonly AiuMigrationFinding[];
+  readonly hostInstructionReferences: readonly AiuMigrationFinding[];
+  readonly trustedCommandDescriptors: readonly AiuMigrationFinding[];
+  readonly reviewRequired: readonly AiuMigrationFinding[];
   readonly scanErrors: readonly AiuMigrationFinding[];
   readonly cleanupCandidates: readonly AiuMigrationFinding[];
   readonly managedSections: readonly AiuMigrationManagedSection[];
+  readonly filesToCreate: readonly AiuMigrationFileAction[];
+  readonly filesToUpdate: readonly AiuMigrationFileAction[];
+  readonly filesToPreserve: readonly AiuMigrationFileAction[];
   readonly customizationPoints: readonly string[];
   readonly conflicts: readonly AiuMigrationFinding[];
+  readonly warnings: readonly string[];
   readonly statePreservation: AiuMigrationStatePreservation;
+  readonly stateMigrations: readonly AiuMigrationStateMigration[];
+  readonly requiredConfirmations: readonly string[];
   readonly requiredTrustSteps: readonly string[];
+  readonly hostTrustSteps: readonly string[];
   readonly plannedCommands: readonly string[];
   readonly recommendedNextCommand: string;
 }
@@ -31,6 +51,12 @@ export interface AiuMigrationFinding {
   readonly relativePath: string;
   readonly category: string;
   readonly reason: string;
+  readonly confidence?: "high" | "medium" | "low";
+  readonly fingerprint?: string;
+  readonly sourceCommandSummary?: string;
+  readonly requiredReview?: boolean;
+  readonly host?: string;
+  readonly evidence?: string;
 }
 
 export interface AiuMigrationManagedSection {
@@ -40,6 +66,23 @@ export interface AiuMigrationManagedSection {
   readonly reason: string;
 }
 
+export interface AiuMigrationFileAction {
+  readonly relativePath: string;
+  readonly action: "create" | "update" | "preserve" | "review";
+  readonly category: string;
+  readonly reason: string;
+  readonly fingerprint?: string;
+}
+
+export interface AiuMigrationStateMigration {
+  readonly relativePath: string;
+  readonly action: "preserve";
+  readonly recognized: boolean;
+  readonly schemaVersion?: number | string;
+  readonly reason: string;
+  readonly fingerprint?: string;
+}
+
 export interface AiuMigrationStatePreservation {
   readonly stateDir: string;
   readonly exists: boolean;
@@ -47,61 +90,136 @@ export interface AiuMigrationStatePreservation {
   readonly reason: string;
 }
 
-const HOST_FILE_PATHS = Object.freeze([
-  path.join(".opencode", "plugins", "ai-umpire-continuation.ts"),
-  path.join(".codex", "hooks", "ai-umpire-stop.json"),
-  path.join(".claude", "hooks", "ai-umpire-stop.json"),
+export interface AiuMigrationPackageCommand {
+  readonly id: string;
+  readonly command: string;
+  readonly host?: string;
+  readonly reason: string;
+}
+
+interface ManagedHostPath {
+  readonly host: string;
+  readonly relativePath: string;
+  readonly content: string;
+}
+
+const SEARCH_ROOTS = Object.freeze([".opencode", ".agents", "plugins", ".claude", ".codex", "scripts", ".umpire"]);
+const SEARCH_FILES = Object.freeze(["package.json", "pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lock", "aiu.config.json", "AGENTS.md", "CLAUDE.md", "README.md"]);
+const LOCAL_CHECKOUT_PATTERN = /(?:file:|link:|workspace:|(?:\.\.\/)+)[:./\\\w-]*(?:ai-umpire|@tjalve\/aiu)|(?:^|["'\s])\/[^"'\s]*(?:ai-umpire|@tjalve\/aiu)(?:\/|["'\s]|$)/i;
+const AIU_TEXT_PATTERN = /\b(?:aiu|ai-umpire|umpire)\b/i;
+const PACKAGE_BACKED_COMMANDS: readonly AiuMigrationPackageCommand[] = Object.freeze([
+  Object.freeze({ id: "aiu", command: "pnpm exec aiu", reason: "Package-backed CLI entrypoint for repository commands." }),
+  Object.freeze({ id: "opencode-plugin", command: "import { createAiuOpenCodePlugin } from \"@tjalve/aiu/opencode\"", host: "opencode", reason: "Package-backed OpenCode plugin wrapper import." }),
+  Object.freeze({ id: "codex-stop-hook", command: "pnpm exec aiu hook-stop --tool codex", host: "codex", reason: "Package-backed Codex Stop hook command." }),
+  Object.freeze({ id: "claude-code-stop-hook", command: "pnpm exec aiu hook-stop --tool claude-code", host: "claude-code", reason: "Package-backed Claude Code Stop hook command." }),
 ]);
-const SEARCH_ROOTS = Object.freeze([".opencode", ".codex", ".claude"]);
-const SEARCH_FILES = Object.freeze(["package.json", "pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lock", "aiu.config.json"]);
-const LOCAL_CHECKOUT_PATTERN = /(?:file:|link:|workspace:|(?:\.\.\/)+)[:./\\\w-]*ai-umpire|(?:^|["'\s])\/[^"'\s]*ai-umpire(?:\/|["'\s]|$)/i;
 
 export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigrationPlan {
   const configLoad = loadAiuConfig({ cwd: options.cwd });
   const repoRoot = configLoad.repoRoot;
   const dryRun = options.dryRun !== false;
-  const repoLocalHooks = findRepoLocalHooks(repoRoot);
   const scanErrors: AiuMigrationFinding[] = [];
-  const localCheckoutReferences = findLocalCheckoutReferences(repoRoot, scanErrors);
-  const conflicts = [
-    ...repoLocalHooks.map((finding) => ({
-      relativePath: finding.relativePath,
-      category: "migration-review-required",
-      reason: `Review ${finding.category} before replacing it with package-managed content.`,
-    })),
-    ...localCheckoutReferences.map((finding) => ({
-      relativePath: finding.relativePath,
-      category: "migration-review-required",
-      reason: `Review ${finding.category} before replacing it with the package-backed aiu dependency.`,
-    })),
-    ...scanErrors.map((finding) => ({
-      relativePath: finding.relativePath,
-      category: "migration-scan-error",
-      reason: finding.reason,
-    })),
-  ];
-  const cleanupCandidates = [...repoLocalHooks, ...localCheckoutReferences].map((finding) => ({
-    relativePath: finding.relativePath,
-    category: "cleanup-candidate",
-    reason: `Review after package-backed migration replaces ${finding.category}.`,
+  const candidates = candidateTextFiles(repoRoot, scanErrors);
+  const managedHostPaths = getManagedHostPaths();
+  const managedPathSet = new Set(managedHostPaths.map((file) => file.relativePath));
+  const managedState = inspectManagedHostPaths(repoRoot, managedHostPaths);
+  const repoLocalHooks = uniqueFindings([
+    ...managedState.repoLocalHooks,
+    ...findOldHookEntries(repoRoot, candidates, managedPathSet),
+  ]);
+  const localCheckoutReferences = findLocalCheckoutReferences(repoRoot, candidates);
+  const copiedHelpers = findCopiedHelpers(repoRoot, candidates);
+  const commandWrappers = findCommandWrappers(repoRoot, candidates);
+  const promptCustomizations = findPromptCustomizations(repoRoot, configLoad.selectedPath, candidates);
+  const existingConfig = findExistingConfig(repoRoot, configLoad.selectedPath);
+  const { stateFindings, stateMigrations } = findState(repoRoot);
+  const hostInstructionReferences = findHostInstructionReferences(repoRoot, candidates);
+  const trustedCommandDescriptors = findTrustedCommandDescriptors(configLoad.selectedPath, configLoad.config.trustedStateCommands);
+  const knownPaths = new Set([
+    ...managedPathSet,
+    ...localCheckoutReferences.map((finding) => finding.relativePath),
+    ...copiedHelpers.map((finding) => finding.relativePath),
+    ...commandWrappers.map((finding) => finding.relativePath),
+    ...promptCustomizations.map((finding) => finding.relativePath),
+    ...existingConfig.map((finding) => finding.relativePath),
+    ...stateFindings.map((finding) => finding.relativePath),
+    ...hostInstructionReferences.map((finding) => finding.relativePath),
+    ...trustedCommandDescriptors.map((finding) => finding.relativePath),
+  ]);
+  const unknownFiles = findUnknownAiuFiles(repoRoot, candidates, knownPaths);
+  const inventory = uniqueFindings([
+    ...repoLocalHooks,
+    ...localCheckoutReferences,
+    ...copiedHelpers,
+    ...commandWrappers,
+    ...promptCustomizations,
+    ...existingConfig,
+    ...stateFindings,
+    ...hostInstructionReferences,
+    ...trustedCommandDescriptors,
+    ...unknownFiles,
+    ...scanErrors,
+  ]);
+  const reviewRequired = inventory.filter((finding) => finding.requiredReview === true || finding.category === "scan-error");
+  const cleanupCandidates = conservativeCleanupCandidates([
+    ...repoLocalHooks,
+    ...localCheckoutReferences,
+    ...copiedHelpers,
+    ...commandWrappers,
+  ]);
+  const conflicts = reviewRequired.map((finding) => findingFrom(finding, {
+    category: finding.category === "scan-error" ? "migration-scan-error" : "migration-review-required",
+    reason: finding.category === "scan-error"
+      ? finding.reason
+      : `Review ${finding.category} before any package-backed migration apply step.`,
   }));
-  const managedSections = HOST_FILE_PATHS.map((relativePath) => ({
-    relativePath,
+  const managedSections = managedHostPaths.map((file) => ({
+    relativePath: file.relativePath,
     owner: "@tjalve/aiu" as const,
-    action: "create-or-update" as const,
+    action: repoLocalHooks.some((finding) => finding.relativePath === file.relativePath) ? "review" as const : "create-or-update" as const,
     reason: "Package-owned host integration managed by aiu init or migrate apply.",
   }));
+  const filesToCreate = managedHostPaths
+    .filter((file) => !existsSync(path.join(repoRoot, file.relativePath)))
+    .map((file) => fileAction(file.relativePath, "create", "package-managed-host-file", "Create package-backed host integration content."));
+  const filesToUpdate = [
+    ...repoLocalHooks.map((finding) => fileAction(finding.relativePath, "update", finding.category, "Replace reviewed repo-local host content with package-backed managed content.", finding.fingerprint)),
+    ...localCheckoutReferences.map((finding) => fileAction(finding.relativePath, "update", finding.category, "Replace repo-local package or command path references with package-backed commands.", finding.fingerprint)),
+  ];
+  const filesToPreserve = [
+    ...existingConfig.map((finding) => fileAction(finding.relativePath, "preserve", finding.category, "Preserve existing repository config and merge only explicit future changes.", finding.fingerprint)),
+    ...promptCustomizations.map((finding) => fileAction(finding.relativePath, "preserve", finding.category, "Preserve prompt customization for explicit review.", finding.fingerprint)),
+    ...stateFindings.map((finding) => fileAction(finding.relativePath, "preserve", finding.category, "Preserve durable local state.", finding.fingerprint)),
+    ...unknownFiles.map((finding) => fileAction(finding.relativePath, "review", finding.category, "Unknown AI Umpire-related file is preserved until explicit cleanup confirmation.", finding.fingerprint)),
+    ...managedState.packageBackedFiles.map((finding) => fileAction(finding.relativePath, "preserve", finding.category, "Existing package-backed managed content is already in target shape.", finding.fingerprint)),
+  ];
   const stateDir = configLoad.config.paths.stateDir;
+  const requiredTrustSteps = [...new Set(getAllAiuHostCapabilityProfiles().flatMap((profile) => profile.trustSteps))];
 
   return Object.freeze({
     ok: conflicts.length === 0,
     dryRun,
     repoRoot,
+    configPath: configLoad.selectedPath,
+    packageBackedCommandPaths: Object.freeze([...PACKAGE_BACKED_COMMANDS]),
+    inventory: Object.freeze(inventory),
+    detectedCategories: Object.freeze([...new Set(inventory.map((finding) => finding.category))].sort()),
     repoLocalHooks: Object.freeze(repoLocalHooks),
     localCheckoutReferences: Object.freeze(localCheckoutReferences),
+    copiedHelpers: Object.freeze(copiedHelpers),
+    commandWrappers: Object.freeze(commandWrappers),
+    promptCustomizations: Object.freeze(promptCustomizations),
+    existingConfig: Object.freeze(existingConfig),
+    stateFindings: Object.freeze(stateFindings),
+    hostInstructionReferences: Object.freeze(hostInstructionReferences),
+    trustedCommandDescriptors: Object.freeze(trustedCommandDescriptors),
+    reviewRequired: Object.freeze(reviewRequired),
     scanErrors: Object.freeze(scanErrors),
     cleanupCandidates: Object.freeze(cleanupCandidates),
     managedSections: Object.freeze(managedSections),
+    filesToCreate: Object.freeze(filesToCreate),
+    filesToUpdate: Object.freeze(filesToUpdate),
+    filesToPreserve: Object.freeze(filesToPreserve),
     customizationPoints: Object.freeze([
       "aiu.config.json trustedStateCommands argv arrays",
       "host trust settings outside package-managed files",
@@ -109,14 +227,22 @@ export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigratio
       ".umpire/ durable state",
     ]),
     conflicts: Object.freeze(conflicts),
+    warnings: Object.freeze(conflicts.map((finding) => finding.reason)),
     statePreservation: Object.freeze({
       stateDir,
       exists: existsSync(path.resolve(repoRoot, stateDir)),
       action: "preserve" as const,
       reason: "Migration preserves durable continuation state and does not delete .umpire data.",
     }),
-    requiredTrustSteps: Object.freeze([...new Set(getAllAiuHostCapabilityProfiles().flatMap((profile) => profile.trustSteps))]),
-    plannedCommands: Object.freeze(["aiu init --dry-run --json", "aiu init --tool all"]),
+    stateMigrations: Object.freeze(stateMigrations),
+    requiredConfirmations: Object.freeze([
+      "Review each migration-review-required item before apply.",
+      "Confirm host trust settings after managed host files are written.",
+      "Confirm cleanup candidates explicitly in the later cleanup command before deleting files.",
+    ]),
+    requiredTrustSteps: Object.freeze(requiredTrustSteps),
+    hostTrustSteps: Object.freeze(requiredTrustSteps),
+    plannedCommands: Object.freeze(["aiu migrate --dry-run --json", "aiu init --dry-run --json", "aiu init --tool all"]),
     recommendedNextCommand: "aiu init --dry-run --json",
   });
 }
@@ -128,11 +254,31 @@ export function formatMigrationPlan(plan: AiuMigrationPlan): string {
     "",
     formatFindingGroup("Repo-local hooks", plan.repoLocalHooks),
     formatFindingGroup("Local-checkout references", plan.localCheckoutReferences),
+    formatFindingGroup("Copied helpers", plan.copiedHelpers),
+    formatFindingGroup("Command wrappers", plan.commandWrappers),
+    formatFindingGroup("Prompt customizations", plan.promptCustomizations),
+    formatFindingGroup("Existing config", plan.existingConfig),
+    formatFindingGroup("State", plan.stateFindings),
+    formatFindingGroup("Host instruction references", plan.hostInstructionReferences),
+    formatFindingGroup("Trusted command descriptors", plan.trustedCommandDescriptors),
+    formatFindingGroup("Review-required files", plan.reviewRequired),
     formatFindingGroup("Scan errors", plan.scanErrors),
     formatFindingGroup("Cleanup candidates", plan.cleanupCandidates),
     formatFindingGroup("Conflicts", plan.conflicts),
+    "Package-backed commands:",
+    ...plan.packageBackedCommandPaths.map((command) => `- ${command.id}: ${command.command}`),
+    "",
     "Package-managed sections:",
     ...plan.managedSections.map((section) => `- ${section.relativePath}: ${section.reason}`),
+    "",
+    "Files to create:",
+    ...formatFileActions(plan.filesToCreate),
+    "",
+    "Files to update:",
+    ...formatFileActions(plan.filesToUpdate),
+    "",
+    "Files to preserve:",
+    ...formatFileActions(plan.filesToPreserve),
     "",
     "Repo-local customization points:",
     ...plan.customizationPoints.map((point) => `- ${point}`),
@@ -147,30 +293,56 @@ export function formatMigrationPlan(plan: AiuMigrationPlan): string {
   ].join("\n");
 }
 
-function findRepoLocalHooks(repoRoot: string): AiuMigrationFinding[] {
-  return HOST_FILE_PATHS.flatMap((relativePath) => {
+function getManagedHostPaths(): readonly ManagedHostPath[] {
+  return Object.freeze(getAllAiuHostCapabilityProfiles().flatMap((profile) => {
+    return profile.managedFiles.map((file) => ({
+      host: profile.tool,
+      relativePath: file.relativePath,
+      content: file.content,
+    }));
+  }));
+}
+
+function inspectManagedHostPaths(repoRoot: string, managedHostPaths: readonly ManagedHostPath[]) {
+  const repoLocalHooks: AiuMigrationFinding[] = [];
+  const packageBackedFiles: AiuMigrationFinding[] = [];
+  for (const managedFile of managedHostPaths) {
+    const { relativePath } = managedFile;
     const absolutePath = path.join(repoRoot, relativePath);
     if (!existsSync(absolutePath) || !safeStat(absolutePath)?.isFile()) {
-      return [];
+      continue;
     }
 
     const content = readText(absolutePath);
-    if (content.includes("Managed by @tjalve/aiu") || content.includes('"managedBy": "@tjalve/aiu"')) {
-      return [];
+    const fingerprint = fingerprintText(content);
+    if (isPackageBackedManagedContent(content, managedFile.content)) {
+      packageBackedFiles.push({
+        relativePath,
+        category: "package-backed-host-file",
+        reason: "Host integration file already matches package-backed managed content.",
+        confidence: "high",
+        fingerprint,
+        host: managedFile.host,
+      });
+      continue;
     }
 
-    return [
-      {
-        relativePath,
-        category: "repo-local-hook",
-        reason: "Host integration file exists but is not package-managed by @tjalve/aiu.",
-      },
-    ];
-  });
+    repoLocalHooks.push({
+      relativePath,
+      category: content.includes("hook-stop") || content.includes("Stop") ? "old-hook-entry" : "repo-local-hook",
+      reason: "Host integration file exists but is not package-managed by @tjalve/aiu.",
+      confidence: "high",
+      fingerprint,
+      requiredReview: true,
+      host: managedFile.host,
+      evidence: summarizeContent(content),
+    });
+  }
+  return { repoLocalHooks, packageBackedFiles };
 }
 
-function findLocalCheckoutReferences(repoRoot: string, scanErrors: AiuMigrationFinding[]): AiuMigrationFinding[] {
-  return candidateTextFiles(repoRoot, scanErrors).flatMap((relativePath) => {
+function findLocalCheckoutReferences(repoRoot: string, candidates: readonly string[]): AiuMigrationFinding[] {
+  return candidates.flatMap((relativePath) => {
     const content = readText(path.join(repoRoot, relativePath));
     if (!LOCAL_CHECKOUT_PATTERN.test(content)) {
       return [];
@@ -180,9 +352,218 @@ function findLocalCheckoutReferences(repoRoot: string, scanErrors: AiuMigrationF
       {
         relativePath,
         category: "local-checkout-reference",
-        reason: "File appears to reference a local ai-umpire checkout or file/link package path.",
+        reason: "File references a repo-local package path or local command path that should be replaced by package-backed aiu usage.",
+        confidence: "high" as const,
+        fingerprint: fingerprintText(content),
+        requiredReview: true,
+        evidence: summarizeContent(content),
       },
     ];
+  });
+}
+
+function findOldHookEntries(repoRoot: string, candidates: readonly string[], managedPathSet: ReadonlySet<string>): AiuMigrationFinding[] {
+  return candidates.flatMap((relativePath) => {
+    if (managedPathSet.has(relativePath)) {
+      return [];
+    }
+    const normalized = relativePath.split(path.sep).join("/");
+    if (!normalized.includes("hook") && !normalized.endsWith("settings.json")) {
+      return [];
+    }
+    const content = readText(path.join(repoRoot, relativePath));
+    if (!/(?:Stop|hook-stop|aiu|ai-umpire)/i.test(content)) {
+      return [];
+    }
+    return [{
+      relativePath,
+      category: "old-hook-entry",
+      reason: "Host hook entry appears related to old Umpire execution and requires review before replacement.",
+      confidence: "medium" as const,
+      fingerprint: fingerprintText(content),
+      requiredReview: true,
+      evidence: summarizeContent(content),
+    }];
+  });
+}
+
+function findCopiedHelpers(repoRoot: string, candidates: readonly string[]): AiuMigrationFinding[] {
+  return candidates.flatMap((relativePath) => {
+    const normalized = relativePath.split(path.sep).join("/");
+    if (!normalized.startsWith("scripts/") && !normalized.startsWith("plugins/ai-umpire/")) {
+      return [];
+    }
+    const content = readText(path.join(repoRoot, relativePath));
+    if (!AIU_TEXT_PATTERN.test(content) && !/hook-stop|continuation|trustedStateCommands/.test(content)) {
+      return [];
+    }
+    return [{
+      relativePath,
+      category: "copied-helper",
+      reason: "Repository-local helper or plugin file appears related to old Umpire execution and requires review before cleanup.",
+      confidence: "medium" as const,
+      fingerprint: fingerprintText(content),
+      requiredReview: true,
+      evidence: summarizeContent(content),
+    }];
+  });
+}
+
+function findCommandWrappers(repoRoot: string, candidates: readonly string[]): AiuMigrationFinding[] {
+  return candidates.flatMap((relativePath) => {
+    const normalized = relativePath.split(path.sep).join("/");
+    if (!normalized.startsWith(".opencode/commands/") && !normalized.startsWith(".agents/commands/") && !normalized.includes("/commands/")) {
+      return [];
+    }
+    const content = readText(path.join(repoRoot, relativePath));
+    if (!AIU_TEXT_PATTERN.test(content)) {
+      return [];
+    }
+    return [{
+      relativePath,
+      category: "command-wrapper",
+      reason: "Host command wrapper references AI Umpire behavior and should be preserved for review or moved outside managed sections.",
+      confidence: "medium" as const,
+      fingerprint: fingerprintText(content),
+      requiredReview: true,
+      evidence: summarizeContent(content),
+    }];
+  });
+}
+
+function findPromptCustomizations(repoRoot: string, configPath: string, candidates: readonly string[]): AiuMigrationFinding[] {
+  const findings: AiuMigrationFinding[] = [];
+  const configRelativePath = relativeToRepo(repoRoot, configPath);
+  const config = readJsonObject(configPath);
+  if (config && isRecord(config.prompts)) {
+    findings.push({
+      relativePath: configRelativePath,
+      category: "prompt-customization",
+      reason: "Config contains prompt customization that migration must preserve.",
+      confidence: "high",
+      fingerprint: fileFingerprint(configPath),
+      requiredReview: false,
+    });
+  }
+  for (const relativePath of candidates) {
+    const normalized = relativePath.split(path.sep).join("/");
+    if (!normalized.startsWith(".opencode/commands/") && !normalized.startsWith(".agents/commands/")) {
+      continue;
+    }
+    const content = readText(path.join(repoRoot, relativePath));
+    if (/prompt|instruction|continue|review/i.test(content)) {
+      findings.push({
+        relativePath,
+        category: "prompt-customization",
+        reason: "Host prompt or command text is repository-authored and preserved for review.",
+        confidence: "medium",
+        fingerprint: fingerprintText(content),
+        requiredReview: false,
+      });
+    }
+  }
+  return uniqueFindings(findings);
+}
+
+function findExistingConfig(repoRoot: string, configPath: string): AiuMigrationFinding[] {
+  if (!existsSync(configPath)) {
+    return [];
+  }
+  return [{
+    relativePath: relativeToRepo(repoRoot, configPath),
+    category: "existing-config",
+    reason: "Existing aiu.config.json is preserved and future apply steps should merge rather than replace repository policy.",
+    confidence: "high",
+    fingerprint: fileFingerprint(configPath),
+  }];
+}
+
+function findState(repoRoot: string): { stateFindings: readonly AiuMigrationFinding[]; stateMigrations: readonly AiuMigrationStateMigration[] } {
+  const stateRoot = path.join(repoRoot, ".umpire");
+  if (!existsSync(stateRoot) || !safeStat(stateRoot)?.isDirectory()) {
+    return { stateFindings: [], stateMigrations: [] };
+  }
+  const files = collectTextFiles(repoRoot, ".umpire", []);
+  const stateFindings = files.map((relativePath) => {
+    const absolutePath = path.join(repoRoot, relativePath);
+    const content = readText(absolutePath);
+    const parsed = readJsonObject(absolutePath);
+    return {
+      relativePath,
+      category: "state-file",
+      reason: parsed && "schemaVersion" in parsed ? "Recognized durable local state file with schemaVersion; preserve during migration." : "Durable local state file is preserved for review.",
+      confidence: parsed && "schemaVersion" in parsed ? "high" as const : "medium" as const,
+      fingerprint: fingerprintText(content),
+      requiredReview: false,
+      evidence: parsed && "schemaVersion" in parsed ? `schemaVersion=${String(parsed.schemaVersion)}` : undefined,
+    };
+  });
+  const stateMigrations = stateFindings.map((finding) => {
+    const parsed = readJsonObject(path.join(repoRoot, finding.relativePath));
+    return {
+      relativePath: finding.relativePath,
+      action: "preserve" as const,
+      recognized: parsed !== null && "schemaVersion" in parsed,
+      ...(parsed && "schemaVersion" in parsed ? { schemaVersion: readSchemaVersion(parsed.schemaVersion) } : {}),
+      reason: "M5.1 dry-run inventory never rewrites or deletes durable local state.",
+      ...(finding.fingerprint ? { fingerprint: finding.fingerprint } : {}),
+    };
+  });
+  return { stateFindings: Object.freeze(stateFindings), stateMigrations: Object.freeze(stateMigrations) };
+}
+
+function findHostInstructionReferences(repoRoot: string, candidates: readonly string[]): AiuMigrationFinding[] {
+  return candidates.flatMap((relativePath) => {
+    const base = path.basename(relativePath);
+    const normalized = relativePath.split(path.sep).join("/");
+    if (!["AGENTS.md", "CLAUDE.md", "README.md"].includes(base) && !normalized.startsWith(".opencode/")) {
+      return [];
+    }
+    const content = readText(path.join(repoRoot, relativePath));
+    if (!LOCAL_CHECKOUT_PATTERN.test(content)) {
+      return [];
+    }
+    return [{
+      relativePath,
+      category: "host-instruction-reference",
+      reason: "Host-facing instructions mention repo-local Umpire paths and should be updated to package-backed commands.",
+      confidence: "medium" as const,
+      fingerprint: fingerprintText(content),
+      requiredReview: true,
+      evidence: summarizeContent(content),
+    }];
+  });
+}
+
+function findTrustedCommandDescriptors(configPath: string, trustedStateCommands: Readonly<Record<string, { readonly argv: readonly string[] }>>): AiuMigrationFinding[] {
+  return Object.entries(trustedStateCommands).map(([sourceId, descriptor]) => ({
+    relativePath: relativeToRepo(path.dirname(configPath), configPath),
+    category: "trusted-command-descriptor",
+    reason: `Trusted state command descriptor ${sourceId} is preserved as repository policy.`,
+    confidence: "high" as const,
+    sourceCommandSummary: descriptor.argv.join(" "),
+    requiredReview: false,
+  }));
+}
+
+function findUnknownAiuFiles(repoRoot: string, candidates: readonly string[], knownPaths: ReadonlySet<string>): AiuMigrationFinding[] {
+  return candidates.flatMap((relativePath) => {
+    if (knownPaths.has(relativePath) || ["package.json", "pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lock", "README.md", "AGENTS.md", "CLAUDE.md"].includes(relativePath)) {
+      return [];
+    }
+    const content = readText(path.join(repoRoot, relativePath));
+    if (!AIU_TEXT_PATTERN.test(content)) {
+      return [];
+    }
+    return [{
+      relativePath,
+      category: "unknown-aiu-file",
+      reason: "Unknown AI Umpire-related file is review-required and preserved by dry-run migration.",
+      confidence: "low" as const,
+      fingerprint: fingerprintText(content),
+      requiredReview: true,
+      evidence: summarizeContent(content),
+    }];
   });
 }
 
@@ -206,6 +587,8 @@ function collectTextFiles(repoRoot: string, relativeRoot: string, scanErrors: Ai
       relativePath: relativeRoot,
       category: "scan-error",
       reason: "Directory could not be read during migration audit; review permissions before trusting the migration plan.",
+      confidence: "low",
+      requiredReview: true,
     });
     return [];
   }
@@ -246,7 +629,100 @@ function readText(absolutePath: string): string {
   }
 }
 
+function readJsonObject(absolutePath: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(readText(absolutePath)) as unknown;
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isPackageBackedManagedContent(content: string, expectedContent: string): boolean {
+  return normalizeText(content) === normalizeText(expectedContent)
+    || content.includes("Managed by @tjalve/aiu")
+    || content.includes('"managedBy": "@tjalve/aiu"')
+    || content.includes("@tjalve/aiu/opencode")
+    || content.includes("pnpm exec aiu hook-stop");
+}
+
+function normalizeText(value: string): string {
+  return value.replace(/\r\n/g, "\n").trim();
+}
+
+function fingerprintText(content: string): string {
+  return `sha256:${createHash("sha256").update(content).digest("hex")}`;
+}
+
+function fileFingerprint(absolutePath: string): string | undefined {
+  const content = readText(absolutePath);
+  return content === "" ? undefined : fingerprintText(content);
+}
+
+function summarizeContent(content: string): string | undefined {
+  const line = content.split(/\r?\n/).find((item) => item.trim().length > 0);
+  return line ? line.trim().slice(0, 120) : undefined;
+}
+
+function findingFrom(finding: AiuMigrationFinding, override: Pick<AiuMigrationFinding, "category" | "reason">): AiuMigrationFinding {
+  return {
+    ...finding,
+    category: override.category,
+    reason: override.reason,
+  };
+}
+
+function conservativeCleanupCandidates(findings: readonly AiuMigrationFinding[]): readonly AiuMigrationFinding[] {
+  return Object.freeze(findings.map((finding) => findingFrom(finding, {
+    category: "cleanup-candidate",
+    reason: `Review after package-backed migration replaces ${finding.category}; deletion requires an explicit later cleanup confirmation.`,
+  })));
+}
+
+function fileAction(relativePath: string, action: AiuMigrationFileAction["action"], category: string, reason: string, fingerprint?: string): AiuMigrationFileAction {
+  return {
+    relativePath,
+    action,
+    category,
+    reason,
+    ...(fingerprint ? { fingerprint } : {}),
+  };
+}
+
+function uniqueFindings(findings: readonly AiuMigrationFinding[]): AiuMigrationFinding[] {
+  const seen = new Set<string>();
+  return findings.filter((finding) => {
+    const key = `${finding.category}\0${finding.relativePath}\0${finding.reason}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function relativeToRepo(repoRoot: string, absolutePath: string): string {
+  const relativePath = path.relative(repoRoot, absolutePath);
+  return relativePath === "" ? path.basename(absolutePath) : relativePath;
+}
+
+function readSchemaVersion(value: unknown): number | string | undefined {
+  return typeof value === "number" || typeof value === "string" ? value : undefined;
+}
+
 function formatFindingGroup(title: string, findings: readonly AiuMigrationFinding[]): string {
-  const body = findings.length === 0 ? ["- none"] : findings.map((finding) => `- ${finding.relativePath} [${finding.category}]: ${finding.reason}`);
+  const body = findings.length === 0 ? ["- none"] : findings.map((finding) => {
+    const confidence = finding.confidence ? ` confidence=${finding.confidence}` : "";
+    const fingerprint = finding.fingerprint ? ` ${finding.fingerprint}` : "";
+    return `- ${finding.relativePath} [${finding.category}${confidence}]: ${finding.reason}${fingerprint}`;
+  });
   return [title, ...body, ""].join("\n");
+}
+
+function formatFileActions(actions: readonly AiuMigrationFileAction[]): string[] {
+  return actions.length === 0 ? ["- none"] : actions.map((action) => `- ${action.relativePath} [${action.action}/${action.category}]: ${action.reason}`);
 }

@@ -138,7 +138,7 @@ export const aiuCli = createCli({
       };
     }),
     createCommand(migrateCommand, (context) => {
-      const dryRun = context.flags["dry-run"] === true;
+      const dryRun = context.flags["dry-run"] !== false;
       const plan = planAiuMigration({ dryRun });
       return {
         human: formatMigrationPlan(plan),

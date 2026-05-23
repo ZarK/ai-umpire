@@ -45,7 +45,7 @@ M5 must not require:
 
 - repo-local OpenCode plugin wrappers
 - old Codex or Claude Code hook entries
-- local-checkout imports or command paths pointing at an Umpire source tree
+- repo-local package imports or command paths that should move to package-backed `aiu` usage
 - copied helper scripts or command wrappers
 - prompt customization files
 - existing `aiu.config.json`
@@ -53,7 +53,7 @@ M5 must not require:
 - host instructions that reference old local paths
 - configured trusted state commands
 
-Inventory output reports categories, paths, confidence, fingerprints, and required review. It does not describe source provenance or local reference repositories.
+Inventory output reports categories, paths, confidence, fingerprints, and required review without historical origin explanations.
 
 Cleanup candidates are conservative:
 
