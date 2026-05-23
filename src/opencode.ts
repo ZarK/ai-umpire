@@ -9,7 +9,6 @@ export interface AiuOpenCodeEvent {
 export interface AiuOpenCodeContext {
   readonly cwd?: string;
   readonly config?: AiuConfig;
-  readonly previousResult?: AiuOpenCodeHandlerResult;
 }
 
 export interface AiuOpenCodeHandlerResult {
