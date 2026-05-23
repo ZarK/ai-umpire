@@ -1,0 +1,64 @@
+test/status.test.ts
+  s_f8aaaf4fdfe4d6::t_2041250bcd3263 167-212,255,274-276
+  s_f8aaaf4fdfe4d6::t_83cea40b42b661 374-378
+src/prompt.ts
+  s_f8aaaf4fdfe4d6::t_b0bef403aeebc2 77,107-115
+src/state.ts
+  s_f8aaaf4fdfe4d6::t_6fb57c1629fe9f 198-258
+src/config.ts
+  s_f8aaaf4fdfe4d6::t_71e23b476cb9e4 29,94-97,168-170,252,280,646-655
+  s_f8aaaf4fdfe4d6::t_ce87ef06cdb3f9 958
+src/opencode.ts
+  s_f8aaaf4fdfe4d6::t_4465ab2992d3df 202
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_92bea3cf1f88d0 277-281
+  s_f8aaaf4fdfe4d6::t_74c4f26268e610 169-175
+src/trusted_adapter.ts
+  s_f8aaaf4fdfe4d6::t_d7f78ccce6a9d9 733-740
+  s_f8aaaf4fdfe4d6::t_4ec17ee2cbb1cd 18-24,362-364,371-491
+src/status.ts
+  s_f8aaaf4fdfe4d6::t_4465ab2992d3df 211
+  s_f8aaaf4fdfe4d6::t_75384d61c7f40f 111-118,308-315
+  s_f8aaaf4fdfe4d6::t_fd1ac7cd03773a 268
+test/trusted_adapter.test.ts
+  s_f8aaaf4fdfe4d6::t_8f5771fefb7fa2 201-264
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_6979d3bbf22105 136-137
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_e065f992fb0d51 140,216-220,222
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_c4651cb2ca3439 289-299
+README.md
+  s_f8aaaf4fdfe4d6::t_6979d3bbf22105 75-76
+src/hook_stop.ts
+  s_f8aaaf4fdfe4d6::t_4465ab2992d3df 123
+test/state.test.ts
+  s_f8aaaf4fdfe4d6::t_28e39cc57e28c7 264-268
+src/decision.ts
+  s_f8aaaf4fdfe4d6::t_604e7b703c2c76 4,42,85,97,117,162-171,173-181,221,256
+  s_f8aaaf4fdfe4d6::t_f71841134e07c2 796-797
+  s_f8aaaf4fdfe4d6::t_b17d0b6bd51b9f 656-682,788-795
+  s_f8aaaf4fdfe4d6::t_9e0f896abb7aed 321-358,365-379,546-559
+docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md
+  s_f8aaaf4fdfe4d6::t_6979d3bbf22105 257-258
+test/decision.test.ts
+  s_f8aaaf4fdfe4d6::t_3d68ac3c98481b 47-57,205-221,231-263,518-522
+test/config.test.ts
+  s_f8aaaf4fdfe4d6::t_e0382ceee54d8b 38,105-107,133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "e8b5876bad28cad6d2673bc9f162b5a45374bb4f",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
