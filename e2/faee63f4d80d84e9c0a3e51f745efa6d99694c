@@ -1,0 +1,62 @@
+test/init.test.ts
+  s_f8aaaf4fdfe4d6::t_a9cddfc7f63cc9 99,110-112
+src/host_policy.ts
+  s_f8aaaf4fdfe4d6::t_0b5abfbfd8aa35 76,112,222
+  s_f8aaaf4fdfe4d6::t_a973efb19d752f 275-278,283
+  s_f8aaaf4fdfe4d6::t_3f9e8a575e4a1e 361
+  s_f8aaaf4fdfe4d6::t_493d96846641a9 1-60,65-75,77-111,113-221,223-274,279,281-282,284-360,362-389
+  s_f8aaaf4fdfe4d6::t_a4b539198dc541 280
+  s_f8aaaf4fdfe4d6::t_a9b44b856f85cb 61-64
+src/doctor.ts
+  s_f8aaaf4fdfe4d6::t_aaf3119cb56c89 12,165,305-322
+test/config.test.ts
+  s_f8aaaf4fdfe4d6::t_1bfc25921555c3 8
+test/host_policy.test.ts
+  s_f8aaaf4fdfe4d6::t_44a3a8480ca58d 1-6,8-13,15-90
+  s_f8aaaf4fdfe4d6::t_a295a2aa6d9257 7,14
+src/config.ts
+  s_f8aaaf4fdfe4d6::t_02cbcf0f575aab 696-711,900-901,933,935
+  s_f8aaaf4fdfe4d6::t_0d01f73062267e 4-5,9,35-36,127-128,243,290-291,295-296,337-380
+test/extensions.test.ts
+  s_f8aaaf4fdfe4d6::t_162b1238c2802c 9
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_2f9db12722c636 98-99
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_760cb79567d70d 139-157,342-368
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_16843c8784a5aa 119-122,173-178
+test/whip.test.ts
+  s_f8aaaf4fdfe4d6::t_f21d336d9e0461 7
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_9a0db61b6adeee 58
+  s_f8aaaf4fdfe4d6::t_7eeb91e84c88f2 50-57,59
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_7b7224cd1f8b94 19,167-170
+test/doctor.test.ts
+  s_f8aaaf4fdfe4d6::t_2268b39fc3cca0 22,28
+  s_f8aaaf4fdfe4d6::t_47cfdea02cea30 69-93
+docs/M3-provider-status-integration-and-stop-hooks.md
+  s_f8aaaf4fdfe4d6::t_9919833f020fdb 81-82,204
+src/migrate.ts
+  s_f8aaaf4fdfe4d6::t_746b392d1124c8 6,118
+src/init.ts
+  s_f8aaaf4fdfe4d6::t_2f4e4667102984 11-13,15-17,31,80
+  s_f8aaaf4fdfe4d6::t_556a2129f755ca 208
+  s_f8aaaf4fdfe4d6::t_40c7b506353021 14,210-212,222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "e2faee63f4d80d84e9c0a3e51f745efa6d99694c",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
