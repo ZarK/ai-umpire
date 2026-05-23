@@ -80,7 +80,7 @@ function promptLead(decision: AiuContinuationDecision): string {
     return qualityLead(decision, item);
   }
   if (decision.kind === "continue" && decision.promptKind === "whip") {
-    return `Continue idle work${item}. Use the ready whip task slot only because higher-priority workflow state is idle.`;
+    return whipLead(decision, item);
   }
   if (decision.kind === "repair") {
     return repairLead(decision);
@@ -113,6 +113,16 @@ function planningLead(decision: AiuContinuationDecision, item: string): string {
     selected?.affectedPaths && selected.affectedPaths.length > 0 ? `Draft paths: ${selected.affectedPaths.map(formatPromptData).join(", ")}.` : "Draft paths: use only trusted planning state paths when provided.",
     `Expected evidence: ${selected?.expectedEvidence ?? "updated trusted Bootstrap planning state plus the configured planning action evidence"}.`,
     "Do not invent missing product decisions, provider schema fields, work-item mappings, or acceptance criteria.",
+  ];
+  return details.join("\n");
+}
+
+function whipLead(decision: AiuContinuationDecision, item: string): string {
+  const selected = decision.selectedItem;
+  const details = [
+    `Continue idle work${item}. Use the selected whip task only because higher-priority workflow state is idle.`,
+    selected?.prompt ? `Task prompt: ${formatPromptData(selected.prompt)}.` : "Task prompt: inspect the selected whip task metadata.",
+    "Prompt delivery does not complete the whip task; completion requires an explicit whip complete command with evidence.",
   ];
   return details.join("\n");
 }

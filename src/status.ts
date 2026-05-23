@@ -10,6 +10,7 @@ import {
   type AiuTrustedCommandExecutionRecord,
   AIU_TRUSTED_ADAPTER_ERROR_CODES,
 } from "./trusted_adapter.js";
+import { decideAiuWhipContinuation, readAiuWhipState, type AiuWhipContinuationDecision } from "./whip.js";
 
 export const AIU_STATUS_ERROR_CODES = [
   "status-config-invalid",
@@ -37,6 +38,7 @@ export interface AiuStatusReport {
   readonly normalizedStateSummary: AiuStatusStateSummary;
   readonly decision: AiuContinuationDecision;
   readonly prompt: AiuContinuationPrompt;
+  readonly whip: AiuStatusWhipSummary;
   readonly paths: AiuStatusPaths;
   readonly continuationState?: AiuContinuationState;
   readonly reasonLabels: readonly AiuReasonCodeDefinition[];
@@ -132,6 +134,19 @@ export interface AiuStatusQualitySummary {
   readonly supplyChainApprovalRequired?: boolean | "unknown";
 }
 
+export interface AiuStatusWhipSummary {
+  readonly outcome: AiuWhipContinuationDecision["outcome"];
+  readonly enqueuesPrompt: boolean;
+  readonly reasonCodes: readonly string[];
+  readonly selectedTask?: {
+    readonly id: string;
+    readonly title: string;
+    readonly priority: number;
+  };
+  readonly promptDeliveryCompletesTask: false;
+  readonly statePath: string;
+}
+
 export interface AiuStatusError {
   readonly code: AiuStatusErrorCode;
   readonly message: string;
@@ -201,6 +216,11 @@ export function createAiuStatusReport(
   const decisionStates = [...inputEnvelopes, ...adapterErrors.map(adapterFailureEnvelope)];
   const continuationPaths = resolveAiuContinuationPaths(configLoad.repoRoot, configLoad.config);
   const continuationState = readAiuContinuationState(continuationPaths);
+  const whipRead = readAiuWhipState(configLoad.repoRoot, configLoad.config);
+  const whipDecision = decideAiuWhipContinuation({
+    config: configLoad.config,
+    state: whipRead.state,
+  });
   const decision = decideAiuContinuation({
     states: decisionStates,
     policy: {
@@ -212,6 +232,8 @@ export function createAiuStatusReport(
       qualityEnabled: configLoad.config.quality.enabled,
       supplyChainApprovalRequired: false,
     },
+    ...(whipDecision.enqueuesPrompt && whipDecision.task ? { whipTask: whipDecision.task } : {}),
+    ...(configLoad.config.whip.enabled && whipRead.errors.length > 0 ? { whipStateError: { kind: "whip", sourceId: whipRead.path, status: "malformed" } } : {}),
   });
   const prompt = renderAiuContinuationPrompt({ decision, config: configLoad.config });
 
@@ -227,6 +249,7 @@ export function createAiuStatusReport(
     normalizedStateSummary: summarizeStates(inputEnvelopes),
     decision,
     prompt,
+    whip: summarizeWhip(whipDecision),
     paths: Object.freeze({
       stateDir: continuationPaths.stateDir,
       lockDir: continuationPaths.lockDir,
@@ -257,6 +280,7 @@ export function formatAiuStatusReport(report: AiuStatusReport): string {
     `logDir: ${report.paths.logDir}`,
     `owner: ${report.continuationState?.ownerSessionId ?? "none"}`,
     `pendingPrompt: ${report.continuationState?.pendingPromptFingerprint ?? "none"}`,
+    `whip: ${report.whip.outcome}${report.whip.selectedTask ? ` ${report.whip.selectedTask.id}` : ""}`,
     `reasons: ${report.reasonLabels.map((reason) => `${reason.code} (${reason.description})`).join(", ") || "none"}`,
     `next: ${report.decision.recommendedNextAction}`,
     "",
@@ -271,6 +295,23 @@ export function formatAiuStatusReport(report: AiuStatusReport): string {
     `warnings: ${report.warnings.length}`,
   ];
   return `${lines.join("\n")}\n`;
+}
+
+function summarizeWhip(decision: AiuWhipContinuationDecision): AiuStatusWhipSummary {
+  return Object.freeze({
+    outcome: decision.outcome,
+    enqueuesPrompt: decision.enqueuesPrompt,
+    reasonCodes: Object.freeze([...decision.reasonCodes]),
+    ...(decision.task ? {
+      selectedTask: Object.freeze({
+        id: decision.task.id,
+        title: decision.task.title,
+        priority: decision.task.priority,
+      }),
+    } : {}),
+    promptDeliveryCompletesTask: false as const,
+    statePath: decision.statePath,
+  });
 }
 
 function summarizeStates(states: readonly AiuTrustedStateEnvelope[]): AiuStatusStateSummary {

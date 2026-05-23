@@ -7,7 +7,7 @@ import { after, describe, it } from "node:test";
 import { getDefaultAiuConfig, type AiuConfig } from "../dist/src/config.js";
 import { readAiuContinuationState, resolveAiuContinuationPaths } from "../dist/src/continuation_store.js";
 import { runAiuOpenCodeContinuation } from "../dist/src/opencode.js";
-import { createAiuTrustedStateEnvelope, type AiuTrustedStateEnvelope, type AiuWorkItemState, type AiuWorkQueueState } from "../dist/src/state.js";
+import { createAiuTrustedStateEnvelope, type AiuPlanningState, type AiuQualityState, type AiuTrustedStateEnvelope, type AiuWorkItemState, type AiuWorkQueueState } from "../dist/src/state.js";
 
 const repoRoot = path.resolve(process.cwd());
 const tempContinuationRoots = new Set<string>();
@@ -41,6 +41,57 @@ describe("OpenCode continuation runtime", () => {
     assert.match(result.prompt?.fingerprint ?? "", /^[a-f0-9]{64}$/);
     assert.equal(result.delivery?.delivered, true);
     assert.equal(delivered.length, 1);
+  });
+
+  it("delivers planning, quality, and whip prompts through the shared prompt payload", async () => {
+    const cases = [
+      {
+        name: "planning",
+        states: [planningEnvelope()],
+        expectedKind: "planning",
+        expectedId: "bootstrap-plan",
+      },
+      {
+        name: "quality",
+        states: [qualityEnvelope()],
+        expectedKind: "quality",
+        expectedId: "typecheck",
+      },
+      {
+        name: "whip",
+        states: [],
+        expectedKind: "whip",
+        expectedId: "review-doc-command-examples",
+      },
+    ] as const;
+
+    for (const item of cases) {
+      const delivered: Array<{ readonly kind: string; readonly id?: string; readonly body: string }> = [];
+      const result = await runAiuOpenCodeContinuation(
+        { type: "session.idle", payload: { sessionId: `ses_${item.name}`, selectedSessionId: `ses_${item.name}` } },
+        {
+          cwd: repoRoot,
+          config: opencodeConfig(),
+          observedAt: "2026-05-23T12:00:00.000Z",
+          trustedStates: item.states,
+          deliverPrompt: (prompt) => {
+            delivered.push({ kind: prompt.kind, id: prompt.selectedItem?.id, body: prompt.body });
+            return { delivered: true, targetSessionId: `ses_${item.name}` };
+          },
+        },
+      );
+
+      assert.equal(result.delivery?.delivered, true, item.name);
+      assert.equal(result.prompt?.kind, item.expectedKind, item.name);
+      assert.equal(result.prompt?.selectedItem?.id, item.expectedId, item.name);
+      assert.equal(delivered[0]?.kind, item.expectedKind, item.name);
+      assert.equal(delivered[0]?.id, item.expectedId, item.name);
+      if (item.name === "whip") {
+        assert.match(delivered[0]?.body ?? "", /Prompt delivery does not complete the whip task/);
+        assert.match(await readFile(String(result.metadata?.logPath), "utf8"), /"promptKind":"whip"/);
+        assert.match(await readFile(String(result.metadata?.logPath), "utf8"), /"selectedItem":\{"kind":"whip"/);
+      }
+    }
   });
 
   it("persists prompt ownership and suppresses duplicate targets", async () => {
@@ -380,6 +431,61 @@ function workQueueEnvelope(overrides: Partial<AiuWorkQueueState> = {}): AiuTrust
       blockedItems: [],
       unknownItems: [],
       ...overrides,
+    },
+  });
+}
+
+function planningEnvelope(): AiuTrustedStateEnvelope<AiuPlanningState> {
+  return createAiuTrustedStateEnvelope({
+    sourceId: "fixture-planning",
+    command: { id: "fixture-planning", argv: ["fixture-planning"] },
+    observedAt: "2026-05-23T12:00:00.000Z",
+    trustLevel: "trusted",
+    capabilities: {},
+    freshness: { kind: "fresh", observedAt: "2026-05-23T12:00:00.000Z" },
+    value: {
+      kind: "planning",
+      status: "pass",
+      needsPlanning: true,
+      humanInputRequired: false,
+      decisions: [],
+      unresolvedQuestions: [],
+      draftPaths: [],
+      artifacts: [],
+      providers: [],
+      nextAction: {
+        id: "bootstrap-plan",
+        status: "pass",
+        command: { id: "bootstrap-plan", argv: ["bootstrap", "plan"] },
+        artifactChecks: ["docs/spec.md"],
+        draftPaths: ["docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md"],
+      },
+    },
+  });
+}
+
+function qualityEnvelope(): AiuTrustedStateEnvelope<AiuQualityState> {
+  return createAiuTrustedStateEnvelope({
+    sourceId: "fixture-quality",
+    command: { id: "fixture-quality", argv: ["fixture-quality"] },
+    observedAt: "2026-05-23T12:00:00.000Z",
+    trustLevel: "trusted",
+    capabilities: {},
+    freshness: { kind: "fresh", observedAt: "2026-05-23T12:00:00.000Z" },
+    value: {
+      kind: "quality",
+      status: "pass",
+      ready: true,
+      lastRunStatus: "fail",
+      stages: [{
+        id: "typecheck",
+        status: "fail",
+        affectedPaths: ["src/decision.ts"],
+        command: { id: "quality-typecheck", argv: ["pnpm", "run", "typecheck"] },
+      }],
+      findings: [],
+      failingChecks: ["typecheck"],
+      affectedPaths: ["src/decision.ts"],
     },
   });
 }

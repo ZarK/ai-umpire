@@ -260,6 +260,8 @@ Status: implemented by extending the trusted `planning` state model and shared c
 
 Extend decision rules and host prompt delivery with the new continuation modes.
 
+Status: implemented by feeding planning, quality, ready work, and durable whip task selection through the shared continuation decision and prompt renderer. The priority order is active repair/continuation, Bootstrap planning continuation, ready work, quality idle work, whip task prompt, then clean stop. Planning and quality selected targets carry command, artifact, affected path, and expected evidence metadata; whip selected targets carry task id, title, prompt, priority, and fingerprint metadata. `aiu status`, OpenCode delivery, stop-hook delivery, continuation state, and decision logs use the shared prompt payload rather than mode-specific host prompt logic. Whip prompt delivery remains read-only and never completes a task.
+
 ### M4.5 - Extend Doctor, Schema, README, And Tests
 
 Document and test idle continuation modes without requiring companion packages in normal fixtures.

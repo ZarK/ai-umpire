@@ -24,6 +24,7 @@ import {
   type AiuWorkQueueState,
 } from "./state.js";
 import { runAiuTrustedStateAdapter } from "./trusted_adapter.js";
+import { decideAiuWhipContinuation, readAiuWhipState } from "./whip.js";
 
 export interface AiuOpenCodeEvent {
   readonly type: string;
@@ -192,6 +193,11 @@ export async function runAiuOpenCodeContinuation(event: AiuOpenCodeEvent, contex
       });
     }
     const { states, adapterErrors } = await collectTrustedStates(event, normalizedContext, host.state);
+    const whipRead = readAiuWhipState(normalizedContext.cwd ?? process.cwd(), normalizedContext.config);
+    const whipDecision = decideAiuWhipContinuation({
+      config: normalizedContext.config,
+      state: whipRead.state,
+    });
     const decision = decideAiuContinuation({
       states,
       policy: {
@@ -203,6 +209,8 @@ export async function runAiuOpenCodeContinuation(event: AiuOpenCodeEvent, contex
         qualityEnabled: normalizedContext.config.quality.enabled,
         cooldownActive: isCooldownActive(normalizedContext, persisted),
       },
+      ...(whipDecision.enqueuesPrompt && whipDecision.task ? { whipTask: whipDecision.task } : {}),
+      ...(normalizedContext.config.whip.enabled && whipRead.errors.length > 0 ? { whipStateError: { kind: "whip", sourceId: whipRead.path, status: "malformed" } } : {}),
     });
     const baseSuppressions = [...host.suppressions, ...decisionSuppressions(decision), ...hostPolicySuppressions(normalizedContext.config, decision.kind)];
     if (baseSuppressions.length > 0 || (decision.kind !== "continue" && decision.kind !== "repair")) {
@@ -583,7 +591,9 @@ function safeLogDecision(paths: AiuContinuationPaths, input: {
     }),
     decisionKind: input.decision.kind,
     mode: input.decision.selectedMode,
+    promptKind: input.decision.promptKind,
     reasonCodes: input.decision.reasonCodes,
+    ...(input.decision.selectedItem ? { selectedItem: input.decision.selectedItem } : {}),
     ...(input.prompt ? { promptFingerprint: input.prompt.fingerprint } : {}),
     ...(input.delivery?.targetSessionId ? { targetSessionId: input.delivery.targetSessionId } : {}),
     sourceSummaries: input.decision.sourceSummaries,

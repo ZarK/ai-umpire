@@ -176,12 +176,39 @@ describe("provider-neutral stop hooks", () => {
     }
   });
 
+  it("blocks stop hooks with a shared whip prompt when higher-priority work is idle", async () => {
+    const { runAiuHookStop } = await loadHookStop();
+    const target = await createRepo({
+      tool: "codex",
+      stopHookBlocking: true,
+      trustedState: emptyWorkState(),
+    });
+    try {
+      const result = await runAiuHookStop({
+        tool: "codex",
+        cwd: target,
+        observedAt,
+        stdin: JSON.stringify(stopPayload(target, "codex-session")),
+      });
+
+      assert.equal(result.decision, "block");
+      assert.equal(result.reason, "continue-whip-task");
+      assert.equal(result.continuationDecision?.promptKind, "whip");
+      assert.equal(result.prompt?.kind, "whip");
+      assert.equal(result.prompt?.selectedItem?.id, "review-doc-command-examples");
+      assert.match("reason" in result.stdoutJson ? result.stdoutJson.reason : "", /Prompt delivery does not complete the whip task/);
+    } finally {
+      await rm(target, { recursive: true, force: true });
+    }
+  });
+
   it("allows clean stop, wait, malformed input, and trusted-state failures", async () => {
     const { runAiuHookStop } = await loadHookStop();
     const clean = await createRepo({
       tool: "codex",
       stopHookBlocking: true,
       trustedState: emptyWorkState(),
+      whipEnabled: false,
     });
     const failing = await createRepo({
       tool: "codex",
@@ -285,6 +312,7 @@ async function createRepo(options: {
   readonly stopHookBlocking: boolean;
   readonly trustedState?: Record<string, unknown>;
   readonly trustedCommand?: readonly [string, ...string[]];
+  readonly whipEnabled?: boolean;
 }): Promise<string> {
   const target = await mkdtemp(path.join(tmpdir(), "aiu-hook-stop-"));
   await mkdir(path.join(target, ".git"));
@@ -315,6 +343,7 @@ async function createRepo(options: {
         maxOutputBytes: 16_384,
       },
     },
+    ...(options.whipEnabled === false ? { whip: { enabled: false } } : {}),
   }), "utf8");
   return target;
 }

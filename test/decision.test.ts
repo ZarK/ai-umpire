@@ -201,6 +201,78 @@ describe("continuation decision engine", () => {
     assert.equal(activeWork.selectedItem?.id, "46");
   });
 
+  it("applies integrated planning, ready work, quality, and whip priority", () => {
+    const allIdleModes = [
+      env(planning({
+        needsPlanning: true,
+        nextAction: planningAction("plan-next"),
+      })),
+      env(workQueue({ readyItems: [workItem("ready", "ready")] })),
+      env(qualityFailure("quality-next")),
+    ];
+    const whipTask = readyWhipTask("whip-next");
+
+    const planningFirst = decideAiuContinuation({ states: allIdleModes, whipTask });
+    assertDecision(planningFirst, "continue", "continue-planning");
+    assert.equal(planningFirst.promptKind, "planning");
+    assert.equal(planningFirst.selectedItem?.id, "plan-next");
+
+    const readyBeforeQualityAndWhip = decideAiuContinuation({
+      states: [
+        env(planning({ needsPlanning: false })),
+        env(workQueue({ readyItems: [workItem("ready", "ready")] })),
+        env(qualityFailure("quality-next")),
+      ],
+      whipTask,
+    });
+    assertDecision(readyBeforeQualityAndWhip, "continue", "continue-ready-work");
+    assert.equal(readyBeforeQualityAndWhip.promptKind, "work");
+    assert.equal(readyBeforeQualityAndWhip.selectedItem?.id, "ready");
+
+    const qualityBeforeWhip = decideAiuContinuation({
+      states: [env(qualityFailure("quality-next"))],
+      whipTask,
+    });
+    assertDecision(qualityBeforeWhip, "continue", "continue-quality");
+    assert.equal(qualityBeforeWhip.promptKind, "quality");
+    assert.equal(qualityBeforeWhip.selectedItem?.id, "quality-next");
+
+    const whipLast = decideAiuContinuation({ states: [], whipTask });
+    assertDecision(whipLast, "continue", "continue-whip-task");
+    assert.equal(whipLast.promptKind, "whip");
+    assert.equal(whipLast.selectedItem?.id, "whip-next");
+    assert.equal(whipLast.selectedItem?.title, "Whip next");
+    assert.equal(whipLast.selectedItem?.prompt, "Run the selected idle maintenance task.");
+
+    assertDecision(
+      decideAiuContinuation({ states: allIdleModes, whipTask, policy: { supplyChainApprovalRequired: true } }),
+      "stop",
+      "stop-supply-chain-approval",
+    );
+    assertDecision(
+      decideAiuContinuation({ states: [env(repository({ dirty: "fail" })), ...allIdleModes], whipTask }),
+      "repair",
+      "repair-repository-state",
+    );
+    assertDecision(
+      decideAiuContinuation({ states: [env(review("active", { targetId: "pr-1" })), ...allIdleModes], whipTask }),
+      "continue",
+      "continue-active-review",
+    );
+    assertDecision(
+      decideAiuContinuation({
+        states: [
+          env(workQueue({ activeItems: [workItem("active", "active")] })),
+          env(planning({ needsPlanning: true, nextAction: planningAction("plan-next") })),
+          env(qualityFailure("quality-next")),
+        ],
+        whipTask,
+      }),
+      "continue",
+      "continue-active-work",
+    );
+  });
+
   it("continues planning, ready work, quality work, whip slot, or clean stop in priority order", () => {
     const planningDecision = decideAiuContinuation({ states: [env(planning({
       needsPlanning: true,
@@ -553,6 +625,43 @@ function quality(overrides: Partial<AiuQualityState> = {}): AiuQualityState {
     failingChecks: [],
     affectedPaths: [],
     ...overrides,
+  };
+}
+
+function planningAction(id: string): NonNullable<AiuPlanningState["nextAction"]> {
+  return {
+    id,
+    title: "Plan next",
+    kind: "bootstrap-plan",
+    status: "pass",
+    command: { id: "bootstrap-plan", argv: ["bootstrap", "plan"] },
+    artifactChecks: ["docs/spec.md"],
+    draftPaths: ["docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md"],
+    expectedEvidence: "Updated planning artifacts and trusted planning state.",
+  };
+}
+
+function qualityFailure(id: string): AiuQualityState {
+  return quality({
+    ready: true,
+    lastRunStatus: "fail",
+    stages: [{
+      id,
+      title: "Quality next",
+      status: "fail",
+      affectedPaths: ["src/decision.ts"],
+      command: { id: "quality-typecheck", argv: ["pnpm", "run", "typecheck"] },
+    }],
+  });
+}
+
+function readyWhipTask(id: string): Decision.AiuDecisionWhipTask {
+  return {
+    id,
+    title: "Whip next",
+    prompt: "Run the selected idle maintenance task.",
+    priority: 100,
+    promptFingerprint: "abc123",
   };
 }
 

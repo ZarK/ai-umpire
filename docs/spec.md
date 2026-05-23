@@ -135,6 +135,8 @@ M4.2 adds quality idle continuation from structured trusted state. The `quality`
 
 M4.3 adds Bootstrap planning continuation from structured trusted state. The `planning` state kind now carries normalized current phase, decisions, unresolved questions, draft paths, artifact status, provider status, next action, stop condition, and supply-chain approval flag. Umpire selects planning only when `planning.enabled` is true, higher-priority work is idle, and `nextAction` is concrete. Human-blocking questions, ambiguous mappings, artifact inconsistencies requiring judgment, supply-chain approval blocks, stale, malformed, unknown, unsupported, and untrusted state stop continuation. Prompts name the trusted planning source, configured command, artifact checks, draft paths, and expected evidence, and must not invent product decisions, provider schema fields, work-item mappings, or acceptance criteria.
 
+M4.4 integrates planning, ready work, quality, and whip selection into one shared decision path. Active work/review repair and continuation still outrank idle modes. Concrete planning continuation outranks starting ready work, ready work outranks quality and whip, and quality outranks whip. Whip task selection is read from durable whip policy/state and is represented as selected prompt metadata for status, OpenCode, and stop-hook delivery; prompt delivery does not complete the task.
+
 ## FR-09 - Existing Repository Migration
 
 | ID | Requirement | Status |

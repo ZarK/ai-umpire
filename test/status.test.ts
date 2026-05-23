@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -154,7 +154,7 @@ describe("status reporting", () => {
     assert.match(report.prompt.body, /Next configured command: "pnpm" "run" "typecheck"/);
     assert.match(report.prompt.body, /Do not treat agent narration/);
 
-    const disabled = createAiuStatusReport(await configLoad({ qualityEnabled: false }), [
+    const disabled = createAiuStatusReport(await configLoad({ qualityEnabled: false, whipEnabled: false }), [
       await successResult(envelope("quality", qualityState({
         ready: true,
         lastRunStatus: "fail",
@@ -196,7 +196,7 @@ describe("status reporting", () => {
     assert.match(report.prompt.body, /do not start implementation work/i);
     assert.match(report.prompt.body, /"bootstrap" "plan"/);
 
-    const disabled = createAiuStatusReport(await configLoad({ planningEnabled: false }), [
+    const disabled = createAiuStatusReport(await configLoad({ planningEnabled: false, whipEnabled: false }), [
       await successResult(envelope("planning", planningState({
         needsPlanning: true,
         nextAction: {
@@ -210,17 +210,60 @@ describe("status reporting", () => {
     assert.deepEqual(disabled.decision.reasonCodes, ["stop-clean"]);
   });
 
+  it("surfaces whip tasks in status and prompt output without completing them", async () => {
+    const { createAiuStatusReport } = await loadStatus();
+    const report = createAiuStatusReport(await configLoad({
+      whipUsePackageDefaults: false,
+      whipTasks: [{
+        id: "repo-docs",
+        title: "Review repo docs",
+        prompt: "Review repository docs for stale aiu examples.",
+        priority: 5,
+      }],
+    }), []);
+
+    assert.deepEqual(report.decision.reasonCodes, ["continue-whip-task"]);
+    assert.equal(report.decision.promptKind, "whip");
+    assert.equal(report.decision.selectedItem?.id, "repo-docs");
+    assert.equal(report.decision.selectedItem?.prompt, "Review repository docs for stale aiu examples.");
+    assert.equal(report.prompt.kind, "whip");
+    assert.equal(report.prompt.selectedItem?.id, "repo-docs");
+    assert.match(report.prompt.body, /Prompt delivery does not complete the whip task/);
+    assert.equal(report.whip.outcome, "prompt");
+    assert.equal(report.whip.selectedTask?.id, "repo-docs");
+    assert.equal(report.whip.promptDeliveryCompletesTask, false);
+  });
+
+  it("hard-stops malformed whip state before selecting idle work", async () => {
+    const { createAiuStatusReport } = await loadStatus();
+    const target = await mkdtemp(path.join(tmpdir(), "aiu-status-whip-malformed-"));
+    try {
+      await mkdir(path.join(target, ".umpire"), { recursive: true });
+      await writeFile(path.join(target, ".umpire", "whip.json"), "{", "utf8");
+
+      const report = createAiuStatusReport(await configLoad({ repoRoot: target }), []);
+
+      assert.deepEqual(report.decision.reasonCodes, ["stop-malformed-input"]);
+      assert.equal(report.decision.selectedItem?.kind, "whip");
+      assert.equal(report.decision.selectedItem?.status, "malformed");
+      assert.equal(report.whip.outcome, "prompt");
+    } finally {
+      await rm(target, { recursive: true, force: true });
+    }
+  });
+
   it("emits concise human status output from the typed report", async () => {
     const result = await runCli(["status"]);
 
     assert.equal(result.exitCode, 0);
     assert.equal(result.stderr, "");
-    assert.match(result.stdout, /decision: stop/);
-    assert.match(result.stdout, /mode: stop/);
+    assert.match(result.stdout, /decision: continue/);
+    assert.match(result.stdout, /mode: continue/);
     assert.match(result.stdout, /stateDir: /);
     assert.match(result.stdout, /pendingPrompt: /);
-    assert.match(result.stdout, /reasons: stop-clean/);
-    assert.match(result.stdout, /next: Stop: no continuation, repair, or wait condition remains\./);
+    assert.match(result.stdout, /whip: prompt review-doc-command-examples/);
+    assert.match(result.stdout, /reasons: continue-whip-task/);
+    assert.match(result.stdout, /next: Continue: use the ready whip task slot\./);
   });
 });
 
@@ -252,13 +295,22 @@ async function envelope(sourceId: string, value: State.AiuTrustedStatePayload, o
   });
 }
 
-async function configLoad(options: { readonly supplyChainApprovalRequired?: boolean; readonly modes?: Config.AiuContinuationMode[]; readonly planningEnabled?: boolean; readonly qualityEnabled?: boolean } = {}): Promise<Config.AiuConfigLoadResult> {
+async function configLoad(options: {
+  readonly supplyChainApprovalRequired?: boolean;
+  readonly modes?: Config.AiuContinuationMode[];
+  readonly planningEnabled?: boolean;
+  readonly qualityEnabled?: boolean;
+  readonly whipEnabled?: boolean;
+  readonly whipUsePackageDefaults?: boolean;
+  readonly whipTasks?: Config.AiuWhipTaskDefinition[];
+  readonly repoRoot?: string;
+} = {}): Promise<Config.AiuConfigLoadResult> {
   const { getDefaultAiuConfig } = await loadConfig();
   const config = getDefaultAiuConfig();
   return {
     ok: true,
-    repoRoot,
-    selectedPath: path.join(repoRoot, "aiu.config.json"),
+    repoRoot: options.repoRoot ?? repoRoot,
+    selectedPath: path.join(options.repoRoot ?? repoRoot, "aiu.config.json"),
     found: false,
     defaultsUsed: true,
     config: {
@@ -278,6 +330,12 @@ async function configLoad(options: { readonly supplyChainApprovalRequired?: bool
       quality: {
         ...config.quality,
         enabled: options.qualityEnabled ?? config.quality.enabled,
+      },
+      whip: {
+        ...config.whip,
+        enabled: options.whipEnabled ?? config.whip.enabled,
+        usePackageDefaults: options.whipUsePackageDefaults ?? config.whip.usePackageDefaults,
+        tasks: options.whipTasks ?? config.whip.tasks,
       },
     },
     diagnostics: [],

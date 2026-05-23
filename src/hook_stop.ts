@@ -4,6 +4,7 @@ import { decideAiuContinuation, type AiuContinuationDecision } from "./decision.
 import { renderAiuContinuationPrompt, type AiuContinuationPrompt } from "./prompt.js";
 import { createAiuTrustedStateEnvelope, type AiuHostSessionState, type AiuTrustedStateEnvelope } from "./state.js";
 import { runAiuTrustedStateAdapter, type AiuTrustedStateAdapterResult } from "./trusted_adapter.js";
+import { decideAiuWhipContinuation, readAiuWhipState } from "./whip.js";
 
 export interface AiuHookStopOptions {
   readonly tool: Extract<AiuHost, "codex" | "claude-code">;
@@ -113,6 +114,11 @@ export async function runAiuHookStop(options: AiuHookStopOptions): Promise<AiuHo
     ...warningDiagnostics,
     ...states.flatMap(stateDiagnostics),
   ];
+  const whipRead = readAiuWhipState(configLoad.repoRoot, configLoad.config);
+  const whipDecision = decideAiuWhipContinuation({
+    config: configLoad.config,
+    state: whipRead.state,
+  });
   const decision = decideAiuContinuation({
     states,
     policy: {
@@ -124,6 +130,8 @@ export async function runAiuHookStop(options: AiuHookStopOptions): Promise<AiuHo
       qualityEnabled: configLoad.config.quality.enabled,
       supplyChainApprovalRequired: configLoad.config.supplyChain.stopOnApprovalRequired === true && hasSupplyChainApprovalBlock(states),
     },
+    ...(whipDecision.enqueuesPrompt && whipDecision.task ? { whipTask: whipDecision.task } : {}),
+    ...(configLoad.config.whip.enabled && whipRead.errors.length > 0 ? { whipStateError: { kind: "whip", sourceId: whipRead.path, status: "malformed" } } : {}),
   });
   const prompt = renderAiuContinuationPrompt({ decision, config: configLoad.config });
   if (!isBlockingDecision(decision, prompt)) {

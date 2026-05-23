@@ -64,6 +64,8 @@ export interface AiuContinuationLogEntry {
   readonly decisionId?: string;
   readonly decisionKind?: string;
   readonly mode?: string;
+  readonly promptKind?: string;
+  readonly selectedItem?: AiuDecisionSelectedItem;
   readonly reasonCodes?: readonly string[];
   readonly promptFingerprint?: string;
   readonly targetSessionId?: string;
