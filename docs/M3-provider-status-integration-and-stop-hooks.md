@@ -200,6 +200,18 @@ Tests cover:
 - lock contention and stale lock recovery
 - stop-hook block/allow/error paths
 - JSON stdout cleanliness
+
+## Part 6: Host Support Matrix
+
+| Host | Support | Lifecycle Events | Prompt Path | Repo Config | Permission Model | Install Path | Safety Risks |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| OpenCode | supported | Project plugin idle/status, todo, message, TUI activity, and selected-session events. | Host plugin delivery through `@tjalve/aiu/opencode`; no stdout stop-hook path. | `hosts.enabled` includes `opencode`; managed wrapper at `.opencode/plugins/ai-umpire-continuation.ts`; modes default to `continue`, `repair`, `wait`, `stop`. | Requires explicit project plugin trust before OpenCode executes the wrapper. | `aiu init --tool opencode` writes the package-backed plugin wrapper. | Prompting the wrong session, duplicate prompts, and stale state are controlled by selected-session checks, durable ownership, cooldowns, locks, and trusted state validation. |
+| Codex | experimental | Stop hook only; no verified project idle event contract. | Stdout block response from `pnpm exec aiu hook-stop --tool codex`. | `hosts.enabled` includes `codex`; `hosts.stopHookBlocking.codex` must be explicitly true before blocking; modes default to `stop`. | Requires repo-local plugin review and hook approval. | `aiu init --tool codex` writes `.agents/plugins/marketplace.json` and `plugins/ai-umpire/**` package-backed hook files. | Hook payload and host text are untrusted; malformed input, missing trusted state, adapter failures, or disabled blocking safe-allow stopping. |
+| Claude Code | experimental | Stop hook only; no verified project idle event contract. | Stdout block response from `pnpm exec aiu hook-stop --tool claude-code`. | `hosts.enabled` includes `claude-code`; `hosts.stopHookBlocking.claude-code` must be explicitly true before blocking; modes default to `stop`. | Requires project settings hook review and approval. | `aiu init --tool claude-code` writes `.claude/settings.json` with the package-backed Stop hook command. | Hook payload and transcript-adjacent data are untrusted; malformed input, missing trusted state, adapter failures, or disabled blocking safe-allow stopping. |
+| Other host tools | recipe-only or unsupported | No confirmed M3 project-level idle or stop hook contract. | None in package runtime. | Not accepted in `hosts.enabled`. | Requires a future verified integration design. | No installer output. | Umpire must not infer prompts or blocking from unverified host behavior or copied legacy helper scripts. |
+
+M3.5 closes the milestone by making this matrix visible in documentation, exposing the same host capability and state shapes through `aiu schema --json`, and adding doctor diagnostics for package-backed host entrypoints.
+
 ---
 
 ## Proposed GitHub Issues

@@ -135,6 +135,20 @@ describe("metadata-backed CLI", () => {
         decision?: {
           promptKinds?: string[];
           modes?: string[];
+          reasonCodes?: Array<{ code: string; category: string; decision: string; description: string }>;
+        };
+        hookStop?: {
+          tools?: string[];
+          outputKinds?: string[];
+          stableErrorKinds?: string[];
+        };
+        continuationState?: {
+          schemaVersion?: number;
+          files?: { state?: string; lock?: string; log?: string };
+          ownershipFields?: string[];
+          lockFields?: string[];
+          logFields?: string[];
+          rotation?: { maxLogBytes?: number; maxLogEntryBytes?: number };
         };
         promptRendering?: {
           fingerprintInputs?: string[];
@@ -144,6 +158,10 @@ describe("metadata-backed CLI", () => {
         status?: {
           outputShape?: string[];
           errorCodes?: string[];
+        };
+        doctor?: {
+          checkCategories?: string[];
+          stableDiagnosticKinds?: string[];
         };
       };
       package: { name: string };
@@ -201,13 +219,38 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.sections?.trustedState?.reasonCodes?.some((reason) => reason.code === "stop-unsupported-input" && reason.category === "input"));
     assert.deepEqual(parsed.sections?.decision?.modes, ["continue", "repair", "wait", "stop"]);
     assert.deepEqual(parsed.sections?.decision?.promptKinds, ["work", "review", "repair", "planning", "quality", "whip", "wait", "stop"]);
+    assert.ok(parsed.sections?.decision?.reasonCodes?.some((reason) => reason.code === "stop-supply-chain-approval" && reason.category === "safety"));
+    assert.deepEqual(parsed.sections?.hookStop?.tools, ["codex", "claude-code"]);
+    assert.deepEqual(parsed.sections?.hookStop?.outputKinds, ["allow", "block"]);
+    assert.ok(parsed.sections?.hookStop?.stableErrorKinds?.includes("malformed-hook-input"));
+    assert.ok(parsed.sections?.hookStop?.stableErrorKinds?.includes("trusted-state-load-failed"));
+    assert.equal(parsed.sections?.continuationState?.schemaVersion, 1);
+    assert.deepEqual(parsed.sections?.continuationState?.files, {
+      state: "continuation.json",
+      lock: "continuation.lock",
+      log: "continuation.jsonl",
+    });
+    assert.ok(parsed.sections?.continuationState?.ownershipFields?.includes("ownerSessionId"));
+    assert.ok(parsed.sections?.continuationState?.ownershipFields?.includes("pendingPromptFingerprint"));
+    assert.ok(parsed.sections?.continuationState?.lockFields?.includes("acquiredAt"));
+    assert.ok(parsed.sections?.continuationState?.logFields?.includes("decisionId"));
+    assert.equal(parsed.sections?.continuationState?.rotation?.maxLogBytes, 65536);
     assert.deepEqual(parsed.sections?.promptRendering?.fingerprintInputs, ["decisionKind", "selectedItem", "reasonCodes", "sourceTimestamps", "body"]);
     assert.deepEqual(parsed.sections?.promptRendering?.customizableSections, ["work", "planning", "quality", "whip"]);
     assert.deepEqual(parsed.sections?.promptRendering?.metadataShape, ["kind", "decisionKind", "selectedItem", "reasonCodes", "sourceTimestamps", "body", "fingerprint"]);
+    assert.ok(parsed.sections?.status?.outputShape?.includes("paths"));
+    assert.ok(parsed.sections?.status?.outputShape?.includes("continuationState"));
     assert.ok(parsed.sections?.status?.outputShape?.includes("decision"));
     assert.ok(parsed.sections?.status?.outputShape?.includes("prompt"));
     assert.ok(parsed.sections?.status?.errorCodes?.includes("trusted-command-malformed-json"));
     assert.ok(parsed.sections?.status?.errorCodes?.includes("status-config-invalid"));
+    assert.ok(parsed.sections?.doctor?.checkCategories?.includes("host"));
+    assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("package-json-present"));
+    assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("repository-root-not-found"));
+    assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("host-runtime-disabled"));
+    assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("host-entrypoint-package-backed"));
+    assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("host-entrypoint-unmanaged"));
+    assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("trusted-command-compatible"));
 
     const init = parsed.commands.find((command) => command.name === "init");
     assert.ok(init);

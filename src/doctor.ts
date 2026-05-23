@@ -173,6 +173,7 @@ export function runAiuDoctor(options: AiuInspectionOptions = {}): AiuDoctorRepor
     ...checkHostRuntimePolicy(configLoad),
     ...checkStatePaths(paths),
     ...checkHostFiles(configLoad),
+    ...checkHostEntrypoints(configLoad),
     ...checkTrustedCommands(paths),
     ...checkTrustedCommandCompatibility(configLoad),
   ];
@@ -363,6 +364,49 @@ function checkHostFiles(configLoad: AiuConfigLoadResult): readonly AiuDoctorChec
       }
     }),
   );
+}
+
+function checkHostEntrypoints(configLoad: AiuConfigLoadResult): readonly AiuDoctorCheck[] {
+  return getAiuHostCapabilityProfiles(configLoad.config.hosts.enabled).flatMap((profile) =>
+    profile.managedFiles.flatMap((file) => {
+      const expectedMarker = packageBackedEntrypointMarker(profile.tool, file.relativePath);
+      if (!expectedMarker) {
+        return [];
+      }
+      const absolutePath = path.join(configLoad.repoRoot, file.relativePath);
+      if (!existsSync(absolutePath)) {
+        return [];
+      }
+      try {
+        const existing = readFileSync(absolutePath, "utf8");
+        if (existing.includes(expectedMarker)) {
+          return [
+            check(`host-entrypoint-${profile.tool}-${file.relativePath}`, "host", "ok", "host-entrypoint-package-backed", `${profile.tool} host entrypoint delegates to the package-backed runtime.`, absolutePath, "Continue using the package-managed host entrypoint."),
+          ];
+        }
+        return [
+          check(`host-entrypoint-${profile.tool}-${file.relativePath}`, "host", "warning", "host-entrypoint-unmanaged", `${profile.tool} host entrypoint does not delegate to the package-backed runtime.`, absolutePath, "Replace copied helper logic with the package-managed entrypoint from aiu init."),
+        ];
+      } catch (error) {
+        return [
+          check(`host-entrypoint-${profile.tool}-${file.relativePath}`, "host", "error", "host-entrypoint-unreadable", `${profile.tool} host entrypoint could not be read: ${error instanceof Error ? error.message : String(error)}`, absolutePath, "Fix file permissions before relying on host integration."),
+        ];
+      }
+    }),
+  );
+}
+
+function packageBackedEntrypointMarker(host: AiuHost, relativePath: string): string | undefined {
+  if (host === "opencode" && relativePath.endsWith(path.join(".opencode", "plugins", "ai-umpire-continuation.ts"))) {
+    return "@tjalve/aiu/opencode";
+  }
+  if (host === "codex" && relativePath.endsWith("hooks.json")) {
+    return `pnpm exec aiu hook-stop --tool ${host}`;
+  }
+  if (host === "claude-code" && relativePath.endsWith(path.join(".claude", "settings.json"))) {
+    return `pnpm exec aiu hook-stop --tool ${host}`;
+  }
+  return undefined;
 }
 
 function checkTrustedCommands(paths: AiuResolvedPaths): readonly AiuDoctorCheck[] {

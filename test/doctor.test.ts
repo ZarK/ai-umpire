@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, it } from "node:test";
 
 import { getAiuResolvedPaths, runAiuDoctor } from "../dist/src/doctor.js";
+import { getAiuHostCapabilityProfile } from "../dist/src/host_policy.js";
 
 const tempRoots: string[] = [];
 
@@ -67,6 +68,52 @@ describe("doctor diagnostics", () => {
 
     assert.equal(report.status, "warning");
     assert.ok(report.checks.some((check) => check.kind === "host-file-missing" && check.path?.endsWith(path.join("plugins", "ai-umpire", "hooks", "hooks.json"))));
+  });
+
+  it("reports package-backed host entrypoints for installed managed files", async () => {
+    const repoRoot = await createRepoRoot();
+    await writeConfig(repoRoot, {
+      version: 1,
+      hosts: {
+        enabled: ["opencode", "codex", "claude-code"],
+        modes: {
+          opencode: ["continue", "repair", "wait", "stop"],
+          codex: ["stop"],
+          "claude-code": ["stop"],
+        },
+      },
+    });
+    await writeManagedHostFiles(repoRoot, "opencode");
+    await writeManagedHostFiles(repoRoot, "codex");
+    await writeManagedHostFiles(repoRoot, "claude-code");
+
+    const report = runAiuDoctor({ cwd: repoRoot });
+    const entrypointChecks = report.checks.filter((check) => check.kind === "host-entrypoint-package-backed");
+
+    assert.equal(entrypointChecks.length, 3);
+    assert.ok(entrypointChecks.some((check) => check.path?.endsWith(path.join(".opencode", "plugins", "ai-umpire-continuation.ts"))));
+    assert.ok(entrypointChecks.some((check) => check.path?.endsWith(path.join("plugins", "ai-umpire", "hooks", "hooks.json"))));
+    assert.ok(entrypointChecks.some((check) => check.path?.endsWith(path.join(".claude", "settings.json"))));
+  });
+
+  it("reports unmanaged host entrypoints that do not delegate to the package runtime", async () => {
+    const repoRoot = await createRepoRoot();
+    const hookPath = path.join(repoRoot, "plugins", "ai-umpire", "hooks", "hooks.json");
+    await mkdir(path.dirname(hookPath), { recursive: true });
+    await writeFile(hookPath, JSON.stringify({ Stop: [{ hooks: [{ type: "command", command: "node scripts/old-aiu-hook.js" }] }] }), "utf8");
+    await writeConfig(repoRoot, {
+      version: 1,
+      hosts: {
+        enabled: ["codex"],
+        modes: {
+          codex: ["stop"],
+        },
+      },
+    });
+
+    const report = runAiuDoctor({ cwd: repoRoot });
+
+    assert.ok(report.checks.some((check) => check.kind === "host-entrypoint-unmanaged" && check.path === hookPath));
   });
 
   it("reports host capability and policy compatibility", async () => {
@@ -211,4 +258,12 @@ async function createRepoRoot(prefix = "aiu-doctor-"): Promise<string> {
 
 async function writeConfig(repoRoot: string, config: unknown): Promise<void> {
   await writeFile(path.join(repoRoot, "aiu.config.json"), `${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+async function writeManagedHostFiles(repoRoot: string, host: "opencode" | "codex" | "claude-code"): Promise<void> {
+  for (const file of getAiuHostCapabilityProfile(host).managedFiles) {
+    const target = path.join(repoRoot, file.relativePath);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, file.content, "utf8");
+  }
 }

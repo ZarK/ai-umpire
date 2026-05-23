@@ -103,6 +103,8 @@ M3.3 wires `aiu hook-stop --tool codex|claude-code` into the same trusted-state 
 
 M3.4 adds durable continuation state for host integrations. OpenCode continuation serializes host events with `.umpire/` locks, recovers stale locks after the configured host timeout, persists prompt ownership, selected target, mode, fingerprints, timestamps, and source summaries, suppresses duplicate or competing prompts, and writes bounded redacted continuation logs. `aiu status --json` exposes the configured state, lock, and log paths plus any persisted continuation state.
 
+M3.5 closes the host integration milestone with explicit diagnostics and schema contracts. `aiu doctor` now reports package-backed host entrypoints in addition to managed host file, state path, trusted command, stop-hook, and capability-policy diagnostics. `aiu schema --json` exposes hook-stop output kinds, continuation ownership/lock/log field shapes, reason codes, status paths, and stable doctor diagnostic kinds so agents can validate M3 integrations without live host runtimes.
+
 ## FR-07 - Host Integrations
 
 | ID | Requirement | Status |

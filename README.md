@@ -230,11 +230,11 @@ Run release checks:
 pnpm run release:check
 ```
 
-`aiu doctor` is read-only. It reports Node version, package metadata and built assets, repository/config health, host install files for enabled hosts, state path writability, and configured trusted command executable availability. It does not execute trusted commands.
+`aiu doctor` is read-only. It reports Node version, package metadata and built assets, repository/config health, host install files and package-backed entrypoints for enabled hosts, state path writability, and configured trusted command executable availability. It does not execute trusted commands.
 
 ## Troubleshooting
 
-Use `pnpm exec aiu doctor --json` as the first diagnostic command. Stable check `kind` values identify setup problems such as `config-missing`, `config-invalid`, `host-file-missing`, `state-path-not-writable`, and `trusted-command-missing`.
+Use `pnpm exec aiu doctor --json` as the first diagnostic command. Stable check `kind` values identify setup problems such as `config-missing`, `config-invalid`, `host-file-missing`, `host-entrypoint-unmanaged`, `state-path-not-writable`, and `trusted-command-missing`.
 
 Use `pnpm exec aiu paths --json` to inspect the resolved package root, config path, `.umpire/` state paths, host install paths, and trusted command executable paths. Diagnostic output redacts token-like values where practical.
 

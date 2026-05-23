@@ -160,6 +160,18 @@ export const doctorCommand = defineCommand({
       description: "A config enables stop-hook blocking for a host that must safe-allow stopping.",
     },
     {
+      kind: "host-entrypoint-package-backed",
+      description: "A configured host entrypoint delegates to the package-backed runtime.",
+    },
+    {
+      kind: "host-entrypoint-unmanaged",
+      description: "A configured host entrypoint appears to contain copied or custom helper logic.",
+    },
+    {
+      kind: "host-entrypoint-unreadable",
+      description: "A configured host entrypoint could not be read.",
+    },
+    {
       kind: "state-path-not-writable",
       description: "A configured state, lock, or log path cannot be written or created.",
     },
