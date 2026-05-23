@@ -168,6 +168,10 @@ export const aiuCli = createCli({
           promptKinds: AIU_DECISION_PROMPT_KINDS,
           modes: AIU_DECISION_MODES,
         },
+        promptRendering: {
+          fingerprintInputs: ["decisionKind", "selectedItem", "reasonCodes", "sourceTimestamps", "body"],
+          customizableSections: ["work", "planning", "quality", "whip"],
+        },
       },
     }),
   ],

@@ -91,6 +91,8 @@ Requirements use stable identifiers (`FR-XX-NNN`) so milestones and issues can r
 
 M2.3 implements FR-06-001 through FR-06-006 in the pure `decideAiuContinuation` service. Prompt text and fingerprints remain in FR-06-007 through FR-06-009 and are implemented by the prompt renderer milestone.
 
+M2.4 implements FR-06-007 and FR-06-008 in the host-neutral `renderAiuContinuationPrompt` service. It emits prompt metadata, trusted source timestamps, concrete prompt bodies, and stable fingerprints while leaving host delivery to later integration milestones.
+
 ## FR-07 - Host Integrations
 
 | ID | Requirement | Status |
