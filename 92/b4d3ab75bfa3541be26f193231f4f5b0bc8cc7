@@ -1,0 +1,37 @@
+test/migrate.test.ts
+  s_f8aaaf4fdfe4d6::t_abf4445ba5ac7e 180-182
+  s_f8aaaf4fdfe4d6::t_7427f43a3734ef 4,159-179,183-209,211-232,234-236,270-281
+  s_f8aaaf4fdfe4d6::t_780d556dde2d76 210,233,282
+src/migrate.ts
+  s_f8aaaf4fdfe4d6::t_b650446c5aa21e 8,849-850
+  s_f8aaaf4fdfe4d6::t_795c163bf770e8 339,357,970-986
+  s_f8aaaf4fdfe4d6::t_7deb1283126a29 2,13,102-128,281-338,340-356,407-436,814-848,851-864,946-969,987-988,1001-1002
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_307466dc98f7da 575,583-592,599-606,621-623,625-628,638
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_76087780a7be87 22,141-152
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_f4432ca10c7108 383,385-386,388,491-518
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_caea476fd54eab 148-149
+README.md
+  s_f8aaaf4fdfe4d6::t_3bc5e64dea5bbe 123-124
+docs/M5-migration-release-readiness-and-provider-architecture.md
+  s_f8aaaf4fdfe4d6::t_74987bf548e533 164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "92b4d3ab75bfa3541be26f193231f4f5b0bc8cc7",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
