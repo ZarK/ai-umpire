@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -85,6 +85,26 @@ describe("doctor diagnostics", () => {
     assert.equal(report.status, "error");
     assert.ok(trustedChecks.some((check) => check.kind === "trusted-command-found" && check.path === process.execPath));
     assert.ok(trustedChecks.some((check) => check.kind === "trusted-command-missing" && check.path === "definitely-not-aiu-test-command"));
+  });
+
+  it("treats backslash executable tokens as direct trusted command paths", async () => {
+    const repoRoot = await createRepoRoot();
+    const executableToken = ".\\local-tool.exe";
+    const executablePath = path.resolve(repoRoot, executableToken);
+    await writeFile(executablePath, "#!/bin/sh\nexit 0\n", "utf8");
+    await chmod(executablePath, 0o700);
+    await writeConfig(repoRoot, {
+      version: 1,
+      trustedStateCommands: {
+        local: {
+          argv: [executableToken],
+        },
+      },
+    });
+
+    const report = runAiuDoctor({ cwd: repoRoot });
+
+    assert.ok(report.checks.some((check) => check.kind === "trusted-command-found" && check.path === executablePath));
   });
 
   it("reports package, config, state, host, and trusted command paths as redacted data", async () => {

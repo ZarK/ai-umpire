@@ -112,8 +112,8 @@ export function getAiuResolvedPaths(options: AiuInspectionOptions = {}): AiuReso
   return redactRecord(buildAiuResolvedPaths(options) as unknown as Readonly<Record<string, unknown>>) as unknown as AiuResolvedPaths;
 }
 
-function buildAiuResolvedPaths(options: AiuInspectionOptions = {}): AiuResolvedPaths {
-  const configLoad = loadAiuConfig(resolveConfigOptions(options));
+function buildAiuResolvedPaths(options: AiuInspectionOptions = {}, preloadedConfig?: AiuConfigLoadResult): AiuResolvedPaths {
+  const configLoad = preloadedConfig ?? loadAiuConfig(resolveConfigOptions(options));
   const packageRoot = getAiuPackageRoot();
   const packageJson = readPackageJson(packageRoot);
   const assetPaths = getAiuPackageAssetPaths();
@@ -154,7 +154,7 @@ function buildAiuResolvedPaths(options: AiuInspectionOptions = {}): AiuResolvedP
 
 export function runAiuDoctor(options: AiuInspectionOptions = {}): AiuDoctorReport {
   const configLoad = loadAiuConfig(resolveConfigOptions(options));
-  const paths = buildAiuResolvedPaths(options);
+  const paths = buildAiuResolvedPaths(options, configLoad);
   const packageJson = readPackageJson(paths.package.root);
   const checks = [
     checkNodeVersion(),
@@ -353,8 +353,12 @@ function resolveTrustedCommandPaths(configLoad: AiuConfigLoadResult): readonly A
 }
 
 function resolveExecutablePath(executable: string, cwd: string): string | undefined {
-  const candidates = executable.includes("/") ? [path.resolve(cwd, executable)] : (process.env.PATH ?? "").split(path.delimiter).filter(Boolean).map((entry) => path.join(entry, executable));
+  const candidates = isDirectExecutablePath(executable) ? [path.resolve(cwd, executable)] : (process.env.PATH ?? "").split(path.delimiter).filter(Boolean).map((entry) => path.join(entry, executable));
   return candidates.find((candidate) => canAccess(candidate, constants.X_OK));
+}
+
+function isDirectExecutablePath(executable: string): boolean {
+  return executable.includes("/") || executable.includes("\\");
 }
 
 function pathExistsCheck(
