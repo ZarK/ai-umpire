@@ -1,0 +1,37 @@
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_00c4ee655d6ccc 16,34,149-178,279-287,345-346
+README.md
+  s_f8aaaf4fdfe4d6::t_42b272dfa0e95e 138-148,258
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_0f621e5079257b 3-4,6,13,16-19,169-177,192,263-270,353-362,443-498,543,546,567-572
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_0acd31ea25e734 628-769,771
+src/whip.ts
+  s_f8aaaf4fdfe4d6::t_3b1149c2bae4d3 294-317
+  s_f8aaaf4fdfe4d6::t_2a68192f3e5c18 216,270
+  s_f8aaaf4fdfe4d6::t_e81150af254c60 2-3,7,24-36,39-40,44,50-52,54-58,60-64,92-153,155-157,170,184-215,217-269,271-290,318-326,360-522
+docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md
+  s_f8aaaf4fdfe4d6::t_fbc6250e005039 245-246
+test/whip.test.ts
+  s_f8aaaf4fdfe4d6::t_d8d7633acae872 2-3,9-16,223-359
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_dd7b4d5983af5d 18,112-114,117-118,120-123,246-248,250-251,255,257
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_b303ffe2498d74 132-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "95eb216b05e4f5ca9457903d5c88242a37b3db9b",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
