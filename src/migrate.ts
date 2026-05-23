@@ -16,6 +16,7 @@ export interface AiuMigrationPlan {
   readonly repoRoot: string;
   readonly repoLocalHooks: readonly AiuMigrationFinding[];
   readonly localCheckoutReferences: readonly AiuMigrationFinding[];
+  readonly scanErrors: readonly AiuMigrationFinding[];
   readonly cleanupCandidates: readonly AiuMigrationFinding[];
   readonly managedSections: readonly AiuMigrationManagedSection[];
   readonly customizationPoints: readonly string[];
@@ -60,7 +61,8 @@ export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigratio
   const repoRoot = configLoad.repoRoot;
   const dryRun = options.dryRun !== false;
   const repoLocalHooks = findRepoLocalHooks(repoRoot);
-  const localCheckoutReferences = findLocalCheckoutReferences(repoRoot);
+  const scanErrors: AiuMigrationFinding[] = [];
+  const localCheckoutReferences = findLocalCheckoutReferences(repoRoot, scanErrors);
   const conflicts = [
     ...repoLocalHooks.map((finding) => ({
       relativePath: finding.relativePath,
@@ -71,6 +73,11 @@ export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigratio
       relativePath: finding.relativePath,
       category: "migration-review-required",
       reason: `Review ${finding.category} before replacing it with the package-backed aiu dependency.`,
+    })),
+    ...scanErrors.map((finding) => ({
+      relativePath: finding.relativePath,
+      category: "migration-scan-error",
+      reason: finding.reason,
     })),
   ];
   const cleanupCandidates = [...repoLocalHooks, ...localCheckoutReferences].map((finding) => ({
@@ -92,6 +99,7 @@ export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigratio
     repoRoot,
     repoLocalHooks: Object.freeze(repoLocalHooks),
     localCheckoutReferences: Object.freeze(localCheckoutReferences),
+    scanErrors: Object.freeze(scanErrors),
     cleanupCandidates: Object.freeze(cleanupCandidates),
     managedSections: Object.freeze(managedSections),
     customizationPoints: Object.freeze([
@@ -120,6 +128,7 @@ export function formatMigrationPlan(plan: AiuMigrationPlan): string {
     "",
     formatFindingGroup("Repo-local hooks", plan.repoLocalHooks),
     formatFindingGroup("Local-checkout references", plan.localCheckoutReferences),
+    formatFindingGroup("Scan errors", plan.scanErrors),
     formatFindingGroup("Cleanup candidates", plan.cleanupCandidates),
     formatFindingGroup("Conflicts", plan.conflicts),
     "Package-managed sections:",
@@ -160,8 +169,8 @@ function findRepoLocalHooks(repoRoot: string): AiuMigrationFinding[] {
   });
 }
 
-function findLocalCheckoutReferences(repoRoot: string): AiuMigrationFinding[] {
-  return candidateTextFiles(repoRoot).flatMap((relativePath) => {
+function findLocalCheckoutReferences(repoRoot: string, scanErrors: AiuMigrationFinding[]): AiuMigrationFinding[] {
+  return candidateTextFiles(repoRoot, scanErrors).flatMap((relativePath) => {
     const content = readText(path.join(repoRoot, relativePath));
     if (!LOCAL_CHECKOUT_PATTERN.test(content)) {
       return [];
@@ -177,13 +186,13 @@ function findLocalCheckoutReferences(repoRoot: string): AiuMigrationFinding[] {
   });
 }
 
-function candidateTextFiles(repoRoot: string): string[] {
+function candidateTextFiles(repoRoot: string, scanErrors: AiuMigrationFinding[]): string[] {
   const directFiles = SEARCH_FILES.filter((relativePath) => existsSync(path.join(repoRoot, relativePath)));
-  const nestedFiles = SEARCH_ROOTS.flatMap((relativeRoot) => collectTextFiles(repoRoot, relativeRoot));
+  const nestedFiles = SEARCH_ROOTS.flatMap((relativeRoot) => collectTextFiles(repoRoot, relativeRoot, scanErrors));
   return [...new Set([...directFiles, ...nestedFiles])];
 }
 
-function collectTextFiles(repoRoot: string, relativeRoot: string): string[] {
+function collectTextFiles(repoRoot: string, relativeRoot: string, scanErrors: AiuMigrationFinding[]): string[] {
   const absoluteRoot = path.join(repoRoot, relativeRoot);
   if (!existsSync(absoluteRoot) || !safeStat(absoluteRoot)?.isDirectory()) {
     return [];
@@ -193,13 +202,18 @@ function collectTextFiles(repoRoot: string, relativeRoot: string): string[] {
   try {
     entries = readdirSync(absoluteRoot, { withFileTypes: true });
   } catch {
+    scanErrors.push({
+      relativePath: relativeRoot,
+      category: "scan-error",
+      reason: "Directory could not be read during migration audit; review permissions before trusting the migration plan.",
+    });
     return [];
   }
 
   return entries.flatMap((entry) => {
     const relativePath = path.join(relativeRoot, entry.name);
     if (entry.isDirectory()) {
-      return collectTextFiles(repoRoot, relativePath);
+      return collectTextFiles(repoRoot, relativePath, scanErrors);
     }
     if (!entry.isFile()) {
       return [];

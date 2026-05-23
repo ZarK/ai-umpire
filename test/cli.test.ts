@@ -256,6 +256,7 @@ describe("metadata-backed CLI", () => {
         dryRun: boolean;
         repoLocalHooks: unknown[];
         localCheckoutReferences: unknown[];
+        scanErrors: unknown[];
         managedSections: unknown[];
         customizationPoints: string[];
         recommendedNextCommand: string;
@@ -269,6 +270,7 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.migrate.ok, true);
     assert.equal(parsed.migrate.dryRun, true);
     assert.deepEqual(parsed.migrate.repoLocalHooks, []);
+    assert.deepEqual(parsed.migrate.scanErrors, []);
     assert.ok(parsed.migrate.managedSections.length >= 3);
     assert.ok(parsed.migrate.customizationPoints.includes("aiu.config.json trustedStateCommands argv arrays"));
     assert.equal(parsed.migrate.recommendedNextCommand, "aiu init --dry-run --json");

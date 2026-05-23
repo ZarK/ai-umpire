@@ -70,6 +70,7 @@ interface MigrationEnvelope {
     readonly ok: boolean;
     readonly repoLocalHooks: Array<{ relativePath: string }>;
     readonly localCheckoutReferences: Array<{ relativePath: string }>;
+    readonly scanErrors: unknown[];
     readonly cleanupCandidates: unknown[];
     readonly conflicts: unknown[];
     readonly statePreservation: { action: string };
