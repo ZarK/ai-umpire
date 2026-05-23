@@ -1,0 +1,350 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+import {
+  AIU_CONFIG_FILENAME,
+  type AiuConfig,
+  type AiuHost,
+  getDefaultAiuConfig,
+  loadAiuConfig,
+} from "./config.js";
+
+export const AIU_INIT_TOOLS = ["opencode", "codex", "claude-code", "all"] as const;
+
+export type AiuInitTool = (typeof AIU_INIT_TOOLS)[number];
+export type AiuInitFileOperation = "create" | "update" | "skip" | "conflict";
+
+export interface AiuInitOptions {
+  readonly cwd?: string;
+  readonly tool?: AiuInitTool;
+  readonly dryRun?: boolean;
+  readonly force?: boolean;
+}
+
+export interface AiuHostCapabilityProfile {
+  readonly tool: AiuHost;
+  readonly description: string;
+  readonly capabilities: Readonly<Record<string, boolean | string>>;
+  readonly managedFiles: readonly AiuManagedHostFile[];
+  readonly trustSteps: readonly string[];
+}
+
+export interface AiuManagedHostFile {
+  readonly relativePath: string;
+  readonly description: string;
+  readonly content: string;
+}
+
+export interface AiuInitPlan {
+  readonly ok: boolean;
+  readonly dryRun: boolean;
+  readonly force: boolean;
+  readonly repoRoot: string;
+  readonly configPath: string;
+  readonly tools: readonly AiuHost[];
+  readonly hostProfiles: readonly AiuHostCapabilityProfile[];
+  readonly files: readonly AiuInitFileAction[];
+  readonly config: AiuInitConfigAction;
+  readonly conflicts: readonly AiuInitConflict[];
+  readonly requiredTrustSteps: readonly string[];
+  readonly recommendedNextCommand: string;
+}
+
+export interface AiuInitFileAction {
+  readonly relativePath: string;
+  readonly absolutePath: string;
+  readonly description: string;
+  readonly operation: AiuInitFileOperation;
+  readonly reason: string;
+  readonly content: string;
+}
+
+export interface AiuInitConfigAction {
+  readonly relativePath: string;
+  readonly absolutePath: string;
+  readonly operation: AiuInitFileOperation;
+  readonly reason: string;
+  readonly content: string;
+  readonly hosts: readonly AiuHost[];
+  readonly trustedStateCommands: readonly string[];
+}
+
+export interface AiuInitConflict {
+  readonly relativePath: string;
+  readonly reason: string;
+  readonly suggestedNextAction: string;
+}
+
+const HOST_PROFILES: Readonly<Record<AiuHost, AiuHostCapabilityProfile>> = Object.freeze({
+  opencode: Object.freeze({
+    tool: "opencode",
+    description: "OpenCode project plugin wrapper delegating to the package-backed aiu entrypoint.",
+    capabilities: Object.freeze({
+      sessionState: true,
+      promptDelivery: "host",
+    }),
+    managedFiles: Object.freeze([
+      Object.freeze({
+        relativePath: path.join(".opencode", "plugins", "ai-umpire-continuation.ts"),
+        description: "OpenCode AI Umpire plugin wrapper.",
+        content: [
+          "// Managed by @tjalve/aiu.",
+          "// Delegates OpenCode continuation events to the package-backed aiu command.",
+          "export const aiUmpireCommand = [\"aiu\", \"hook\", \"opencode\"] as const;",
+          "",
+        ].join("\n"),
+      }),
+    ]),
+    trustSteps: Object.freeze(["Enable the OpenCode project plugin after reviewing the managed wrapper."]),
+  }),
+  codex: Object.freeze({
+    tool: "codex",
+    description: "Codex stop-hook configuration delegating to the package-backed aiu entrypoint.",
+    capabilities: Object.freeze({
+      stopHook: true,
+      promptDelivery: "stdout",
+    }),
+    managedFiles: Object.freeze([
+      Object.freeze({
+        relativePath: path.join(".codex", "hooks", "ai-umpire-stop.json"),
+        description: "Codex AI Umpire stop-hook descriptor.",
+        content: stableJson({
+          managedBy: "@tjalve/aiu",
+          hook: "stop",
+          command: ["aiu", "hook", "stop", "--tool", "codex"],
+        }),
+      }),
+    ]),
+    trustSteps: Object.freeze(["Enable the Codex stop hook after reviewing the managed descriptor."]),
+  }),
+  "claude-code": Object.freeze({
+    tool: "claude-code",
+    description: "Claude Code stop-hook configuration delegating to the package-backed aiu entrypoint.",
+    capabilities: Object.freeze({
+      stopHook: true,
+      promptDelivery: "stdout",
+    }),
+    managedFiles: Object.freeze([
+      Object.freeze({
+        relativePath: path.join(".claude", "hooks", "ai-umpire-stop.json"),
+        description: "Claude Code AI Umpire stop-hook descriptor.",
+        content: stableJson({
+          managedBy: "@tjalve/aiu",
+          hook: "stop",
+          command: ["aiu", "hook", "stop", "--tool", "claude-code"],
+        }),
+      }),
+    ]),
+    trustSteps: Object.freeze(["Enable the Claude Code stop hook after reviewing the managed descriptor."]),
+  }),
+});
+
+export function planAiuInit(options: AiuInitOptions = {}): AiuInitPlan {
+  const configLoad = loadAiuConfig({ cwd: options.cwd });
+  const repoRoot = configLoad.repoRoot;
+  const tool = options.tool ?? "all";
+  const tools = expandInitTools(tool);
+  const dryRun = options.dryRun === true;
+  const force = options.force === true;
+  const hostProfiles = tools.map((selectedTool) => HOST_PROFILES[selectedTool]);
+  const files = hostProfiles.flatMap((profile) => profile.managedFiles.map((file) => planFile(repoRoot, file, force)));
+  const config = planConfig(repoRoot, configLoad.selectedPath, configLoad.config, tools, force);
+  const conflicts = [
+    ...files.filter((file) => file.operation === "conflict").map((file) => ({
+      relativePath: file.relativePath,
+      reason: file.reason,
+      suggestedNextAction: `Review ${file.relativePath}, then rerun with --force if replacing it is intentional.`,
+    })),
+    ...(config.operation === "conflict"
+      ? [
+          {
+            relativePath: config.relativePath,
+            reason: config.reason,
+            suggestedNextAction: `Fix ${AIU_CONFIG_FILENAME} or rerun with --force to replace it with package defaults.`,
+          },
+        ]
+      : []),
+  ];
+
+  return Object.freeze({
+    ok: conflicts.length === 0,
+    dryRun,
+    force,
+    repoRoot,
+    configPath: configLoad.selectedPath,
+    tools: Object.freeze(tools),
+    hostProfiles: Object.freeze(hostProfiles),
+    files: Object.freeze(files),
+    config,
+    conflicts: Object.freeze(conflicts),
+    requiredTrustSteps: Object.freeze([...new Set(hostProfiles.flatMap((profile) => profile.trustSteps))]),
+    recommendedNextCommand: "aiu doctor --json",
+  });
+}
+
+export function applyAiuInitPlan(plan: AiuInitPlan): AiuInitPlan {
+  if (plan.dryRun || !plan.ok) {
+    return plan;
+  }
+
+  for (const file of [...plan.files, plan.config]) {
+    if (file.operation === "create" || file.operation === "update") {
+      mkdirSync(path.dirname(file.absolutePath), { recursive: true });
+      writeFileSync(file.absolutePath, file.content, "utf8");
+    }
+  }
+
+  return plan;
+}
+
+export function formatInitPlan(plan: AiuInitPlan): string {
+  const sections = [
+    `repoRoot: ${plan.repoRoot}`,
+    `mode: ${plan.dryRun ? "dry-run" : "apply"}`,
+    `tools: ${plan.tools.join(", ")}`,
+    "",
+    formatFileGroup("Created", plan, "create"),
+    formatFileGroup("Updated", plan, "update"),
+    formatFileGroup("Skipped", plan, "skip"),
+    formatFileGroup("Conflicts", plan, "conflict"),
+    "Required trust steps:",
+    ...plan.requiredTrustSteps.map((step) => `- ${step}`),
+    "",
+    `Recommended next command: ${plan.recommendedNextCommand}`,
+  ];
+
+  return `${sections.join("\n")}\n`;
+}
+
+function expandInitTools(tool: AiuInitTool): readonly AiuHost[] {
+  return tool === "all" ? ["opencode", "codex", "claude-code"] : [tool];
+}
+
+function planFile(repoRoot: string, file: AiuManagedHostFile, force: boolean): AiuInitFileAction {
+  const absolutePath = path.join(repoRoot, file.relativePath);
+  const existing = existsSync(absolutePath) ? readFileSync(absolutePath, "utf8") : undefined;
+  const operation = classifyWrite(existing, file.content, force);
+  return Object.freeze({
+    relativePath: file.relativePath,
+    absolutePath,
+    description: file.description,
+    operation,
+    reason: reasonForOperation(operation),
+    content: file.content,
+  });
+}
+
+function planConfig(repoRoot: string, configPath: string, loadedConfig: AiuConfig, tools: readonly AiuHost[], force: boolean): AiuInitConfigAction {
+  const relativePath = path.relative(repoRoot, configPath) || AIU_CONFIG_FILENAME;
+  const existing = existsSync(configPath) ? readFileSync(configPath, "utf8") : undefined;
+  const existingRaw = existing ? parseJsonObject(existing) : { ok: true, value: {} };
+  const content = stableJson(mergeConfig(loadedConfig, existingRaw.ok ? existingRaw.value : {}, tools));
+  const operation = existingRaw.ok ? classifyWrite(existing, content, force) : force ? "update" : "conflict";
+
+  return Object.freeze({
+    relativePath,
+    absolutePath: configPath,
+    operation,
+    reason: existingRaw.ok ? reasonForOperation(operation) : "Existing config is not valid JSON.",
+    content,
+    hosts: Object.freeze(tools),
+    trustedStateCommands: Object.freeze(["work"]),
+  });
+}
+
+function mergeConfig(config: AiuConfig, raw: Record<string, unknown>, tools: readonly AiuHost[]): Record<string, unknown> {
+  const defaults = getDefaultAiuConfig();
+  const enabled = [...new Set([...config.hosts.enabled, ...tools])];
+  const capabilities = {
+    ...config.hosts.capabilities,
+    ...Object.fromEntries(tools.map((tool) => [tool, HOST_PROFILES[tool].capabilities])),
+  };
+
+  return {
+    ...raw,
+    version: 1,
+    hosts: {
+      ...(isRecord(raw.hosts) ? raw.hosts : {}),
+      enabled,
+      capabilities,
+    },
+    trustedStateCommands: {
+      ...config.trustedStateCommands,
+      work: config.trustedStateCommands.work ?? {
+        argv: ["aie", "status", "--json"],
+        timeoutMs: defaults.timeouts.commandMs,
+        maxOutputBytes: 1_048_576,
+      },
+    },
+    continuation: {
+      ...config.continuation,
+      modes: config.continuation.modes,
+      stopOnUnknownState: true,
+      stopOnUnsafeState: true,
+      stopOnSupplyChainApprovalBlock: true,
+      allowProviderMutation: false,
+      allowBackgroundScheduling: false,
+      trustUnstructuredProse: false,
+    },
+    timeouts: config.timeouts,
+    cooldowns: config.cooldowns,
+    paths: config.paths,
+    supplyChain: {
+      ...config.supplyChain,
+      stopOnApprovalRequired: true,
+    },
+  };
+}
+
+function classifyWrite(existing: string | undefined, desired: string, force: boolean): AiuInitFileOperation {
+  if (existing === undefined) {
+    return "create";
+  }
+  if (normalizeText(existing) === normalizeText(desired)) {
+    return "skip";
+  }
+  return force ? "update" : "conflict";
+}
+
+function reasonForOperation(operation: AiuInitFileOperation): string {
+  if (operation === "create") return "Managed file does not exist yet.";
+  if (operation === "update") return "Existing managed file differs and --force was provided.";
+  if (operation === "skip") return "Existing managed file already matches the planned content.";
+  return "Existing file differs; preserving it unless --force is provided.";
+}
+
+function formatFileGroup(title: string, plan: AiuInitPlan, operation: AiuInitFileOperation): string {
+  const files = [...plan.files, plan.config].filter((file) => file.operation === operation);
+  return [`${title}:`, ...(files.length === 0 ? ["- none"] : files.map((file) => `- ${file.relativePath}: ${file.reason}`)), ""].join("\n");
+}
+
+function parseJsonObject(raw: string): { readonly ok: true; readonly value: Record<string, unknown> } | { readonly ok: false } {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return isRecord(parsed) ? { ok: true, value: parsed } : { ok: false };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function stableJson(value: unknown): string {
+  return `${JSON.stringify(sortJson(value), null, 2)}\n`;
+}
+
+function sortJson(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortJson);
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, entry]) => [key, sortJson(entry)]));
+}
+
+function normalizeText(value: string): string {
+  return value.replace(/\r\n/g, "\n");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}

@@ -12,7 +12,8 @@ import {
   getDefaultAiuConfig,
   loadAiuConfig,
 } from "./config.js";
-import { AIU_COMMAND_REGISTRY, configCommand, pathsCommand } from "./command_registry.js";
+import { AIU_COMMAND_REGISTRY, configCommand, initCommand, pathsCommand } from "./command_registry.js";
+import { applyAiuInitPlan, formatInitPlan, planAiuInit, type AiuInitTool } from "./init.js";
 
 interface PackageJson {
   readonly name: string;
@@ -53,6 +54,18 @@ export const aiuCli = createCli({
             value: result.config,
             diagnostics: result.diagnostics,
           },
+        },
+      };
+    }),
+    createCommand(initCommand, (context) => {
+      const tool = typeof context.flags.tool === "string" ? (context.flags.tool as AiuInitTool) : undefined;
+      const dryRun = context.flags["dry-run"] === true;
+      const force = context.flags.force === true;
+      const plan = applyAiuInitPlan(planAiuInit({ tool, dryRun, force }));
+      return {
+        human: formatInitPlan(plan),
+        json: {
+          init: plan,
         },
       };
     }),

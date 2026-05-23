@@ -2,6 +2,7 @@ import { defineCommand, defineExample, defineFlag } from "@tjalve/qube-cli/metad
 import { createCommandRegistry } from "@tjalve/qube-cli/registry";
 
 import { AIU_CONFIG_FILENAME } from "./config.js";
+import { AIU_INIT_TOOLS } from "./init.js";
 
 const jsonFlag = defineFlag({
   name: "json",
@@ -150,6 +151,89 @@ export const configCommand = defineCommand({
   ],
 });
 
+export const initCommand = defineCommand({
+  kind: "command",
+  name: "init",
+  description: "Plan and apply package-backed host installation files and repository config.",
+  flags: [
+    jsonFlag,
+    defineFlag({
+      name: "tool",
+      description: "Select host tooling to initialize.",
+      type: "option",
+      options: AIU_INIT_TOOLS,
+      defaultValue: "all",
+    }),
+    defineFlag({
+      name: "dry-run",
+      description: "Render the init plan without writing files.",
+      type: "boolean",
+    }),
+    defineFlag({
+      name: "force",
+      description: "Replace conflicting managed files explicitly.",
+      type: "boolean",
+    }),
+  ],
+  examples: [
+    defineExample({
+      description: "Inspect the full init plan without writing files.",
+      command: "aiu init --dry-run --json",
+    }),
+    defineExample({
+      description: "Initialize only Codex host files.",
+      command: "aiu init --tool codex",
+    }),
+    defineExample({
+      description: "Replace conflicting managed files intentionally.",
+      command: "aiu init --tool all --force",
+    }),
+  ],
+  output: {
+    formats: ["human", "json"],
+    defaultFormat: "human",
+  },
+  interactions: {
+    json: true,
+    dryRun: {
+      supported: true,
+    },
+    noColor: true,
+    nonInteractive: true,
+    ttyPrompt: false,
+  },
+  mutation: {
+    categories: ["local-files", "local-config"],
+  },
+  errors: [
+    {
+      kind: "init-conflict",
+      description: "Init found existing files that differ from planned managed content.",
+    },
+    {
+      kind: "invalid-command-usage",
+      description: "Init command usage was invalid.",
+    },
+  ],
+  exitCodes: [
+    {
+      code: 0,
+      category: "success",
+      description: "Init plan was produced, and apply mode wrote files when no conflicts were present.",
+    },
+    {
+      code: 2,
+      category: "usage",
+      description: "Command usage was invalid.",
+    },
+    {
+      code: 1,
+      category: "unexpected",
+      description: "Command failed unexpectedly.",
+    },
+  ],
+});
+
 export const AIU_COMMAND_REGISTRY = createCommandRegistry({
-  commands: [configCommand, pathsCommand],
+  commands: [configCommand, initCommand, pathsCommand],
 });

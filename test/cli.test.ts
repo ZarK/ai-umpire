@@ -96,7 +96,7 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.package.name, "@tjalve/aiu");
 
     const commandNames = parsed.commands.map((command) => command.name);
-    assert.deepEqual(commandNames, ["config", "paths", "schema"]);
+    assert.deepEqual(commandNames, ["config", "init", "paths", "schema"]);
 
     const config = parsed.commands.find((command) => command.name === "config");
     assert.ok(config);
@@ -112,6 +112,15 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.sections?.config?.defaultPath, "aiu.config.json");
     assert.deepEqual(parsed.sections?.config?.hostNames, ["opencode", "codex", "claude-code"]);
     assert.deepEqual(parsed.sections?.config?.hostCapabilityNames, ["stopHook", "sessionState", "promptDelivery"]);
+
+    const init = parsed.commands.find((command) => command.name === "init");
+    assert.ok(init);
+    assert.equal(init.interactions?.json, true);
+    assert.equal(init.dryRun?.supported, true);
+    assert.equal(init.mutation?.mutates, true);
+    assert.ok(init.flags?.some((flag) => flag.name === "tool" && flag.type === "option"));
+    assert.ok(init.flags?.some((flag) => flag.name === "dry-run" && flag.type === "boolean"));
+    assert.ok(init.flags?.some((flag) => flag.name === "force" && flag.type === "boolean"));
 
     const paths = parsed.commands.find((command) => command.name === "paths");
     assert.ok(paths);

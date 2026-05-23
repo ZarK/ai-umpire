@@ -126,6 +126,8 @@ Trusted state commands are represented as validated `argv` arrays. Runtime shell
 
 OpenCode installation writes a package-backed plugin wrapper. Codex and Claude Code installation write stop-hook configuration that calls the package-backed `aiu` command. Host files must be updated safely and preserve unrelated user-authored config.
 
+Existing managed files that differ from planned content are conflicts by default. `--force` is required before init replaces them.
+
 Prompts are TTY-only. Every prompt has a flag or config equivalent so non-interactive init is possible.
 
 ## Part 5: Doctor, Schema, Docs, And Tests

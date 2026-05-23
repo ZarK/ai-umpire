@@ -10,6 +10,7 @@ export {
 export {
   AIU_COMMAND_REGISTRY,
   configCommand,
+  initCommand,
   pathsCommand,
 } from "./command_registry.js";
 export {
@@ -22,6 +23,12 @@ export {
   getDefaultAiuConfig,
   loadAiuConfig,
 } from "./config.js";
+export {
+  AIU_INIT_TOOLS,
+  applyAiuInitPlan,
+  formatInitPlan,
+  planAiuInit,
+} from "./init.js";
 export type {
   AiuPackageAssetPaths,
 } from "./assets.js";
@@ -35,3 +42,11 @@ export type {
   AiuHostCapabilityName,
   AiuTrustedStateCommandDescriptor,
 } from "./config.js";
+export type {
+  AiuHostCapabilityProfile,
+  AiuInitFileAction,
+  AiuInitFileOperation,
+  AiuInitOptions,
+  AiuInitPlan,
+  AiuInitTool,
+} from "./init.js";
