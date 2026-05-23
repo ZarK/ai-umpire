@@ -572,7 +572,7 @@ export const hookStopCommand = defineCommand({
 export const migrateCommand = defineCommand({
   kind: "command",
   name: "migrate",
-  description: "Audit existing repo-local Umpire hooks and local-checkout references before package-backed migration.",
+  description: "Audit and explicitly apply package-backed host migration while preserving repository state and policy.",
   flags: [
     jsonFlag,
     defineFlag({
@@ -580,11 +580,29 @@ export const migrateCommand = defineCommand({
       description: "Render the migration audit plan without writing files.",
       type: "boolean",
     }),
+    defineFlag({
+      name: "apply",
+      description: "Write package-backed config and managed host files for migration-safe paths.",
+      type: "boolean",
+    }),
+    defineFlag({
+      name: "force",
+      description: "Replace differing managed host files explicitly; never deletes preserved state or cleanup candidates.",
+      type: "boolean",
+    }),
   ],
   examples: [
     defineExample({
       description: "Inspect migration work without writing files.",
       command: "aiu migrate --dry-run --json",
+    }),
+    defineExample({
+      description: "Apply package-backed migration changes for safe paths.",
+      command: "aiu migrate --apply --json",
+    }),
+    defineExample({
+      description: "Replace differing managed host files after review.",
+      command: "aiu migrate --apply --force --json",
     }),
   ],
   output: {
@@ -600,7 +618,14 @@ export const migrateCommand = defineCommand({
     nonInteractive: true,
     ttyPrompt: false,
   },
+  mutation: {
+    categories: ["local-files", "local-config"],
+  },
   errors: [
+    {
+      kind: "migration-conflict",
+      description: "Migration apply found paths requiring review or explicit force before replacement.",
+    },
     {
       kind: "invalid-command-usage",
       description: "Migration command usage was invalid.",
@@ -610,7 +635,7 @@ export const migrateCommand = defineCommand({
     {
       code: 0,
       category: "success",
-      description: "Migration audit plan was produced without mutating repository files.",
+      description: "Migration audit or explicit apply completed without provider, git, or cleanup mutations.",
     },
     {
       code: 2,

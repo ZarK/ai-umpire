@@ -161,7 +161,7 @@ Detect repo-local hooks, local-checkout references, copied helpers, config, host
 
 ### M5.2 - Implement Migration Apply And State Preservation
 
-Apply package-backed config and host updates, preserve recognized state and user customizations, and write clear diagnostics.
+Apply package-backed config and managed host updates only through explicit `aiu migrate --apply`, preserve recognized state, trusted command descriptors, repository policy choices, and user customizations, and report changed, preserved, skipped, conflicted, and review-required paths without provider or git mutations.
 
 ### M5.3 - Implement Explicit Cleanup For Confirmed Old Assets
 

@@ -19,7 +19,7 @@ import { formatAiuDoctorReport, formatAiuPaths, getAiuResolvedPaths, runAiuDocto
 import { AIU_HOST_CAPABILITY_SUPPORT, AIU_HOST_SUPPORT_LEVELS, getAllAiuHostCapabilityProfiles } from "./host_policy.js";
 import { formatHookStopJson, readHookStopStdin, runAiuHookStop } from "./hook_stop.js";
 import { applyAiuInitPlan, formatInitPlan, planAiuInit, type AiuInitTool } from "./init.js";
-import { formatMigrationPlan, planAiuMigration } from "./migrate.js";
+import { applyAiuMigration, formatMigrationApplyResult, formatMigrationPlan, planAiuMigration } from "./migrate.js";
 import { AIU_STATUS_ERROR_CODES, formatAiuStatusReport, runAiuStatus } from "./status.js";
 import {
   AIU_REASON_CODE_CATALOG,
@@ -138,8 +138,18 @@ export const aiuCli = createCli({
       };
     }),
     createCommand(migrateCommand, (context) => {
-      const dryRun = context.flags["dry-run"] !== false;
-      const plan = planAiuMigration({ dryRun });
+      const apply = context.flags.apply === true && context.flags["dry-run"] !== true;
+      const force = context.flags.force === true;
+      if (apply) {
+        const result = applyAiuMigration({ force });
+        return {
+          human: formatMigrationApplyResult(result),
+          json: {
+            migrate: result,
+          },
+        };
+      }
+      const plan = planAiuMigration({ dryRun: true });
       return {
         human: formatMigrationPlan(plan),
         json: {

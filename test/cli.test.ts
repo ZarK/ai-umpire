@@ -380,9 +380,12 @@ describe("metadata-backed CLI", () => {
     assert.equal(migrate.output?.defaultFormat, "human");
     assert.equal(migrate.interactions?.json, true);
     assert.equal(migrate.dryRun?.supported, true);
-    assert.equal(migrate.mutation?.mutates, false);
+    assert.equal(migrate.mutation?.mutates, true);
     assert.ok(migrate.flags?.some((flag) => flag.name === "dry-run" && flag.type === "boolean"));
+    assert.ok(migrate.flags?.some((flag) => flag.name === "apply" && flag.type === "boolean"));
+    assert.ok(migrate.flags?.some((flag) => flag.name === "force" && flag.type === "boolean"));
     assert.ok(migrate.examples?.some((example) => example.command === "aiu migrate --dry-run --json"));
+    assert.ok(migrate.examples?.some((example) => example.command === "aiu migrate --apply --json"));
 
     const schema = parsed.commands.find((command) => command.name === "schema");
     assert.ok(schema);
@@ -483,6 +486,36 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.migrate.managedSections.length >= 3);
     assert.ok(parsed.migrate.customizationPoints.includes("aiu.config.json trustedStateCommands argv arrays"));
     assert.equal(parsed.migrate.recommendedNextCommand, "aiu init --dry-run --json");
+  });
+
+  it("emits clean JSON for explicit migration apply", async () => {
+    const target = await createRepoRoot();
+    const result = await runCli(["migrate", "--apply", "--json"], target);
+    const parsed = JSON.parse(result.stdout) as {
+      ok: boolean;
+      command: string;
+      migrate: {
+        ok: boolean;
+        dryRun: boolean;
+        applied: boolean;
+        changed: Array<{ relativePath: string; action: string }>;
+        preserved: unknown[];
+        skipped: unknown[];
+        conflicted: unknown[];
+        reviewRequired: unknown[];
+      };
+    };
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.command, "migrate");
+    assert.equal(parsed.migrate.ok, true);
+    assert.equal(parsed.migrate.dryRun, false);
+    assert.equal(parsed.migrate.applied, true);
+    assert.ok(parsed.migrate.changed.some((item) => item.relativePath === "aiu.config.json" && item.action === "create"));
+    assert.deepEqual(parsed.migrate.conflicted, []);
+    assert.deepEqual(parsed.migrate.reviewRequired, []);
   });
 
   it("emits clean JSON for whip status and dry-run mutations", async () => {

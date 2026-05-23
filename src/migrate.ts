@@ -1,14 +1,16 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import type { Dirent } from "node:fs";
 import path from "node:path";
 
 import { loadAiuConfig } from "./config.js";
 import { getAllAiuHostCapabilityProfiles } from "./host_policy.js";
+import { planAiuInit } from "./init.js";
 
 export interface AiuMigrationOptions {
   readonly cwd?: string;
   readonly dryRun?: boolean;
+  readonly force?: boolean;
 }
 
 export interface AiuMigrationPlan {
@@ -95,6 +97,33 @@ export interface AiuMigrationPackageCommand {
   readonly command: string;
   readonly host?: string;
   readonly reason: string;
+}
+
+export interface AiuMigrationApplyResult {
+  readonly ok: boolean;
+  readonly dryRun: false;
+  readonly applied: true;
+  readonly force: boolean;
+  readonly repoRoot: string;
+  readonly configPath: string;
+  readonly plan: AiuMigrationPlan;
+  readonly changed: readonly AiuMigrationApplyAction[];
+  readonly preserved: readonly AiuMigrationApplyAction[];
+  readonly skipped: readonly AiuMigrationApplyAction[];
+  readonly conflicted: readonly AiuMigrationApplyAction[];
+  readonly reviewRequired: readonly AiuMigrationApplyAction[];
+  readonly warnings: readonly string[];
+  readonly statePreservation: AiuMigrationStatePreservation;
+  readonly requiredTrustSteps: readonly string[];
+  readonly recommendedNextCommand: string;
+}
+
+export interface AiuMigrationApplyAction {
+  readonly relativePath: string;
+  readonly action: "create" | "update" | "preserve" | "skip" | "conflict" | "review";
+  readonly category: string;
+  readonly reason: string;
+  readonly fingerprint?: string;
 }
 
 interface ManagedHostPath {
@@ -249,6 +278,86 @@ export function planAiuMigration(options: AiuMigrationOptions = {}): AiuMigratio
   });
 }
 
+export function applyAiuMigration(options: AiuMigrationOptions = {}): AiuMigrationApplyResult {
+  const force = options.force === true;
+  const plan = planAiuMigration({ cwd: options.cwd, dryRun: false });
+  const managedHostPaths = getManagedHostPaths();
+  const managedPathSet = new Set(managedHostPaths.map((file) => file.relativePath));
+  const changed: AiuMigrationApplyAction[] = [];
+  const preserved: AiuMigrationApplyAction[] = [];
+  const skipped: AiuMigrationApplyAction[] = [];
+  const conflicted: AiuMigrationApplyAction[] = [];
+
+  applyConfig(plan, changed, preserved, conflicted);
+
+  for (const file of managedHostPaths) {
+    const absolutePath = path.join(plan.repoRoot, file.relativePath);
+    const existing = readExistingManagedText(absolutePath);
+    if (!existing.exists) {
+      writeManagedText(absolutePath, file.content);
+      changed.push(applyAction(file.relativePath, "create", "package-managed-host-file", "Created package-backed host integration content."));
+      continue;
+    }
+    if (existing.error !== undefined) {
+      conflicted.push(applyAction(file.relativePath, "conflict", "package-managed-host-file", `Existing managed host file could not be read: ${existing.error}`));
+      continue;
+    }
+    if (isPackageBackedManagedContent(existing.content ?? "", file.content)) {
+      preserved.push(applyAction(file.relativePath, "preserve", "package-backed-host-file", "Existing package-backed managed content already matches the target shape.", fingerprintText(existing.content ?? "")));
+      continue;
+    }
+    if (force) {
+      writeManagedText(absolutePath, file.content);
+      changed.push(applyAction(file.relativePath, "update", "package-managed-host-file", "Replaced differing managed host file because --force was provided.", fingerprintText(existing.content ?? "")));
+      continue;
+    }
+    conflicted.push(applyAction(file.relativePath, "conflict", "package-managed-host-file", "Existing managed host file differs; preserving it unless --force is provided.", fingerprintText(existing.content ?? "")));
+  }
+
+  for (const item of plan.stateMigrations) {
+    preserved.push(applyAction(item.relativePath, "preserve", "state-file", item.reason, item.fingerprint));
+  }
+  for (const finding of [...plan.promptCustomizations, ...plan.trustedCommandDescriptors]) {
+    preserved.push(applyAction(finding.relativePath, "preserve", finding.category, finding.reason, finding.fingerprint));
+  }
+
+  const unresolvedReview = plan.reviewRequired
+    .filter((finding) => !(force && managedPathSet.has(finding.relativePath)))
+    .map((finding) => applyAction(finding.relativePath, "review", finding.category, finding.reason, finding.fingerprint));
+  skipped.push(...plan.cleanupCandidates.map((finding) => applyAction(finding.relativePath, "skip", "cleanup-candidate", "Cleanup is intentionally deferred to the explicit cleanup command.", finding.fingerprint)));
+  skipped.push(...unresolvedReview.map((action) => applyAction(action.relativePath, "skip", action.category, "Review-required path was preserved without mutation.", action.fingerprint)));
+
+  const unresolvedPlanConflicts = plan.conflicts
+    .filter((finding) => !(force && managedPathSet.has(finding.relativePath)))
+    .map((finding) => applyAction(finding.relativePath, "conflict", finding.category, finding.reason, finding.fingerprint));
+  const allConflicted = uniqueApplyActions([...conflicted, ...unresolvedPlanConflicts]);
+  const allReviewRequired = uniqueApplyActions(unresolvedReview);
+  const warnings = uniqueStrings([
+    ...allConflicted.map((item) => `${item.relativePath}: ${item.reason}`),
+    ...allReviewRequired.map((item) => `${item.relativePath}: ${item.reason}`),
+  ]);
+  const recommendedNextCommand = recommendApplyNextCommand(allConflicted, allReviewRequired, managedPathSet, force);
+
+  return Object.freeze({
+    ok: allConflicted.length === 0 && allReviewRequired.length === 0,
+    dryRun: false as const,
+    applied: true as const,
+    force,
+    repoRoot: plan.repoRoot,
+    configPath: plan.configPath,
+    plan,
+    changed: Object.freeze(uniqueApplyActions(changed)),
+    preserved: Object.freeze(uniqueApplyActions(preserved)),
+    skipped: Object.freeze(uniqueApplyActions(skipped)),
+    conflicted: Object.freeze(allConflicted),
+    reviewRequired: Object.freeze(allReviewRequired),
+    warnings: Object.freeze(warnings),
+    statePreservation: plan.statePreservation,
+    requiredTrustSteps: plan.requiredTrustSteps,
+    recommendedNextCommand,
+  });
+}
+
 export function formatMigrationPlan(plan: AiuMigrationPlan): string {
   return [
     `repoRoot: ${plan.repoRoot}`,
@@ -291,6 +400,36 @@ export function formatMigrationPlan(plan: AiuMigrationPlan): string {
     ...plan.requiredTrustSteps.map((step) => `- ${step}`),
     "",
     `Recommended next command: ${plan.recommendedNextCommand}`,
+    "",
+  ].join("\n");
+}
+
+export function formatMigrationApplyResult(result: AiuMigrationApplyResult): string {
+  return [
+    `repoRoot: ${result.repoRoot}`,
+    `mode: apply${result.force ? " --force" : ""}`,
+    "",
+    "Changed:",
+    ...formatApplyActions(result.changed),
+    "",
+    "Preserved:",
+    ...formatApplyActions(result.preserved),
+    "",
+    "Skipped:",
+    ...formatApplyActions(result.skipped),
+    "",
+    "Conflicted:",
+    ...formatApplyActions(result.conflicted),
+    "",
+    "Review-required:",
+    ...formatApplyActions(result.reviewRequired),
+    "",
+    `State preservation: ${result.statePreservation.stateDir} (${result.statePreservation.exists ? "present" : "not present"})`,
+    "",
+    "Required trust steps:",
+    ...result.requiredTrustSteps.map((step) => `- ${step}`),
+    "",
+    `Recommended next command: ${result.recommendedNextCommand}`,
     "",
   ].join("\n");
 }
@@ -672,6 +811,57 @@ function readText(absolutePath: string): string {
   }
 }
 
+interface ExistingManagedText {
+  readonly exists: boolean;
+  readonly content?: string;
+  readonly error?: string;
+}
+
+function readExistingManagedText(absolutePath: string): ExistingManagedText {
+  if (!existsSync(absolutePath)) {
+    return { exists: false };
+  }
+  try {
+    const stat = statSync(absolutePath);
+    if (!stat.isFile()) {
+      return { exists: true, error: "Path exists but is not a file." };
+    }
+    return { exists: true, content: readFileSync(absolutePath, "utf8") };
+  } catch (error) {
+    return { exists: true, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function writeManagedText(absolutePath: string, content: string): void {
+  mkdirSync(path.dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, content, "utf8");
+}
+
+function applyConfig(
+  plan: AiuMigrationPlan,
+  changed: AiuMigrationApplyAction[],
+  preserved: AiuMigrationApplyAction[],
+  conflicted: AiuMigrationApplyAction[],
+): void {
+  const relativePath = relativeToRepo(plan.repoRoot, plan.configPath);
+  const existing = readExistingManagedText(plan.configPath);
+  if (!existing.exists) {
+    const initPlan = planAiuInit({ cwd: plan.repoRoot, tool: "all" });
+    writeManagedText(plan.configPath, initPlan.config.content);
+    changed.push(applyAction(relativePath, "create", "package-config", "Created package-backed aiu.config.json defaults."));
+    return;
+  }
+  if (existing.error !== undefined) {
+    conflicted.push(applyAction(relativePath, "conflict", "existing-config", `Existing config could not be read: ${existing.error}`));
+    return;
+  }
+  if (readJsonObject(plan.configPath) === null) {
+    conflicted.push(applyAction(relativePath, "conflict", "existing-config", "Existing config is not valid JSON; preserving it until repaired."));
+    return;
+  }
+  preserved.push(applyAction(relativePath, "preserve", "existing-config", "Existing repository config and policy choices were preserved.", fingerprintText(existing.content ?? "")));
+}
+
 function readJsonObject(absolutePath: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(readText(absolutePath)) as unknown;
@@ -753,6 +943,49 @@ function readSchemaVersion(value: unknown): number | string | undefined {
   return typeof value === "number" || typeof value === "string" ? value : undefined;
 }
 
+function applyAction(relativePath: string, action: AiuMigrationApplyAction["action"], category: string, reason: string, fingerprint?: string): AiuMigrationApplyAction {
+  return {
+    relativePath,
+    action,
+    category,
+    reason,
+    ...(fingerprint ? { fingerprint } : {}),
+  };
+}
+
+function uniqueApplyActions(actions: readonly AiuMigrationApplyAction[]): AiuMigrationApplyAction[] {
+  const seen = new Set<string>();
+  return actions.filter((action) => {
+    const key = `${action.action}\0${action.category}\0${action.relativePath}\0${action.reason}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values)];
+}
+
+function recommendApplyNextCommand(
+  conflicted: readonly AiuMigrationApplyAction[],
+  reviewRequired: readonly AiuMigrationApplyAction[],
+  managedPathSet: ReadonlySet<string>,
+  force: boolean,
+): string {
+  if (conflicted.length === 0 && reviewRequired.length === 0) {
+    return "aiu doctor --json";
+  }
+  const unresolved = [...conflicted, ...reviewRequired];
+  const onlyManagedHostConflicts = unresolved.every((action) => managedPathSet.has(action.relativePath));
+  if (!force && onlyManagedHostConflicts) {
+    return "aiu migrate --apply --force --json";
+  }
+  return "Review reported paths, then rerun aiu migrate --dry-run --json.";
+}
+
 function formatFindingGroup(title: string, findings: readonly AiuMigrationFinding[]): string {
   const body = findings.length === 0 ? ["- none"] : findings.map((finding) => {
     const confidence = finding.confidence ? ` confidence=${finding.confidence}` : "";
@@ -763,5 +996,9 @@ function formatFindingGroup(title: string, findings: readonly AiuMigrationFindin
 }
 
 function formatFileActions(actions: readonly AiuMigrationFileAction[]): string[] {
+  return actions.length === 0 ? ["- none"] : actions.map((action) => `- ${action.relativePath} [${action.action}/${action.category}]: ${action.reason}`);
+}
+
+function formatApplyActions(actions: readonly AiuMigrationApplyAction[]): string[] {
   return actions.length === 0 ? ["- none"] : actions.map((action) => `- ${action.relativePath} [${action.action}/${action.category}]: ${action.reason}`);
 }

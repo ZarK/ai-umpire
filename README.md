@@ -120,6 +120,8 @@ The migration plan is expected to report repo-local hook wrappers, local-checkou
 
 Package-owned managed sections are the files and content emitted by `aiu init` or future migration apply commands. Repo-local customization points are repository policy, trusted state command argv arrays, host trust settings, prompts outside managed sections, and durable `.umpire/` state. If package-owned content conflicts with local content, review the diff and choose an explicit apply or `--force` path only when replacement is intentional.
 
+Apply is never the default. `pnpm exec aiu migrate --apply --json` writes package-backed config and managed host files for migration-safe paths, preserves existing config, prompt customizations, trusted command descriptors, and `.umpire/` state, and reports changed, preserved, skipped, conflicted, and review-required paths. Apply mode does not stage, commit, branch, push, open PRs, merge, close issues, delete cleanup candidates, or mutate provider state.
+
 OpenCode continuation uses `.umpire/state/continuation.json`, `.umpire/locks/continuation.lock`, and `.umpire/logs/continuation.jsonl` by default. These paths are configurable in `aiu.config.json`, exposed by `aiu paths` and `aiu status --json`, and remain local state that should not be committed or uploaded as provider truth.
 
 ## Whip Tasks

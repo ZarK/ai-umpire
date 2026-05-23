@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -156,6 +156,84 @@ describe("migration planner", () => {
     assert.equal(existsSync(path.join(target, ".umpire", "whip.json")), true);
     assert.equal(existsSync(path.join(target, "aiu.config.json")), true);
   });
+
+  it("applies package-backed config and managed host files only when explicitly requested", async () => {
+    const target = await createRepoRoot();
+
+    const dryRun = await runCli(target, ["migrate", "--json"]);
+    const dryRunJson = JSON.parse(dryRun.stdout) as MigrationEnvelope;
+    assert.equal(dryRunJson.migrate.dryRun, true);
+    assert.equal(existsSync(path.join(target, "aiu.config.json")), false);
+
+    const result = await runCli(target, ["migrate", "--apply", "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationApplyEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.migrate.applied, true);
+    assert.equal(parsed.migrate.dryRun, false);
+    assert.equal(parsed.migrate.ok, true);
+    assert.ok(parsed.migrate.changed.some((item) => item.relativePath === "aiu.config.json" && item.action === "create"));
+    assert.ok(parsed.migrate.changed.some((item) => item.relativePath === path.join(".opencode", "plugins", "ai-umpire-continuation.ts")));
+    assert.equal(existsSync(path.join(target, "aiu.config.json")), true);
+    const config = JSON.parse(await readFile(path.join(target, "aiu.config.json"), "utf8")) as { hosts: { enabled: string[] }; trustedStateCommands: Record<string, unknown> };
+    assert.deepEqual(config.hosts.enabled, ["opencode", "codex", "claude-code"]);
+    assert.ok("work" in config.trustedStateCommands);
+    assert.match(await readFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "utf8"), /@tjalve\/aiu\/opencode/);
+    assert.equal(existsSync(path.join(target, ".umpire")), false);
+  });
+
+  it("preserves existing config, prompt customizations, and state while reporting conflicts", async () => {
+    const target = await createRepoRoot();
+    await mkdir(path.join(target, ".opencode", "plugins"), { recursive: true });
+    await mkdir(path.join(target, ".umpire"), { recursive: true });
+    await writeFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "export const repoLocalPrompt = true;\n", "utf8");
+    await writeFile(path.join(target, ".umpire", "continuation.json"), JSON.stringify({ schemaVersion: 1, active: true }), "utf8");
+    await writeFile(path.join(target, "aiu.config.json"), JSON.stringify({
+      version: 1,
+      prompts: { sections: { work: { prepend: "Keep this repo prompt." } } },
+      trustedStateCommands: {
+        work: { argv: ["aie", "status", "--json"] },
+      },
+      hosts: { enabled: ["opencode"] },
+    }, null, 2), "utf8");
+
+    const result = await runCli(target, ["migrate", "--apply", "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationApplyEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.migrate.ok, false);
+    assert.ok(parsed.migrate.conflicted.some((item) => item.relativePath === path.join(".opencode", "plugins", "ai-umpire-continuation.ts")));
+    assert.ok(parsed.migrate.reviewRequired.some((item) => item.relativePath === path.join(".opencode", "plugins", "ai-umpire-continuation.ts")));
+    assert.equal(parsed.migrate.recommendedNextCommand, "aiu migrate --apply --force --json");
+    assert.ok(parsed.migrate.preserved.some((item) => item.relativePath === "aiu.config.json" && item.category === "existing-config"));
+    assert.ok(parsed.migrate.preserved.some((item) => item.relativePath === path.join(".umpire", "continuation.json")));
+    assert.equal(await readFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "utf8"), "export const repoLocalPrompt = true;\n");
+    assert.match(await readFile(path.join(target, "aiu.config.json"), "utf8"), /Keep this repo prompt/);
+    assert.match(await readFile(path.join(target, ".umpire", "continuation.json"), "utf8"), /"active":true/);
+  });
+
+  it("force apply replaces only managed host files and leaves cleanup candidates untouched", async () => {
+    const target = await createRepoRoot();
+    await mkdir(path.join(target, ".opencode", "plugins"), { recursive: true });
+    await mkdir(path.join(target, "scripts"), { recursive: true });
+    await writeFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "export const oldLocalHook = true;\n", "utf8");
+    await writeFile(path.join(target, "scripts", "aiu-stop.js"), "console.log('old ai-umpire helper');\n", "utf8");
+
+    const result = await runCli(target, ["migrate", "--apply", "--force", "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationApplyEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.migrate.force, true);
+    assert.ok(parsed.migrate.changed.some((item) => item.relativePath === path.join(".opencode", "plugins", "ai-umpire-continuation.ts") && item.action === "update"));
+    assert.ok(parsed.migrate.skipped.some((item) => item.relativePath === path.join("scripts", "aiu-stop.js") && item.category === "cleanup-candidate"));
+    assert.equal(parsed.migrate.recommendedNextCommand, "Review reported paths, then rerun aiu migrate --dry-run --json.");
+    assert.match(await readFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "utf8"), /createAiuOpenCodePlugin/);
+    assert.equal(await readFile(path.join(target, "scripts", "aiu-stop.js"), "utf8"), "console.log('old ai-umpire helper');\n");
+  });
 });
 
 interface MigrationEnvelope {
@@ -185,6 +263,22 @@ interface MigrationEnvelope {
     readonly stateMigrations: Array<{ relativePath: string; recognized: boolean }>;
     readonly requiredConfirmations: string[];
     readonly hostTrustSteps: string[];
+    readonly recommendedNextCommand: string;
+  };
+}
+
+interface MigrationApplyEnvelope {
+  readonly ok: boolean;
+  readonly migrate: {
+    readonly ok: boolean;
+    readonly dryRun: boolean;
+    readonly applied: boolean;
+    readonly force: boolean;
+    readonly changed: Array<{ relativePath: string; action: string; category: string }>;
+    readonly preserved: Array<{ relativePath: string; action: string; category: string }>;
+    readonly skipped: Array<{ relativePath: string; action: string; category: string }>;
+    readonly conflicted: Array<{ relativePath: string; action: string; category: string }>;
+    readonly reviewRequired: Array<{ relativePath: string; action: string; category: string }>;
     readonly recommendedNextCommand: string;
   };
 }

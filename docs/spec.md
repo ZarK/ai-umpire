@@ -145,8 +145,8 @@ M4.5 closes the milestone by making idle modes observable through read-only diag
 |----|-------------|--------|
 | FR-09-001 | Umpire can help repositories that previously used repo-local Umpire hooks, plugin wrappers, copied helper scripts, or local-checkout package references move to the published package entrypoint. | Desired |
 | FR-09-002 | Migration is dry-run first and reports files to update, package command paths, existing customizations, conflicts, state files, cleanup candidates, and required host trust steps. | Desired |
-| FR-09-003 | Migration preserves user-authored prompt text, host configuration outside managed sections, and durable continuation state where the state schema is recognized. | Desired |
-| FR-09-004 | Migration can apply package-backed config and host updates only after explicit user request. It must not stage, commit, branch, push, open PRs, or close work items. | Required |
+| FR-09-003 | Migration preserves user-authored prompt text, host configuration outside managed sections, trusted command descriptors, repository policy choices, and durable continuation state where the state schema is recognized. | Required |
+| FR-09-004 | Migration can apply package-backed config and host updates only after explicit user request. It reports changed, preserved, skipped, conflicted, and review-required paths, and must not stage, commit, branch, push, open PRs, merge, close work items, delete cleanup candidates, or mutate provider state. | Required |
 | FR-09-005 | Migration does not add runtime fallback support for copied implementation scripts or old helper semantics. Repositories should end on package-backed host entrypoints and configured trusted commands. | Required |
 
 ## FR-10 - Safety, Observability, And Hygiene
