@@ -114,7 +114,7 @@ export const aiuCli = createCli({
           exitCode: 2,
         };
       }
-      const result = runAiuHookStop({ tool, stdin: await readHookStopStdin() });
+      const result = await runAiuHookStop({ tool, stdin: await readHookStopStdin() });
       if (context.flags.json === true) {
         return {
           json: {
@@ -124,12 +124,15 @@ export const aiuCli = createCli({
               reason: result.reason,
               inputBytes: result.inputBytes,
               stdoutJson: result.stdoutJson,
+              diagnostics: result.diagnostics,
             },
           },
+          stderr: result.stderr,
         };
       }
       return {
         stdout: formatHookStopJson(result),
+        stderr: result.stderr,
       };
     }),
     createCommand(migrateCommand, (context) => {

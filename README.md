@@ -211,13 +211,13 @@ Supported targets are installed by `aiu init --tool <tool>` with package-backed 
 | Tool | Status | Lifecycle event | Prompt/continue path | Repo config written | Permission model | Install path | Main safety risk |
 |---|---|---|---|---|---|---|---|
 | OpenCode | Supported | Project plugin event hooks | Host plugin delegates to `@tjalve/aiu/opencode` and the package `aiu` command | `.opencode/plugins/ai-umpire-continuation.ts` | Review and enable project plugin | `aiu init --tool opencode` | Host plugin trust must be explicit. |
-| Codex CLI/Desktop | Experimental | `Stop` hook from a repo-local Codex plugin | `pnpm exec aiu hook-stop --tool codex`; currently safe-allows until the decision engine is wired | `.agents/plugins/marketplace.json`, `plugins/ai-umpire/**` | Install repo-local plugin and approve hook trust | `aiu init --tool codex` | Stop-hook continuation must not surprise the user; trust prompt is required. |
-| Claude Code | Experimental | Project `Stop` hook | `pnpm exec aiu hook-stop --tool claude-code`; currently safe-allows until the decision engine is wired | `.claude/settings.json` | Review project settings and approve hook trust | `aiu init --tool claude-code` | Project settings can run local commands, so conflicts are preserved by default. |
+| Codex CLI/Desktop | Experimental | `Stop` hook from a repo-local Codex plugin | `pnpm exec aiu hook-stop --tool codex`; blocks only when trusted state yields a concrete safe prompt and `hosts.stopHookBlocking.codex` is enabled | `.agents/plugins/marketplace.json`, `plugins/ai-umpire/**` | Install repo-local plugin and approve hook trust | `aiu init --tool codex` | Stop-hook continuation must not surprise the user; trust prompt is required. |
+| Claude Code | Experimental | Project `Stop` hook | `pnpm exec aiu hook-stop --tool claude-code`; blocks only when trusted state yields a concrete safe prompt and `hosts.stopHookBlocking.claude-code` is enabled | `.claude/settings.json` | Review project settings and approve hook trust | `aiu init --tool claude-code` | Project settings can run local commands, so conflicts are preserved by default. |
 | Gemini CLI, Cursor, Aider, Continue.dev, Goose | Unsupported recipe targets | No confirmed project Stop hook contract in this package | Document recipes only; no installer writes files | none | Tool-specific | none | Wrappers/MCP/rules may not have autonomous idle continuation semantics. |
 | Generic MCP server | Unsupported as a continuation hook | Host must call MCP explicitly | Possible future tool-provider integration only | none | Host MCP trust | none | MCP alone cannot continue an idle session unless the host invokes it. |
 | Git hooks and GitHub Actions | Unsupported for interactive continuation | Repository/CI events, not agent idle events | Validation only | none | Git/CI trust | none | Wrong lifecycle; these must not drive interactive continuation. |
 
-The experimental stop-hook command emits a valid allow response today instead of pretending the M2/M3 decision engine is already available. Future M3 work will replace that safe allow path with trusted-state decisions before blocking host stops.
+The experimental stop-hook command safe-allows by default. It emits a blocking host response only after configured trusted state loads successfully, the shared decision engine selects `continue` or safe `repair`, the rendered prompt is concrete, and per-host stop-hook blocking is explicitly enabled in config.
 
 ## Local Development
 
@@ -240,7 +240,7 @@ Use `pnpm exec aiu paths --json` to inspect the resolved package root, config pa
 - `@tjalve/aiu` - public package asset helpers
 - `@tjalve/aiu/opencode` - OpenCode plugin composition helpers
 - `aiu` - package CLI foundation
-- `aiu hook-stop` - experimental Codex and Claude Code Stop hook entrypoint that safely allows until M3 decisions are wired
+- `aiu hook-stop` - experimental Codex and Claude Code Stop hook entrypoint backed by trusted-state decisions and explicit stop-hook blocking policy
 - `loadAiuConfig` - typed config discovery, defaults, and validation
 - `renderAiuPromptSection` - repo-level prompt section customization helper
 - `runAiuDoctor` and `getAiuResolvedPaths` - read-only diagnostics and path inspection helpers

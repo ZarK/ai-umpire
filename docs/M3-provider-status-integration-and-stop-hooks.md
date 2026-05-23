@@ -72,13 +72,13 @@ Define host capability descriptors for:
 - user typing/TUI activity signals
 - project trust requirements
 
-OpenCode is the supported v1 host profile. Codex and Claude Code are experimental stop-hook installer targets because their project hook formats are known, but they must safe-allow stopping until the M2 decision engine is wired into M3 stop hooks. Other evaluated tools remain recipe-only or unsupported until they expose a confirmed project-level idle/stop hook contract.
+OpenCode is the supported v1 host profile. Codex and Claude Code are experimental stop-hook installer targets because their project hook formats are known; they safe-allow by default and block only after trusted state selects a concrete continuation or repair prompt and explicit per-host blocking policy is enabled. Other evaluated tools remain recipe-only or unsupported until they expose a confirmed project-level idle/stop hook contract.
 
 ### 1.2 - Host Policy
 
 Config can enable or disable continuation modes per host. If a host lacks a required capability for the selected continuation mode, Umpire stops with an actionable diagnostic.
 
-M3.1 implements this as a package-level `host_policy` runtime surface. `getAllAiuHostCapabilityProfiles()` exposes the OpenCode, Codex, and Claude Code profiles; `evaluateAiuHostRuntimePolicy()` validates per-host `hosts.modes` against effective capability support and returns stable `host-mode-supported`, `host-capability-disabled`, `host-capability-experimental`, and `host-capability-unsupported` diagnostics. `aiu init` writes safe defaults: OpenCode receives `continue`, `repair`, `wait`, and `stop`; Codex and Claude Code receive `stop` only until later M3 stop-hook blocking work is implemented.
+M3.1 implements this as a package-level `host_policy` runtime surface. `getAllAiuHostCapabilityProfiles()` exposes the OpenCode, Codex, and Claude Code profiles; `evaluateAiuHostRuntimePolicy()` validates per-host `hosts.modes` against effective capability support and returns stable `host-mode-supported`, `host-capability-disabled`, `host-capability-experimental`, and `host-capability-unsupported` diagnostics. `aiu init` writes safe defaults: OpenCode receives `continue`, `repair`, `wait`, and `stop`; Codex and Claude Code receive `stop`, with stop-hook blocking still requiring explicit `hosts.stopHookBlocking` opt-in.
 
 ---
 
@@ -121,7 +121,7 @@ Todos are advisory host state, not the source of workflow truth. Umpire can use 
 
 Stop-hook stderr is reserved for diagnostics only. JSON stdout must stay valid.
 
-The prototype command emits a valid allow response until the full M3 stop-hook decision flow exists; installers must not write host config that pretends continuation blocking is implemented earlier than it is.
+The command safe-allows unless the full stop-hook decision flow is available and explicitly enabled. Installers write package-backed commands, but blocking remains controlled by `hosts.stopHookBlocking` so host trust and project policy stay explicit.
 
 ### 3.2 - Block And Allow Rules
 
@@ -212,6 +212,8 @@ Status: implemented by the `@tjalve/aiu/opencode` runtime delegate. It normalize
 ### M3.3 - Implement Provider-Neutral Stop Hooks For Codex And Claude Code
 
 Make `aiu hook stop` use M2 decisions.
+
+Status: implemented by `aiu hook-stop --tool codex|claude-code`. The command parses host Stop hook JSON from stdin, loads configured trusted state commands, normalizes host-session state, runs the shared continuation decision engine, renders prompts, and emits clean host JSON. It blocks only for concrete `continue` or safe `repair` prompts when `hosts.stopHookBlocking.<tool>` is enabled; malformed hook input, config errors, trusted-state failures, unavailable state, active stop hooks, `wait`, and `stop` decisions all allow the host to stop with bounded redacted diagnostics on stderr.
 
 ### M3.4 - Implement Durable State, Locking, Logging, And Rotation
 

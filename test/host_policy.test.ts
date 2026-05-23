@@ -20,7 +20,7 @@ describe("host runtime policy", () => {
     assert.deepEqual(profiles.map((profile) => profile.tool), ["opencode", "codex", "claude-code"]);
     assert.deepEqual(profiles.map((profile) => profile.supportLevel), ["supported", "experimental", "experimental"]);
     assert.equal(getAiuHostCapabilityProfile("opencode").capabilities.promptDelivery.support, "supported");
-    assert.equal(getAiuHostCapabilityProfile("codex").stopHook.blocksByDefault, false);
+    assert.equal(getAiuHostCapabilityProfile("codex").stopHook.blocksByDefault, true);
     assert.equal(getAiuHostCapabilityProfile("claude-code").capabilities.stopHook.support, "experimental");
   });
 
@@ -101,9 +101,7 @@ describe("host runtime policy", () => {
             opencode: ["continue", "stop"],
             codex: ["continue"],
           },
-          stopHookBlocking: {
-            codex: true,
-          },
+          stopHookBlocking: {},
         },
       }));
 
@@ -112,7 +110,7 @@ describe("host runtime policy", () => {
       assert.equal(result.ok, false);
       assert.ok(result.diagnostics.some((item) => item.kind === "host-capability-disabled" && item.severity === "error"));
       assert.ok(result.diagnostics.some((item) => item.kind === "host-capability-experimental" && item.severity === "warning"));
-      assert.ok(result.diagnostics.some((item) => item.kind === "host-stop-hook-blocking-unsafe" && item.severity === "error"));
+      assert.equal(result.diagnostics.some((item) => item.kind === "host-stop-hook-blocking-unsafe"), false);
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }

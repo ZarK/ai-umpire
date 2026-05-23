@@ -111,7 +111,9 @@ describe("doctor diagnostics", () => {
 
     assert.equal(report.status, "error");
     assert.ok(report.checks.some((check) => check.kind === "host-runtime-disabled" && check.category === "host"));
-    assert.ok(report.checks.some((check) => check.kind === "host-stop-hook-blocking-unsafe" && check.category === "host"));
+    const stopHookCheck = report.checks.find((check) => check.kind === "host-stop-hook-blocking-unsafe" && check.category === "host");
+    assert.ok(stopHookCheck);
+    assert.match(stopHookCheck.suggestedNextAction, /hosts\.stopHookBlocking\.codex/);
   });
 
   it("reports trusted command availability without executing commands", async () => {
