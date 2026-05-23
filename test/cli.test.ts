@@ -166,6 +166,13 @@ describe("metadata-backed CLI", () => {
           outputShape?: string[];
           errorCodes?: string[];
         };
+        planning?: {
+          enabledDefault?: boolean;
+          stateFields?: string[];
+          questionFields?: string[];
+          actionFields?: string[];
+          stopReasons?: string[];
+        };
         quality?: {
           enabledDefault?: boolean;
           targetKinds?: string[];
@@ -267,6 +274,11 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.sections?.status?.outputShape?.includes("prompt"));
     assert.ok(parsed.sections?.status?.errorCodes?.includes("trusted-command-malformed-json"));
     assert.ok(parsed.sections?.status?.errorCodes?.includes("status-config-invalid"));
+    assert.equal(parsed.sections?.planning?.enabledDefault, true);
+    assert.ok(parsed.sections?.planning?.stateFields?.includes("nextAction"));
+    assert.ok(parsed.sections?.planning?.questionFields?.includes("requiresHuman"));
+    assert.ok(parsed.sections?.planning?.actionFields?.includes("artifactChecks"));
+    assert.ok(parsed.sections?.planning?.stopReasons?.includes("stop-human-input-required"));
     assert.equal(parsed.sections?.quality?.enabledDefault, true);
     assert.deepEqual(parsed.sections?.quality?.targetKinds, ["stage", "finding"]);
     assert.ok(parsed.sections?.quality?.stateFields?.includes("selectedTarget"));

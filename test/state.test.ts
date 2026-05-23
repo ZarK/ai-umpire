@@ -261,6 +261,11 @@ function fixtures(): readonly AiuTrustedStatePayload[] {
     status: "unsupported",
     needsPlanning: "unsupported",
     humanInputRequired: "unknown",
+    decisions: [],
+    unresolvedQuestions: [],
+    draftPaths: [],
+    artifacts: [],
+    providers: [],
     reasonCodes: ["stop-unsupported-input"],
   };
 

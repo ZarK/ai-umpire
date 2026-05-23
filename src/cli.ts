@@ -286,6 +286,17 @@ export const aiuCli = createCli({
           selectedTargetFields: ["kind", "id", "title", "stageId", "status", "affectedPaths", "command", "rerunCommand", "expectedEvidence"],
           stopReasons: ["stop-supply-chain-approval", "stop-human-input-required", "stop-malformed-input", "stop-stale-input", "stop-unknown-input", "stop-unsupported-input", "stop-untrusted-input"],
         },
+        planning: {
+          enabledDefault: getDefaultAiuConfig().planning.enabled,
+          stateFields: ["needsPlanning", "humanInputRequired", "currentPhase", "decisions", "unresolvedQuestions", "draftPaths", "artifacts", "providers", "nextAction", "stopCondition", "supplyChainApprovalRequired"],
+          decisionFields: ["id", "title", "status", "summary", "source"],
+          questionFields: ["id", "title", "summary", "category", "status", "requiresHuman", "affectedPaths"],
+          artifactFields: ["path", "kind", "status", "summary"],
+          providerFields: ["id", "kind", "status", "summary"],
+          actionFields: ["id", "title", "kind", "status", "command", "artifactChecks", "draftPaths", "expectedEvidence"],
+          stopConditionFields: ["id", "title", "category", "status", "requiresHuman", "affectedPaths"],
+          stopReasons: ["stop-supply-chain-approval", "stop-human-input-required", "stop-malformed-input", "stop-stale-input", "stop-unknown-input", "stop-unsupported-input", "stop-untrusted-input"],
+        },
         whip: {
           commands: ["aiu whip list", "aiu whip status", "aiu whip add", "aiu whip cancel", "aiu whip complete"],
           stateSchemaVersion: AIU_WHIP_STATE_SCHEMA_VERSION,

@@ -35,6 +35,7 @@ describe("config foundation", () => {
     assert.equal(result.config.continuation.trustUnstructuredProse, false);
     assert.equal(result.config.supplyChain.stopOnApprovalRequired, true);
     assert.deepEqual(result.config.prompts.sections, {});
+    assert.equal(result.config.planning.enabled, true);
     assert.equal(result.config.quality.enabled, true);
     assert.equal(result.config.whip.enabled, true);
     assert.equal(result.config.whip.usePackageDefaults, true);
@@ -101,6 +102,9 @@ describe("config foundation", () => {
       quality: {
         enabled: false,
       },
+      planning: {
+        enabled: false,
+      },
       whip: {
         enabled: false,
         usePackageDefaults: false,
@@ -126,6 +130,7 @@ describe("config foundation", () => {
     assert.equal(result.config.timeouts.commandMs, 10_000);
     assert.deepEqual(result.config.prompts.sections.work?.prepend, ["Check trusted state first."]);
     assert.deepEqual(result.config.prompts.sections.work?.append, ["Keep the prompt bounded."]);
+    assert.equal(result.config.planning.enabled, false);
     assert.equal(result.config.quality.enabled, false);
     assert.equal(result.config.whip.enabled, false);
     assert.equal(result.config.whip.usePackageDefaults, false);

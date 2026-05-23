@@ -120,6 +120,7 @@ export async function runAiuHookStop(options: AiuHookStopOptions): Promise<AiuHo
       stopOnUnknownState: configLoad.config.continuation.stopOnUnknownState,
       stopOnUnsafeState: configLoad.config.continuation.stopOnUnsafeState,
       stopOnSupplyChainApprovalBlock: configLoad.config.continuation.stopOnSupplyChainApprovalBlock,
+      planningEnabled: configLoad.config.planning.enabled,
       qualityEnabled: configLoad.config.quality.enabled,
       supplyChainApprovalRequired: configLoad.config.supplyChain.stopOnApprovalRequired === true && hasSupplyChainApprovalBlock(states),
     },

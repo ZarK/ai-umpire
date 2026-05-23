@@ -198,6 +198,70 @@ describe("trusted command adapters", () => {
     assert.equal(result.states[0]?.value.status, "pass");
   });
 
+  it("normalizes Bootstrap planning actions, questions, artifacts, and providers", async () => {
+    const { parseAiuTrustedStateJson, toAiuTrustedStateCommandRef } = await loadTrustedAdapter();
+    const command = toAiuTrustedStateCommandRef("planning", { argv: ["fixture"] });
+    const result = parseAiuTrustedStateJson({
+      sourceId: "planning",
+      command,
+      stdout: JSON.stringify({
+        schemaVersion: 1,
+        observedAt,
+        value: {
+          kind: "planning",
+          status: "pass",
+          needsPlanning: true,
+          humanInputRequired: false,
+          currentPhase: "milestone-draft",
+          decisions: [{ id: "scope", status: "decided", summary: "Keep this to planning continuation." }],
+          unresolvedQuestions: [{
+            id: "provider-schema",
+            category: "provider-schema",
+            status: "fail",
+            requiresHuman: true,
+            affectedPaths: ["docs/spec.md", 42],
+          }],
+          draftPaths: ["docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md"],
+          artifacts: [{ path: "docs/spec.md", kind: "spec", status: "pass" }],
+          providers: [{ id: "github", kind: "issues", status: "unknown" }],
+          nextAction: {
+            id: "bootstrap-plan",
+            title: "Refresh Bootstrap plan",
+            kind: "artifact-update",
+            status: "pass",
+            command: { id: "bootstrap-plan", argv: ["bootstrap", "plan"], timeoutMs: 1000 },
+            artifactChecks: ["docs/spec.md"],
+            draftPaths: ["docs/spec.md"],
+            expectedEvidence: "Updated planning artifacts.",
+          },
+          stopCondition: {
+            id: "human-schema",
+            category: "human-question",
+            status: "fail",
+            requiresHuman: true,
+            affectedPaths: ["docs/spec.md"],
+          },
+          supplyChainApprovalRequired: "unknown",
+        },
+      }),
+      observedAt,
+    });
+
+    assert.equal(result.ok, true);
+    const value = result.states[0]?.value;
+    assert.equal(value?.kind, "planning");
+    assert.equal(value?.kind === "planning" ? value.currentPhase : undefined, "milestone-draft");
+    assert.deepEqual(value?.kind === "planning" ? value.draftPaths : [], ["docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md"]);
+    assert.equal(value?.kind === "planning" ? value.nextAction?.command?.argv.join(" ") : "", "bootstrap plan");
+    assert.equal(value?.kind === "planning" ? value.nextAction?.command?.timeoutMs : undefined, 1000);
+    assert.deepEqual(value?.kind === "planning" ? value.nextAction?.artifactChecks : [], ["docs/spec.md"]);
+    assert.equal(value?.kind === "planning" ? value.unresolvedQuestions[0]?.requiresHuman : false, true);
+    assert.deepEqual(value?.kind === "planning" ? value.unresolvedQuestions[0]?.affectedPaths : [], ["docs/spec.md"]);
+    assert.equal(value?.kind === "planning" ? value.providers[0]?.status : undefined, "unknown");
+    assert.equal(value?.kind === "planning" ? value.stopCondition?.category : undefined, "human-question");
+    assert.equal(value?.kind === "planning" ? value.supplyChainApprovalRequired : undefined, "unknown");
+  });
+
   it("normalizes quality stages, findings, commands, and approval blocks", async () => {
     const { parseAiuTrustedStateJson, toAiuTrustedStateCommandRef } = await loadTrustedAdapter();
     const command = toAiuTrustedStateCommandRef("quality", { argv: ["fixture"] });

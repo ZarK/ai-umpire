@@ -74,7 +74,7 @@ function promptLead(decision: AiuContinuationDecision): string {
     return `Start ready work${item}. Start the selected ready work item and keep the change scoped to that item.`;
   }
   if (decision.kind === "continue" && decision.promptKind === "planning") {
-    return `Continue planning${item}. Use the trusted planning state to make the next concrete planning update.`;
+    return planningLead(decision, item);
   }
   if (decision.kind === "continue" && decision.promptKind === "quality") {
     return qualityLead(decision, item);
@@ -100,6 +100,19 @@ function qualityLead(decision: AiuContinuationDecision, item: string): string {
     selected?.affectedPaths && selected.affectedPaths.length > 0 ? `Affected paths: ${selected.affectedPaths.map(formatPromptData).join(", ")}.` : "Affected paths: use the trusted quality state when provided.",
     `Expected evidence: ${selected?.expectedEvidence ?? "updated trusted quality state plus rerun output"}.`,
     "Do not treat agent narration, terminal logs, issue prose, comments, or checklist edits as passing quality evidence.",
+  ];
+  return details.join("\n");
+}
+
+function planningLead(decision: AiuContinuationDecision, item: string): string {
+  const selected = decision.selectedItem;
+  const details = [
+    `Continue planning${item}. Run one concrete Bootstrap planning action from trusted planning state; do not start implementation work.`,
+    selected?.command ? `Next configured command: ${formatCommand(selected.command)}.` : "Next configured command: inspect the trusted planning source for the configured Bootstrap command.",
+    selected?.artifactChecks && selected.artifactChecks.length > 0 ? `Artifact checks: ${selected.artifactChecks.map(formatPromptData).join(", ")}.` : "Artifact checks: verify the generated planning artifacts named by trusted state.",
+    selected?.affectedPaths && selected.affectedPaths.length > 0 ? `Draft paths: ${selected.affectedPaths.map(formatPromptData).join(", ")}.` : "Draft paths: use only trusted planning state paths when provided.",
+    `Expected evidence: ${selected?.expectedEvidence ?? "updated trusted Bootstrap planning state plus artifact check output"}.`,
+    "Do not invent missing product decisions, provider schema fields, work-item mappings, or acceptance criteria.",
   ];
   return details.join("\n");
 }

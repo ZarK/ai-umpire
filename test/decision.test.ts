@@ -44,7 +44,17 @@ describe("continuation decision engine", () => {
 
   it("stops when planning needs a human answer", () => {
     const result = decideAiuContinuation({
-      states: [env(planning({ needsPlanning: true, humanInputRequired: true }))],
+      states: [env(planning({
+        needsPlanning: true,
+        humanInputRequired: true,
+        unresolvedQuestions: [{
+          id: "provider-fields",
+          category: "provider-schema",
+          status: "fail",
+          requiresHuman: true,
+          affectedPaths: ["docs/spec.md"],
+        }],
+      }))],
     });
 
     assertDecision(result, "stop", "stop-human-input-required");
@@ -192,7 +202,23 @@ describe("continuation decision engine", () => {
   });
 
   it("continues planning, ready work, quality work, whip slot, or clean stop in priority order", () => {
-    assertDecision(decideAiuContinuation({ states: [env(planning({ needsPlanning: true }))] }), "continue", "continue-planning");
+    const planningDecision = decideAiuContinuation({ states: [env(planning({
+      needsPlanning: true,
+      nextAction: {
+        id: "refresh-milestone",
+        title: "Refresh milestone draft",
+        kind: "bootstrap-plan",
+        status: "pass",
+        command: { id: "bootstrap-plan", argv: ["bootstrap", "plan"] },
+        artifactChecks: ["docs/spec.md"],
+        draftPaths: ["docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md"],
+        expectedEvidence: "Updated planning artifacts and trusted planning state.",
+      },
+    }))] });
+    assertDecision(planningDecision, "continue", "continue-planning");
+    assert.equal(planningDecision.promptKind, "planning");
+    assert.equal(planningDecision.selectedItem?.id, "refresh-milestone");
+    assert.deepEqual(planningDecision.selectedItem?.artifactChecks, ["docs/spec.md"]);
 
     assertDecision(
       decideAiuContinuation({
@@ -200,6 +226,39 @@ describe("continuation decision engine", () => {
       }),
       "stop",
       "stop-unknown-input",
+    );
+
+    assertDecision(
+      decideAiuContinuation({
+        states: [env(planning({
+          needsPlanning: true,
+          nextAction: {
+            id: "ambiguous",
+            status: "unknown",
+            artifactChecks: [],
+            draftPaths: [],
+          },
+        }))],
+      }),
+      "stop",
+      "stop-unknown-input",
+    );
+
+    assertDecision(
+      decideAiuContinuation({
+        states: [env(planning({
+          needsPlanning: true,
+          nextAction: {
+            id: "refresh-milestone",
+            status: "pass",
+            artifactChecks: ["docs/spec.md"],
+            draftPaths: [],
+          },
+        }))],
+        policy: { planningEnabled: false },
+      }),
+      "stop",
+      "stop-clean",
     );
 
     const ready = decideAiuContinuation({
@@ -456,6 +515,11 @@ function planning(overrides: Partial<AiuPlanningState> = {}): AiuPlanningState {
     status: "pass",
     needsPlanning: false,
     humanInputRequired: false,
+    decisions: [],
+    unresolvedQuestions: [],
+    draftPaths: [],
+    artifacts: [],
+    providers: [],
     ...overrides,
   };
 }

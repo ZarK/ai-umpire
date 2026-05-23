@@ -108,6 +108,14 @@ export interface AiuStatusPlanningSummary {
   readonly status: AiuStateValueKind;
   readonly needsPlanning: boolean | "unknown" | "unsupported";
   readonly humanInputRequired: boolean | "unknown";
+  readonly currentPhase?: string;
+  readonly selectedAction?: string;
+  readonly unresolvedQuestions: readonly string[];
+  readonly draftPaths: readonly string[];
+  readonly artifactCount: number;
+  readonly providerCount: number;
+  readonly stopCondition?: string;
+  readonly supplyChainApprovalRequired?: boolean | "unknown";
 }
 
 export interface AiuStatusQualitySummary {
@@ -200,6 +208,7 @@ export function createAiuStatusReport(
       stopOnUnknownState: configLoad.config.continuation.stopOnUnknownState,
       stopOnUnsafeState: configLoad.config.continuation.stopOnUnsafeState,
       stopOnSupplyChainApprovalBlock: configLoad.config.continuation.stopOnSupplyChainApprovalBlock,
+      planningEnabled: configLoad.config.planning.enabled,
       qualityEnabled: configLoad.config.quality.enabled,
       supplyChainApprovalRequired: false,
     },
@@ -256,7 +265,7 @@ export function formatAiuStatusReport(report: AiuStatusReport): string {
     "",
     `activeWork: ${report.normalizedStateSummary.activeWork.length}`,
     `activeReviews: ${report.normalizedStateSummary.activeReviews.length}`,
-    `planning: ${report.normalizedStateSummary.planning.map((item) => `${item.sourceId} needs=${String(item.needsPlanning)} human=${String(item.humanInputRequired)}`).join(", ") || "none"}`,
+    `planning: ${report.normalizedStateSummary.planning.map((item) => `${item.sourceId} needs=${String(item.needsPlanning)} human=${String(item.humanInputRequired)} action=${item.selectedAction ?? "none"} questions=${item.unresolvedQuestions.length}`).join(", ") || "none"}`,
     `quality: ${report.normalizedStateSummary.quality.map((item) => `${item.sourceId} ready=${String(item.ready)} last=${item.lastRunStatus} target=${item.selectedTarget ?? "none"}`).join(", ") || "none"}`,
     `errors: ${report.errors.length}`,
     `warnings: ${report.warnings.length}`,
@@ -296,6 +305,14 @@ function summarizeStates(states: readonly AiuTrustedStateEnvelope[]): AiuStatusS
         status: value.status,
         needsPlanning: value.needsPlanning,
         humanInputRequired: value.humanInputRequired,
+        ...(value.currentPhase ? { currentPhase: value.currentPhase } : {}),
+        ...(value.nextAction ? { selectedAction: value.nextAction.id } : {}),
+        unresolvedQuestions: Object.freeze(value.unresolvedQuestions.map((question) => question.id)),
+        draftPaths: Object.freeze([...value.draftPaths]),
+        artifactCount: value.artifacts.length,
+        providerCount: value.providers.length,
+        ...(value.stopCondition ? { stopCondition: value.stopCondition.id } : {}),
+        ...(value.supplyChainApprovalRequired !== undefined ? { supplyChainApprovalRequired: value.supplyChainApprovalRequired } : {}),
       }];
     })),
     quality: Object.freeze(states.flatMap((state) => {

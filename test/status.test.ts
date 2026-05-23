@@ -164,6 +164,52 @@ describe("status reporting", () => {
     assert.deepEqual(disabled.decision.reasonCodes, ["stop-clean"]);
   });
 
+  it("surfaces Bootstrap planning actions in status and prompt output", async () => {
+    const { createAiuStatusReport } = await loadStatus();
+    const report = createAiuStatusReport(await configLoad(), [
+      await successResult(envelope("planning", planningState({
+        needsPlanning: true,
+        currentPhase: "milestone-draft",
+        draftPaths: ["docs/spec.md"],
+        artifacts: [{ path: "docs/spec.md", status: "pass" }],
+        providers: [{ id: "github", status: "pass" }],
+        nextAction: {
+          id: "bootstrap-plan",
+          status: "pass",
+          command: { id: "bootstrap-plan", argv: ["bootstrap", "plan"] },
+          artifactChecks: ["docs/spec.md"],
+          draftPaths: ["docs/M4-whip-tasks-quality-idle-work-and-planning-continuation.md"],
+          expectedEvidence: "Updated Bootstrap planning artifacts.",
+        },
+      }))),
+    ]);
+
+    assert.deepEqual(report.decision.reasonCodes, ["continue-planning"]);
+    assert.equal(report.decision.selectedItem?.id, "bootstrap-plan");
+    assert.deepEqual(report.decision.selectedItem?.artifactChecks, ["docs/spec.md"]);
+    assert.equal(report.normalizedStateSummary.planning[0]?.currentPhase, "milestone-draft");
+    assert.equal(report.normalizedStateSummary.planning[0]?.selectedAction, "bootstrap-plan");
+    assert.deepEqual(report.normalizedStateSummary.planning[0]?.draftPaths, ["docs/spec.md"]);
+    assert.equal(report.normalizedStateSummary.planning[0]?.artifactCount, 1);
+    assert.equal(report.normalizedStateSummary.planning[0]?.providerCount, 1);
+    assert.match(report.prompt.body, /Continue planning/);
+    assert.match(report.prompt.body, /do not start implementation work/i);
+    assert.match(report.prompt.body, /"bootstrap" "plan"/);
+
+    const disabled = createAiuStatusReport(await configLoad({ planningEnabled: false }), [
+      await successResult(envelope("planning", planningState({
+        needsPlanning: true,
+        nextAction: {
+          id: "bootstrap-plan",
+          status: "pass",
+          artifactChecks: ["docs/spec.md"],
+          draftPaths: [],
+        },
+      }))),
+    ]);
+    assert.deepEqual(disabled.decision.reasonCodes, ["stop-clean"]);
+  });
+
   it("emits concise human status output from the typed report", async () => {
     const result = await runCli(["status"]);
 
@@ -206,7 +252,7 @@ async function envelope(sourceId: string, value: State.AiuTrustedStatePayload, o
   });
 }
 
-async function configLoad(options: { readonly supplyChainApprovalRequired?: boolean; readonly modes?: Config.AiuContinuationMode[]; readonly qualityEnabled?: boolean } = {}): Promise<Config.AiuConfigLoadResult> {
+async function configLoad(options: { readonly supplyChainApprovalRequired?: boolean; readonly modes?: Config.AiuContinuationMode[]; readonly planningEnabled?: boolean; readonly qualityEnabled?: boolean } = {}): Promise<Config.AiuConfigLoadResult> {
   const { getDefaultAiuConfig } = await loadConfig();
   const config = getDefaultAiuConfig();
   return {
@@ -224,6 +270,10 @@ async function configLoad(options: { readonly supplyChainApprovalRequired?: bool
       continuation: {
         ...config.continuation,
         modes: options.modes ?? config.continuation.modes,
+      },
+      planning: {
+        ...config.planning,
+        enabled: options.planningEnabled ?? config.planning.enabled,
       },
       quality: {
         ...config.quality,
@@ -321,6 +371,11 @@ function planningState(overrides: Partial<State.AiuPlanningState> = {}): State.A
     status: "pass",
     needsPlanning: false,
     humanInputRequired: false,
+    decisions: [],
+    unresolvedQuestions: [],
+    draftPaths: [],
+    artifacts: [],
+    providers: [],
     ...overrides,
   };
 }

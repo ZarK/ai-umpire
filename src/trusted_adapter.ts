@@ -15,6 +15,13 @@ import {
   type AiuStateFreshness,
   type AiuStateFreshnessKind,
   type AiuStateValueKind,
+  type AiuPlanningAction,
+  type AiuPlanningArtifact,
+  type AiuPlanningDecision,
+  type AiuPlanningProvider,
+  type AiuPlanningQuestion,
+  type AiuPlanningState,
+  type AiuPlanningStopCondition,
   type AiuQualityFinding,
   type AiuQualitySelectedTarget,
   type AiuQualityStage,
@@ -352,10 +359,136 @@ function normalizeTrustedStateEntry(
 }
 
 function normalizeTrustedStateValue(value: Record<string, unknown>): AiuTrustedStatePayload {
+  if (value.kind === "planning") {
+    return normalizePlanningState(value);
+  }
   if (value.kind === "quality") {
     return normalizeQualityState(value);
   }
   return value as unknown as AiuTrustedStatePayload;
+}
+
+function normalizePlanningState(value: Record<string, unknown>): AiuPlanningState {
+  const summary = readString(value.summary);
+  const currentPhase = readString(value.currentPhase);
+  const nextAction = normalizePlanningAction(value.nextAction);
+  const stopCondition = normalizePlanningStopCondition(value.stopCondition);
+  const supplyChainApprovalRequired = readBooleanUnknown(value.supplyChainApprovalRequired);
+  return Object.freeze({
+    kind: "planning",
+    status: value.status as AiuStateValueKind,
+    ...(summary ? { summary } : {}),
+    needsPlanning: readBooleanUnknownUnsupported(value.needsPlanning, false),
+    humanInputRequired: readBooleanUnknown(value.humanInputRequired) ?? false,
+    ...(currentPhase ? { currentPhase } : {}),
+    decisions: normalizePlanningDecisions(value.decisions),
+    unresolvedQuestions: normalizePlanningQuestions(value.unresolvedQuestions),
+    draftPaths: Object.freeze(readStringArray(value.draftPaths)),
+    artifacts: normalizePlanningArtifacts(value.artifacts),
+    providers: normalizePlanningProviders(value.providers),
+    ...(nextAction ? { nextAction } : {}),
+    ...(stopCondition ? { stopCondition } : {}),
+    ...(supplyChainApprovalRequired !== undefined ? { supplyChainApprovalRequired } : {}),
+    ...(Array.isArray(value.reasonCodes) ? { reasonCodes: readStringArray(value.reasonCodes) as AiuPlanningState["reasonCodes"] } : {}),
+  });
+}
+
+function normalizePlanningDecisions(value: unknown): readonly AiuPlanningDecision[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze(value.flatMap((item): AiuPlanningDecision[] => {
+    if (!isRecord(item) || !readString(item.id)) return [];
+    const title = readString(item.title);
+    const summary = readString(item.summary);
+    const source = readString(item.source);
+    return [Object.freeze({
+      id: readString(item.id) as string,
+      ...(title ? { title } : {}),
+      status: item.status === "decided" || item.status === "pending" || item.status === "unknown" ? item.status : "unknown",
+      ...(summary ? { summary } : {}),
+      ...(source ? { source } : {}),
+    })];
+  }));
+}
+
+function normalizePlanningQuestions(value: unknown): readonly AiuPlanningQuestion[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze(value.flatMap((item): AiuPlanningQuestion[] => {
+    if (!isRecord(item) || !readString(item.id)) return [];
+    const title = readString(item.title);
+    const summary = readString(item.summary);
+    const requiresHuman = readBooleanUnknown(item.requiresHuman);
+    return [Object.freeze({
+      id: readString(item.id) as string,
+      ...(title ? { title } : {}),
+      ...(summary ? { summary } : {}),
+      ...(isPlanningQuestionCategory(item.category) ? { category: item.category } : {}),
+      status: isStateValueKind(item.status) ? item.status : "unknown",
+      ...(requiresHuman !== undefined ? { requiresHuman } : {}),
+      affectedPaths: Object.freeze(readStringArray(item.affectedPaths)),
+    })];
+  }));
+}
+
+function normalizePlanningArtifacts(value: unknown): readonly AiuPlanningArtifact[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze(value.flatMap((item): AiuPlanningArtifact[] => {
+    if (!isRecord(item) || !readString(item.path)) return [];
+    const kind = readString(item.kind);
+    const summary = readString(item.summary);
+    return [Object.freeze({
+      path: readString(item.path) as string,
+      ...(kind ? { kind } : {}),
+      status: isStateValueKind(item.status) ? item.status : "unknown",
+      ...(summary ? { summary } : {}),
+    })];
+  }));
+}
+
+function normalizePlanningProviders(value: unknown): readonly AiuPlanningProvider[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze(value.flatMap((item): AiuPlanningProvider[] => {
+    if (!isRecord(item) || !readString(item.id)) return [];
+    const kind = readString(item.kind);
+    const summary = readString(item.summary);
+    return [Object.freeze({
+      id: readString(item.id) as string,
+      ...(kind ? { kind } : {}),
+      status: isStateValueKind(item.status) ? item.status : "unknown",
+      ...(summary ? { summary } : {}),
+    })];
+  }));
+}
+
+function normalizePlanningAction(value: unknown): AiuPlanningAction | undefined {
+  if (!isRecord(value) || !readString(value.id)) return undefined;
+  const title = readString(value.title);
+  const kind = readString(value.kind);
+  const command = normalizeCommandRef(value.command);
+  const expectedEvidence = readString(value.expectedEvidence);
+  return Object.freeze({
+    id: readString(value.id) as string,
+    ...(title ? { title } : {}),
+    ...(kind ? { kind } : {}),
+    status: isStateValueKind(value.status) ? value.status : "unknown",
+    ...(command ? { command } : {}),
+    artifactChecks: Object.freeze(readStringArray(value.artifactChecks)),
+    draftPaths: Object.freeze(readStringArray(value.draftPaths)),
+    ...(expectedEvidence ? { expectedEvidence } : {}),
+  });
+}
+
+function normalizePlanningStopCondition(value: unknown): AiuPlanningStopCondition | undefined {
+  if (!isRecord(value) || !readString(value.id)) return undefined;
+  const title = readString(value.title);
+  const requiresHuman = readBooleanUnknown(value.requiresHuman);
+  return Object.freeze({
+    id: readString(value.id) as string,
+    ...(title ? { title } : {}),
+    category: isPlanningStopCategory(value.category) ? value.category : "unknown",
+    status: isStateValueKind(value.status) ? value.status : "unknown",
+    ...(requiresHuman !== undefined ? { requiresHuman } : {}),
+    affectedPaths: Object.freeze(readStringArray(value.affectedPaths)),
+  });
 }
 
 function normalizeQualityState(value: Record<string, unknown>): AiuQualityState {
@@ -595,6 +728,14 @@ function isQualityTargetKind(value: unknown): value is AiuQualityTargetKind {
 
 function isQualitySeverity(value: unknown): value is AiuQualityFinding["severity"] {
   return value === "low" || value === "medium" || value === "high" || value === "critical" || value === "unknown";
+}
+
+function isPlanningQuestionCategory(value: unknown): value is NonNullable<AiuPlanningQuestion["category"]> {
+  return value === "product-decision" || value === "provider-schema" || value === "work-item-mapping" || value === "artifact-inconsistency" || value === "supply-chain" || value === "unknown";
+}
+
+function isPlanningStopCategory(value: unknown): value is AiuPlanningStopCondition["category"] {
+  return value === "human-question" || value === "ambiguous-mapping" || value === "artifact-inconsistency" || value === "supply-chain-approval" || value === "unknown";
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {

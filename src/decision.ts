@@ -1,6 +1,7 @@
 import {
   type AiuContinuationDecisionKind,
   type AiuGateState,
+  type AiuPlanningAction,
   type AiuReasonCode,
   type AiuReviewState,
   type AiuQualityFinding,
@@ -38,6 +39,7 @@ export interface AiuContinuationDecisionPolicy {
   readonly stopOnSupplyChainApprovalBlock?: boolean;
   readonly allowParallelWork?: boolean;
   readonly allowParallelReview?: boolean;
+  readonly planningEnabled?: boolean;
   readonly qualityEnabled?: boolean;
   readonly cooldownActive?: boolean;
   readonly supplyChainApprovalRequired?: boolean;
@@ -80,6 +82,7 @@ export interface AiuDecisionSelectedItem {
   readonly affectedPaths?: readonly string[];
   readonly command?: { readonly id: string; readonly argv: readonly [string, ...string[]]; readonly cwd?: string; readonly timeoutMs?: number; readonly maxOutputBytes?: number };
   readonly rerunCommand?: { readonly id: string; readonly argv: readonly [string, ...string[]]; readonly cwd?: string; readonly timeoutMs?: number; readonly maxOutputBytes?: number };
+  readonly artifactChecks?: readonly string[];
   readonly expectedEvidence?: string;
 }
 
@@ -91,6 +94,7 @@ interface DecisionPolicy {
   readonly stopOnSupplyChainApprovalBlock: boolean;
   readonly allowParallelWork: boolean;
   readonly allowParallelReview: boolean;
+  readonly planningEnabled: boolean;
   readonly qualityEnabled: boolean;
   readonly cooldownActive: boolean;
   readonly supplyChainApprovalRequired: boolean;
@@ -110,6 +114,7 @@ const DEFAULT_POLICY: DecisionPolicy = Object.freeze({
   stopOnSupplyChainApprovalBlock: true,
   allowParallelWork: false,
   allowParallelReview: false,
+  planningEnabled: true,
   qualityEnabled: true,
   cooldownActive: false,
   supplyChainApprovalRequired: false,
@@ -154,14 +159,26 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
     }
   }
 
-  const planningHumanBlock = findPlanningHumanBlock(indexed);
-  if (planningHumanBlock) {
-    return decision(policy, "stop", "stop-human-input-required", summaries, "stop", planningHumanBlock, "Stop: answer the named planning question before continuing.");
-  }
+  if (policy.planningEnabled) {
+    const planningSupplyChainBlock = findPlanningSupplyChainBlock(indexed);
+    if (planningSupplyChainBlock && policy.stopOnSupplyChainApprovalBlock) {
+      return decision(policy, "stop", "stop-supply-chain-approval", summaries, "stop", planningSupplyChainBlock, "Stop: planning state reports supply-chain risk requiring human approval.");
+    }
 
-  const planningUnknownBlock = findPlanningUnknownBlock(indexed, policy);
-  if (planningUnknownBlock) {
-    return decision(policy, "stop", "stop-unknown-input", summaries, "stop", planningUnknownBlock, "Stop: refresh planning state before continuing.");
+    const planningHumanBlock = findPlanningHumanBlock(indexed);
+    if (planningHumanBlock) {
+      return decision(policy, "stop", "stop-human-input-required", summaries, "stop", planningHumanBlock, "Stop: answer the named planning question before continuing.");
+    }
+
+    const planningUnsupportedBlock = findPlanningUnsupportedBlock(indexed);
+    if (planningUnsupportedBlock) {
+      return decision(policy, "stop", "stop-unsupported-input", summaries, "stop", planningUnsupportedBlock, "Stop: planning state reports unsupported planning continuation.");
+    }
+
+    const planningUnknownBlock = findPlanningUnknownBlock(indexed, policy);
+    if (planningUnknownBlock) {
+      return decision(policy, "stop", "stop-unknown-input", summaries, "stop", planningUnknownBlock, "Stop: refresh planning state before continuing.");
+    }
   }
 
   const contradiction = findContradiction(indexed);
@@ -201,7 +218,7 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
     return decision(policy, "continue", "continue-active-work", summaries, "work", selectWorkItem(activeWork[0]), "Continue: resume the active work item before starting new work.");
   }
 
-  const planning = findPlanningContinuation(indexed);
+  const planning = findPlanningContinuation(indexed, policy);
   if (planning) {
     return decision(policy, "continue", "continue-planning", summaries, "planning", planning, "Continue: run the next planning action from trusted planning state.");
   }
@@ -236,6 +253,7 @@ function normalizeDecisionPolicy(input: AiuContinuationDecisionInput): DecisionP
     stopOnSupplyChainApprovalBlock: normalizeBoolean(configured.stopOnSupplyChainApprovalBlock, statePolicy?.kind === "continuation-policy" ? statePolicy.stopOnSupplyChainApprovalBlock : undefined, DEFAULT_POLICY.stopOnSupplyChainApprovalBlock),
     allowParallelWork: configured.allowParallelWork ?? DEFAULT_POLICY.allowParallelWork,
     allowParallelReview: configured.allowParallelReview ?? DEFAULT_POLICY.allowParallelReview,
+    planningEnabled: configured.planningEnabled ?? DEFAULT_POLICY.planningEnabled,
     qualityEnabled: configured.qualityEnabled ?? DEFAULT_POLICY.qualityEnabled,
     cooldownActive: configured.cooldownActive ?? DEFAULT_POLICY.cooldownActive,
     supplyChainApprovalRequired: configured.supplyChainApprovalRequired ?? DEFAULT_POLICY.supplyChainApprovalRequired,
@@ -300,18 +318,65 @@ function findHardInputStop(indexed: readonly IndexedState[], policy: DecisionPol
 }
 
 function findPlanningHumanBlock(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
-  const planning = indexed.find((item) => item.value.kind === "planning" && item.value.humanInputRequired === true);
-  return planning ? selectState(planning) : undefined;
+  for (const item of indexed) {
+    if (!hasKind(item, "planning")) continue;
+    if (
+      item.value.humanInputRequired === true
+      || item.value.unresolvedQuestions.some((question) => question.requiresHuman === true || isHumanPlanningQuestion(question.category))
+      || item.value.stopCondition?.requiresHuman === true
+      || item.value.stopCondition?.category === "human-question"
+      || item.value.stopCondition?.category === "ambiguous-mapping"
+      || item.value.stopCondition?.category === "artifact-inconsistency"
+    ) {
+      return selectPlanningState(item);
+    }
+  }
+  return undefined;
+}
+
+function findPlanningSupplyChainBlock(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
+  for (const item of indexed) {
+    if (!hasKind(item, "planning")) continue;
+    if (
+      item.value.supplyChainApprovalRequired === true
+      || item.value.stopCondition?.category === "supply-chain-approval"
+      || item.value.unresolvedQuestions.some((question) => question.category === "supply-chain" && question.requiresHuman !== false)
+    ) {
+      return selectPlanningState(item);
+    }
+  }
+  return undefined;
+}
+
+function findPlanningUnsupportedBlock(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
+  for (const item of indexed) {
+    if (!hasKind(item, "planning")) continue;
+    if (item.value.needsPlanning === "unsupported" || item.value.nextAction?.status === "unsupported" || item.value.stopCondition?.status === "unsupported") {
+      return selectPlanningState(item);
+    }
+  }
+  return undefined;
 }
 
 function findPlanningUnknownBlock(indexed: readonly IndexedState[], policy: DecisionPolicy): AiuDecisionSelectedItem | undefined {
   if (!policy.stopOnUnknownState) {
     return undefined;
   }
-  const planning = indexed.find(
-    (item) => item.value.kind === "planning" && (item.value.needsPlanning === "unknown" || item.value.humanInputRequired === "unknown"),
-  );
-  return planning ? selectState(planning) : undefined;
+  for (const item of indexed) {
+    if (!hasKind(item, "planning")) continue;
+    if (
+      item.value.needsPlanning === "unknown"
+      || item.value.humanInputRequired === "unknown"
+      || item.value.supplyChainApprovalRequired === "unknown"
+      || item.value.unresolvedQuestions.some((question) => question.status === "unknown" || question.requiresHuman === "unknown")
+      || item.value.artifacts.some((artifact) => artifact.status === "unknown")
+      || item.value.stopCondition?.status === "unknown"
+      || (item.value.needsPlanning === true && selectPlanningAction(item) === undefined)
+    ) {
+      return selectPlanningState(item);
+    }
+  }
+  return undefined;
 }
 
 function findQualitySupplyChainBlock(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
@@ -478,9 +543,20 @@ function reviewIdentity(item: AiuReviewState): string {
   return item.targetId ?? `${item.reviewStatus}:${item.status}:${item.unresolvedFeedbackCount ?? ""}`;
 }
 
-function findPlanningContinuation(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
-  const planning = indexed.find((item) => item.value.kind === "planning" && item.value.needsPlanning === true && item.value.humanInputRequired === false);
-  return planning ? selectState(planning) : undefined;
+function findPlanningContinuation(indexed: readonly IndexedState[], policy: DecisionPolicy): AiuDecisionSelectedItem | undefined {
+  if (!policy.planningEnabled) {
+    return undefined;
+  }
+  for (const planning of indexed.filter((item) => hasKind(item, "planning"))) {
+    if (planning.value.needsPlanning !== true || planning.value.humanInputRequired !== false) {
+      continue;
+    }
+    const action = selectPlanningAction(planning);
+    if (action) {
+      return action;
+    }
+  }
+  return undefined;
 }
 
 function findQualityContinuation(indexed: readonly IndexedState[], policy: DecisionPolicy): AiuDecisionSelectedItem | undefined {
@@ -574,6 +650,33 @@ function selectState(item: IndexedState): AiuDecisionSelectedItem {
     kind: item.value.kind,
     sourceId: item.sourceId,
     status: item.value.status,
+  });
+}
+
+function selectPlanningState(item: IndexedState & { readonly value: Extract<AiuTrustedStatePayload, { readonly kind: "planning" }> }): AiuDecisionSelectedItem {
+  return Object.freeze({
+    kind: "planning",
+    sourceId: item.sourceId,
+    status: item.value.status,
+    ...(item.value.currentPhase ? { title: item.value.currentPhase } : {}),
+    affectedPaths: Object.freeze([...item.value.draftPaths]),
+  });
+}
+
+function selectPlanningAction(item: IndexedState & { readonly value: Extract<AiuTrustedStatePayload, { readonly kind: "planning" }> }): AiuDecisionSelectedItem | undefined {
+  const action = item.value.nextAction;
+  if (!isConcretePlanningAction(action)) return undefined;
+  return Object.freeze({
+    kind: "planning",
+    id: action.id,
+    ...(action.title ? { title: action.title } : {}),
+    sourceId: item.sourceId,
+    status: action.status,
+    targetKind: action.kind ?? "planning-action",
+    affectedPaths: Object.freeze([...action.draftPaths, ...item.value.draftPaths].filter((path, index, all) => all.indexOf(path) === index)),
+    ...(action.command ? { command: action.command } : {}),
+    artifactChecks: Object.freeze([...action.artifactChecks]),
+    expectedEvidence: action.expectedEvidence ?? "Updated trusted Bootstrap planning state plus artifact check output.",
   });
 }
 
@@ -680,6 +783,18 @@ function statusReasonCode(value: AiuStateValueKind): AiuReasonCode {
 
 function isRepairableUnknown(kind: AiuTrustedStateKind): boolean {
   return kind === "repository" || kind === "gate-evidence" || kind === "review";
+}
+
+function isConcretePlanningAction(action: AiuPlanningAction | undefined): action is AiuPlanningAction {
+  return action !== undefined
+    && action.status === "pass"
+    && action.id.length > 0
+    && (action.command !== undefined || action.artifactChecks.length > 0 || action.draftPaths.length > 0);
+}
+
+function isHumanPlanningQuestion(category: string | undefined): boolean {
+  const externalSchemaQuestion = ["provider", "schema"].join("-");
+  return category === "product-decision" || category === externalSchemaQuestion || category === "work-item-mapping" || category === "artifact-inconsistency";
 }
 
 function hasKind<TKind extends AiuTrustedStateKind>(

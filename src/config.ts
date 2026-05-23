@@ -26,6 +26,7 @@ export interface AiuConfig {
   readonly paths: AiuPathsConfig;
   readonly supplyChain: AiuSupplyChainPolicy;
   readonly prompts: AiuPromptPolicy;
+  readonly planning: AiuPlanningPolicy;
   readonly quality: AiuQualityPolicy;
   readonly whip: AiuWhipPolicy;
 }
@@ -88,6 +89,10 @@ export interface AiuWhipPolicy {
   readonly usePackageDefaults: boolean;
   readonly tasks: readonly AiuWhipTaskDefinition[];
   readonly statePath: string;
+}
+
+export interface AiuPlanningPolicy {
+  readonly enabled: boolean;
 }
 
 export interface AiuQualityPolicy {
@@ -159,6 +164,9 @@ const DEFAULT_CONFIG: AiuConfig = Object.freeze({
   }),
   prompts: Object.freeze({
     sections: Object.freeze({}),
+  }),
+  planning: Object.freeze({
+    enabled: true,
   }),
   quality: Object.freeze({
     enabled: true,
@@ -241,6 +249,7 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
   const pathsConfig = normalizePaths(raw.paths, diagnostics);
   const supplyChain = normalizeSupplyChain(raw.supplyChain, diagnostics);
   const prompts = normalizePrompts(raw.prompts, diagnostics);
+  const planning = normalizePlanning(raw.planning, diagnostics);
   const quality = normalizeQuality(raw.quality, diagnostics);
   const whip = normalizeWhip(raw.whip, diagnostics);
 
@@ -268,6 +277,7 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
       paths: pathsConfig,
       supplyChain,
       prompts,
+      planning,
       quality,
       whip,
     }),
@@ -633,6 +643,19 @@ function normalizeQuality(value: unknown, diagnostics: AiuConfigDiagnostic[]): A
   });
 }
 
+function normalizePlanning(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuPlanningPolicy {
+  if (value === undefined) {
+    return DEFAULT_CONFIG.planning;
+  }
+  if (!isRecord(value)) {
+    diagnostics.push(diagnostic("invalid-planning-policy", "$.planning", "planning must be an object.", "Use { \"enabled\": false } to disable Bootstrap planning continuation."));
+    return DEFAULT_CONFIG.planning;
+  }
+  return Object.freeze({
+    enabled: normalizeBoolean(value.enabled, DEFAULT_CONFIG.planning.enabled, "$.planning.enabled", diagnostics),
+  });
+}
+
 function normalizeWhip(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuWhipPolicy {
   if (value === undefined) {
     return DEFAULT_CONFIG.whip;
@@ -932,6 +955,7 @@ function cloneConfig(config: AiuConfig): AiuConfig {
     cooldowns: Object.freeze({ ...config.cooldowns }),
     paths: Object.freeze({ ...config.paths }),
     supplyChain: Object.freeze({ ...config.supplyChain }),
+    planning: Object.freeze({ ...config.planning }),
     quality: Object.freeze({ ...config.quality }),
     prompts: Object.freeze({
       sections: Object.freeze(

@@ -195,6 +195,67 @@ export interface AiuGateState {
 export interface AiuPlanningState extends AiuBaseState<"planning"> {
   readonly needsPlanning: boolean | "unknown" | "unsupported";
   readonly humanInputRequired: boolean | "unknown";
+  readonly currentPhase?: string;
+  readonly decisions: readonly AiuPlanningDecision[];
+  readonly unresolvedQuestions: readonly AiuPlanningQuestion[];
+  readonly draftPaths: readonly string[];
+  readonly artifacts: readonly AiuPlanningArtifact[];
+  readonly providers: readonly AiuPlanningProvider[];
+  readonly nextAction?: AiuPlanningAction;
+  readonly stopCondition?: AiuPlanningStopCondition;
+  readonly supplyChainApprovalRequired?: boolean | "unknown";
+}
+
+export interface AiuPlanningDecision {
+  readonly id: string;
+  readonly title?: string;
+  readonly status: "decided" | "pending" | "unknown";
+  readonly summary?: string;
+  readonly source?: string;
+}
+
+export interface AiuPlanningQuestion {
+  readonly id: string;
+  readonly title?: string;
+  readonly summary?: string;
+  readonly category?: "product-decision" | "provider-schema" | "work-item-mapping" | "artifact-inconsistency" | "supply-chain" | "unknown";
+  readonly status: AiuStateValueKind;
+  readonly requiresHuman?: boolean | "unknown";
+  readonly affectedPaths: readonly string[];
+}
+
+export interface AiuPlanningArtifact {
+  readonly path: string;
+  readonly kind?: string;
+  readonly status: AiuStateValueKind;
+  readonly summary?: string;
+}
+
+export interface AiuPlanningProvider {
+  readonly id: string;
+  readonly kind?: string;
+  readonly status: AiuStateValueKind;
+  readonly summary?: string;
+}
+
+export interface AiuPlanningAction {
+  readonly id: string;
+  readonly title?: string;
+  readonly kind?: string;
+  readonly status: AiuStateValueKind;
+  readonly command?: AiuTrustedStateCommandRef;
+  readonly artifactChecks: readonly string[];
+  readonly draftPaths: readonly string[];
+  readonly expectedEvidence?: string;
+}
+
+export interface AiuPlanningStopCondition {
+  readonly id: string;
+  readonly title?: string;
+  readonly category: "human-question" | "ambiguous-mapping" | "artifact-inconsistency" | "supply-chain-approval" | "unknown";
+  readonly status: AiuStateValueKind;
+  readonly requiresHuman?: boolean | "unknown";
+  readonly affectedPaths: readonly string[];
 }
 
 export interface AiuQualityState extends AiuBaseState<"quality"> {
