@@ -1,0 +1,33 @@
+test/host_policy.test.ts
+  s_f8aaaf4fdfe4d6::t_8f7fcd9b417b0e 32
+test/init.test.ts
+  s_f8aaaf4fdfe4d6::t_8f7fcd9b417b0e 116-148
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_8f7fcd9b417b0e 176,236
+src/init.ts
+  s_f8aaaf4fdfe4d6::t_8f7fcd9b417b0e 208-216,220-222
+test/doctor.test.ts
+  s_f8aaaf4fdfe4d6::t_8f7fcd9b417b0e 98-116
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_8f7fcd9b417b0e 159-161
+src/doctor.ts
+  s_f8aaaf4fdfe4d6::t_8f7fcd9b417b0e 315,317,319,341
+src/host_policy.ts
+  s_f8aaaf4fdfe4d6::t_8f7fcd9b417b0e 272-279,372,376-379
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "29b86eec3ab879e7eb09e9552755d71024616658",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
