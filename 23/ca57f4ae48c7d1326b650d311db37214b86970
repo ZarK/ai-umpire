@@ -1,0 +1,61 @@
+test/hook_stop.test.ts
+  s_f8aaaf4fdfe4d6::t_0e47bc580195b1 121-146,148-154
+  s_f8aaaf4fdfe4d6::t_e7487ec7c69ef9 64-87,251-260
+  s_f8aaaf4fdfe4d6::t_6eeb04fa2968d7 88-89,92-94,101-111,113,116-120,336,365
+  s_f8aaaf4fdfe4d6::t_8b23232f1d0455 212-221
+  s_f8aaaf4fdfe4d6::t_4413c36647b748 147
+  s_f8aaaf4fdfe4d6::t_c9b2395d98e89b 90,95-98,100,112,114-115
+  s_f8aaaf4fdfe4d6::t_fab20a1509130d 1-63,155-211,222-231,262-335,337-364,366-391
+  s_f8aaaf4fdfe4d6::t_d3f81d749f74c9 232-250,261
+  s_f8aaaf4fdfe4d6::t_3c7adb603b99be 91,99
+test/host_policy.test.ts
+  s_f8aaaf4fdfe4d6::t_92a17310aefe97 23,104,113
+test/doctor.test.ts
+  s_f8aaaf4fdfe4d6::t_8defd7a347d11b 114-116
+src/doctor.ts
+  s_f8aaaf4fdfe4d6::t_2096b91ab80cff 338
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_dc6100fd36a889 371,386,391
+  s_f8aaaf4fdfe4d6::t_6d0eea668e2e8a 178
+docs/M3-provider-status-integration-and-stop-hooks.md
+  s_f8aaaf4fdfe4d6::t_6f464e992b6ad2 75,81
+  s_f8aaaf4fdfe4d6::t_a4ea77459ca978 124,216
+src/host_policy.ts
+  s_f8aaaf4fdfe4d6::t_1f6979ef1c1a48 110,112-113,121-122,220,222-223,231-232,321
+src/hook_stop.ts
+  s_f8aaaf4fdfe4d6::t_75722f6f0faef2 45,198-201,213,222-237,239-240,242-244
+  s_f8aaaf4fdfe4d6::t_144719e74f003e 71,79,83-87,90,101-104,112-115,128,140-141,358,371-379
+  s_f8aaaf4fdfe4d6::t_ecdd78561d37d8 347-348,350-351
+  s_f8aaaf4fdfe4d6::t_cea87c344bae43 1-6,11-13,18,21-25,28-44,46-48,50-51,53-56,59-70,72-78,80-82,88-89,91-100,105-111,116-127,129-130,133-139,142-143,187,189-190,192-195,197,202-212,214-218,220-221,245-346,354-357,359-370,380-388,399-404
+  s_f8aaaf4fdfe4d6::t_f046d860e101ab 57-58,188,191,196,219
+  s_f8aaaf4fdfe4d6::t_a19562ed06e742 238,241,393-396
+  s_f8aaaf4fdfe4d6::t_7473e9e9d278b1 49,349,352-353
+  s_f8aaaf4fdfe4d6::t_d9a423a475c2f2 391-392,397-398
+src/config.ts
+  s_f8aaaf4fdfe4d6::t_1ef834e1316099 705,707
+  s_f8aaaf4fdfe4d6::t_99cd1842ed2590 704,706
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_b61f1cfb29f8d7 513,517
+README.md
+  s_f8aaaf4fdfe4d6::t_c5d49448e079ad 214-215,220,243
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_7ce602898dc224 117,127,130,135
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_d4571d5cca8c85 102-103,115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "23ca57f4ae48c7d1326b650d311db37214b86970",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
