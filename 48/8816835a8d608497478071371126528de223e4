@@ -1,0 +1,34 @@
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_304650ca454a68 5,154-236,238
+src/init.ts
+  s_f8aaaf4fdfe4d6::t_c515626cd630ce 240
+  s_f8aaaf4fdfe4d6::t_835ed0546210c4 1-239,241-350
+test/init.test.ts
+  s_f8aaaf4fdfe4d6::t_031a1460295f8f 1-165
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_c70f7025cb9be7 99,116-123
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_6d39cf6922cd0e 15-16,60-68
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_e091114abb84df 13,26-31,45-52
+docs/M1-package-cli-config-and-host-foundation.md
+  s_f8aaaf4fdfe4d6::t_0d5d3ffccdc7a9 129-130
+README.md
+  s_f8aaaf4fdfe4d6::t_8e0b15eab7d01d 10,40,46-47,54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "488816835a8d608497478071371126528de223e4",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
