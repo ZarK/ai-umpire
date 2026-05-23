@@ -234,6 +234,20 @@ describe("migration planner", () => {
     assert.match(await readFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "utf8"), /createAiuOpenCodePlugin/);
     assert.equal(await readFile(path.join(target, "scripts", "aiu-stop.js"), "utf8"), "console.log('old ai-umpire helper');\n");
   });
+
+  it("reports managed write failures as conflicts without aborting apply output", async () => {
+    const target = await createRepoRoot();
+    await writeFile(path.join(target, ".opencode"), "not a directory\n", "utf8");
+
+    const result = await runCli(target, ["migrate", "--apply", "--json"]);
+    const parsed = JSON.parse(result.stdout) as MigrationApplyEnvelope;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.migrate.ok, false);
+    assert.ok(parsed.migrate.conflicted.some((item) => item.relativePath === path.join(".opencode", "plugins", "ai-umpire-continuation.ts") && item.category === "package-managed-host-file"));
+    assert.equal(await readFile(path.join(target, ".opencode"), "utf8"), "not a directory\n");
+  });
 });
 
 interface MigrationEnvelope {

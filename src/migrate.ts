@@ -294,7 +294,11 @@ export function applyAiuMigration(options: AiuMigrationOptions = {}): AiuMigrati
     const absolutePath = path.join(plan.repoRoot, file.relativePath);
     const existing = readExistingManagedText(absolutePath);
     if (!existing.exists) {
-      writeManagedText(absolutePath, file.content);
+      const writeError = tryWriteManagedText(absolutePath, file.content);
+      if (writeError !== undefined) {
+        conflicted.push(applyAction(file.relativePath, "conflict", "package-managed-host-file", `Managed host file could not be written: ${writeError}`));
+        continue;
+      }
       changed.push(applyAction(file.relativePath, "create", "package-managed-host-file", "Created package-backed host integration content."));
       continue;
     }
@@ -307,7 +311,11 @@ export function applyAiuMigration(options: AiuMigrationOptions = {}): AiuMigrati
       continue;
     }
     if (force) {
-      writeManagedText(absolutePath, file.content);
+      const writeError = tryWriteManagedText(absolutePath, file.content);
+      if (writeError !== undefined) {
+        conflicted.push(applyAction(file.relativePath, "conflict", "package-managed-host-file", `Managed host file could not be written: ${writeError}`, fingerprintText(existing.content ?? "")));
+        continue;
+      }
       changed.push(applyAction(file.relativePath, "update", "package-managed-host-file", "Replaced differing managed host file because --force was provided.", fingerprintText(existing.content ?? "")));
       continue;
     }
@@ -837,6 +845,15 @@ function writeManagedText(absolutePath: string, content: string): void {
   writeFileSync(absolutePath, content, "utf8");
 }
 
+function tryWriteManagedText(absolutePath: string, content: string): string | undefined {
+  try {
+    writeManagedText(absolutePath, content);
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
 function applyConfig(
   plan: AiuMigrationPlan,
   changed: AiuMigrationApplyAction[],
@@ -847,7 +864,11 @@ function applyConfig(
   const existing = readExistingManagedText(plan.configPath);
   if (!existing.exists) {
     const initPlan = planAiuInit({ cwd: plan.repoRoot, tool: "all" });
-    writeManagedText(plan.configPath, initPlan.config.content);
+    const writeError = tryWriteManagedText(plan.configPath, initPlan.config.content);
+    if (writeError !== undefined) {
+      conflicted.push(applyAction(relativePath, "conflict", "package-config", `Config could not be written: ${writeError}`));
+      return;
+    }
     changed.push(applyAction(relativePath, "create", "package-config", "Created package-backed aiu.config.json defaults."));
     return;
   }
