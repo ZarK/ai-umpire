@@ -1,0 +1,21 @@
+test/decision.test.ts
+  s_f8aaaf4fdfe4d6::t_8f1d0058c76d01 253-256
+src/decision.ts
+  s_f8aaaf4fdfe4d6::t_f6da27ceccd6a5 153-156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "41258a69d9a90519f303fac5278463f1daa47e28",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
