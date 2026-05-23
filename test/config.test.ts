@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { accessSync, constants } from "node:fs";
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -140,12 +141,18 @@ describe("config foundation", () => {
     assert.ok(kinds.includes("legacy-fallback-unsupported"));
   });
 
-  it("rejects state paths below file ancestors and non-searchable directories", async () => {
+  it("rejects state paths below file ancestors and non-searchable directories", async (t) => {
     const repoRoot = await createRepoRoot();
     const blockedDir = path.join(repoRoot, "blocked-dir");
     await writeFile(path.join(repoRoot, "state-parent-file"), "not a directory\n", "utf8");
     await mkdir(blockedDir);
     await chmod(blockedDir, 0o600);
+    if (canAccess(blockedDir, constants.W_OK | constants.X_OK)) {
+      await chmod(blockedDir, 0o700);
+      t.skip("directory search permission is not enforced on this platform or user");
+      return;
+    }
+
     try {
       await writeConfig(repoRoot, {
         version: 1,
@@ -178,4 +185,13 @@ async function createRepoRoot(): Promise<string> {
 
 async function writeConfig(repoRoot: string, config: unknown): Promise<void> {
   await writeFile(path.join(repoRoot, "aiu.config.json"), `${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+function canAccess(targetPath: string, mode: number): boolean {
+  try {
+    accessSync(targetPath, mode);
+    return true;
+  } catch {
+    return false;
+  }
 }
