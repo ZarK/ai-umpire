@@ -1,0 +1,23 @@
+src/hook_stop.ts
+  s_f8aaaf4fdfe4d6::t_bb6f7533838b7d 39,55-56,59
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_7c9cd09a9722a3 99
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_ae413590697c90 87-93,151-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "8c273fbf5c493290f25444057d6970d25ccc80f5",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
