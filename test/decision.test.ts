@@ -127,6 +127,25 @@ describe("continuation decision engine", () => {
     }
   });
 
+  it("repairs actionable invalid state before waiting on cooldown or host busy state", () => {
+    assertDecision(
+      decideAiuContinuation({
+        states: [env(review("blocked"))],
+        policy: { cooldownActive: true },
+      }),
+      "repair",
+      "repair-active-review",
+    );
+
+    assertDecision(
+      decideAiuContinuation({
+        states: [env(review("blocked")), env(hostSession({ sessionStatus: "busy" }))],
+      }),
+      "repair",
+      "repair-active-review",
+    );
+  });
+
   it("continues active review and active work before ready work", () => {
     const activeReview = decideAiuContinuation({
       states: [env(review("changes-requested", { targetId: "60" })), env(workQueue({ readyItems: [workItem("47", "ready")] }))],

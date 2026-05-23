@@ -139,6 +139,11 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
     return decision(policy, "stop", "stop-active-review-conflict", summaries, "stop", selectReview(activeReviews[0]), "Stop: reconcile multiple active review items before continuing.");
   }
 
+  const repair = findRepair(indexed);
+  if (repair) {
+    return decision(policy, "repair", repair.reasonCode, summaries, "repair", repair.selectedItem, repair.nextAction);
+  }
+
   if (policy.cooldownActive) {
     return decision(policy, "wait", "wait-cooldown-active", summaries, "wait", undefined, "Wait: a configured continuation cooldown is still active.");
   }
@@ -146,11 +151,6 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
   const busyHost = findBusyHost(indexed);
   if (busyHost) {
     return decision(policy, "wait", "wait-host-session-busy", summaries, "wait", busyHost, "Wait: the host session is busy or cannot receive a prompt.");
-  }
-
-  const repair = findRepair(indexed);
-  if (repair) {
-    return decision(policy, "repair", repair.reasonCode, summaries, "repair", repair.selectedItem, repair.nextAction);
   }
 
   if (activeReviews.length >= 1) {
