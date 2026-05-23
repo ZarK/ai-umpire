@@ -678,9 +678,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isPackageBackedManagedContent(content: string, expectedContent: string): boolean {
-  return normalizeText(content) === normalizeText(expectedContent)
-    || content.includes("Managed by @tjalve/aiu")
-    || content.includes('"managedBy": "@tjalve/aiu"');
+  return normalizeText(content) === normalizeText(expectedContent);
 }
 
 function normalizeText(value: string): string {
