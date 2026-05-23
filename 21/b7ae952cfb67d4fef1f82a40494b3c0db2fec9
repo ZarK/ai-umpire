@@ -1,0 +1,23 @@
+src/migrate.ts
+  s_f8aaaf4fdfe4d6::t_41cabd017b2ab3 19,64-65,77-81,102,131,172-173,189,191,195,205-209,216
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_41cabd017b2ab3 259,273
+test/migrate.test.ts
+  s_f8aaaf4fdfe4d6::t_41cabd017b2ab3 73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "21b7ae952cfb67d4fef1f82a40494b3c0db2fec9",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
