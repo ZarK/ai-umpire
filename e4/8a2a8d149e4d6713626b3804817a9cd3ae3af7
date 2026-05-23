@@ -1,0 +1,21 @@
+src/opencode.ts
+  s_f8aaaf4fdfe4d6::t_6f3563681ac35c 12,37-38,41-45
+test/extensions.test.ts
+  s_f8aaaf4fdfe4d6::t_6f3563681ac35c 51-55,59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "e48a2a8d149e4d6713626b3804817a9cd3ae3af7",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
