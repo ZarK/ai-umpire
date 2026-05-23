@@ -161,8 +161,12 @@ function formatPromptData(value: string): string {
 
 function redactLocalPaths(value: string): string {
   return value
-    .replace(/\/Users\/[^\s"'`]+/g, "[local-path]")
-    .replace(/[A-Za-z]:\\[^\s"'`]+/g, "[local-path]");
+    .replace(/(["'`])\/(?:Users|home)\/(?:(?!\1)[^\r\n])+\1/g, "$1[local-path]$1")
+    .replace(/(["'`])\/root(?:\/(?:(?!\1)[^\r\n])*)?\1/g, "$1[local-path]$1")
+    .replace(/(["'`])[A-Za-z]:\\(?:(?!\1)[^\r\n])+\1/g, "$1[local-path]$1")
+    .replace(/\/(?:Users|home)\/[^"'`\r\n]+/g, "[local-path]")
+    .replace(/\/root(?:\/[^"'`\r\n]+)?/g, "[local-path]")
+    .replace(/[A-Za-z]:\\[^"'`\r\n]+/g, "[local-path]");
 }
 
 function applyPromptCustomization(
