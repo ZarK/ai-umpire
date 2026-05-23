@@ -12,6 +12,7 @@ export {
   configCommand,
   doctorCommand,
   initCommand,
+  migrateCommand,
   pathsCommand,
 } from "./command_registry.js";
 export {
@@ -37,6 +38,10 @@ export {
   getAiuHostCapabilityProfiles,
   planAiuInit,
 } from "./init.js";
+export {
+  formatMigrationPlan,
+  planAiuMigration,
+} from "./migrate.js";
 export type {
   AiuPackageAssetPaths,
 } from "./assets.js";
@@ -69,3 +74,10 @@ export type {
   AiuInitPlan,
   AiuInitTool,
 } from "./init.js";
+export type {
+  AiuMigrationFinding,
+  AiuMigrationManagedSection,
+  AiuMigrationOptions,
+  AiuMigrationPlan,
+  AiuMigrationStatePreservation,
+} from "./migrate.js";

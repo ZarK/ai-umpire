@@ -12,9 +12,10 @@ import {
   getDefaultAiuConfig,
   loadAiuConfig,
 } from "./config.js";
-import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, initCommand, pathsCommand } from "./command_registry.js";
+import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, initCommand, migrateCommand, pathsCommand } from "./command_registry.js";
 import { formatAiuDoctorReport, formatAiuPaths, getAiuResolvedPaths, runAiuDoctor } from "./doctor.js";
 import { applyAiuInitPlan, formatInitPlan, planAiuInit, type AiuInitTool } from "./init.js";
+import { formatMigrationPlan, planAiuMigration } from "./migrate.js";
 
 interface PackageJson {
   readonly name: string;
@@ -77,6 +78,16 @@ export const aiuCli = createCli({
         human: formatInitPlan(plan),
         json: {
           init: plan,
+        },
+      };
+    }),
+    createCommand(migrateCommand, (context) => {
+      const dryRun = context.flags["dry-run"] === true;
+      const plan = planAiuMigration({ dryRun });
+      return {
+        human: formatMigrationPlan(plan),
+        json: {
+          migrate: plan,
         },
       };
     }),

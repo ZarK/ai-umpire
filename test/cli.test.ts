@@ -125,7 +125,7 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.package.name, "@tjalve/aiu");
 
     const commandNames = parsed.commands.map((command) => command.name);
-    assert.deepEqual(commandNames, ["config", "doctor", "init", "paths", "schema"]);
+    assert.deepEqual(commandNames, ["config", "doctor", "init", "migrate", "paths", "schema"]);
 
     const config = parsed.commands.find((command) => command.name === "config");
     assert.ok(config);
@@ -176,6 +176,16 @@ describe("metadata-backed CLI", () => {
     assert.ok(paths.examples?.some((example) => example.command === "aiu paths --json"));
     assert.ok(paths.errors?.some((error) => error.kind === "asset-paths-unavailable"));
     assert.deepEqual(paths.exitCodes?.map((exitCode) => exitCode.code), [0, 1, 2]);
+
+    const migrate = parsed.commands.find((command) => command.name === "migrate");
+    assert.ok(migrate);
+    assert.deepEqual(migrate.output?.formats, ["human", "json"]);
+    assert.equal(migrate.output?.defaultFormat, "human");
+    assert.equal(migrate.interactions?.json, true);
+    assert.equal(migrate.dryRun?.supported, true);
+    assert.equal(migrate.mutation?.mutates, false);
+    assert.ok(migrate.flags?.some((flag) => flag.name === "dry-run" && flag.type === "boolean"));
+    assert.ok(migrate.examples?.some((example) => example.command === "aiu migrate --dry-run --json"));
 
     const schema = parsed.commands.find((command) => command.name === "schema");
     assert.ok(schema);
@@ -234,6 +244,34 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.config.value.continuation.allowBackgroundScheduling, false);
     assert.equal(parsed.config.value.supplyChain.stopOnApprovalRequired, true);
     assert.deepEqual(parsed.config.diagnostics, []);
+  });
+
+  it("emits clean JSON for migration dry-run plans", async () => {
+    const result = await runCli(["migrate", "--dry-run", "--json"]);
+    const parsed = JSON.parse(result.stdout) as {
+      ok: boolean;
+      command: string;
+      migrate: {
+        ok: boolean;
+        dryRun: boolean;
+        repoLocalHooks: unknown[];
+        localCheckoutReferences: unknown[];
+        managedSections: unknown[];
+        customizationPoints: string[];
+        recommendedNextCommand: string;
+      };
+    };
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.command, "migrate");
+    assert.equal(parsed.migrate.ok, true);
+    assert.equal(parsed.migrate.dryRun, true);
+    assert.deepEqual(parsed.migrate.repoLocalHooks, []);
+    assert.ok(parsed.migrate.managedSections.length >= 3);
+    assert.ok(parsed.migrate.customizationPoints.includes("aiu.config.json trustedStateCommands argv arrays"));
+    assert.equal(parsed.migrate.recommendedNextCommand, "aiu init --dry-run --json");
   });
 
   it("suggests unknown commands and flags without executing alternatives", async () => {

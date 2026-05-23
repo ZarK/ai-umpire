@@ -332,6 +332,62 @@ export const initCommand = defineCommand({
   ],
 });
 
+export const migrateCommand = defineCommand({
+  kind: "command",
+  name: "migrate",
+  description: "Audit existing repo-local Umpire hooks and local-checkout references before package-backed migration.",
+  flags: [
+    jsonFlag,
+    defineFlag({
+      name: "dry-run",
+      description: "Render the migration audit plan without writing files.",
+      type: "boolean",
+    }),
+  ],
+  examples: [
+    defineExample({
+      description: "Inspect migration work without writing files.",
+      command: "aiu migrate --dry-run --json",
+    }),
+  ],
+  output: {
+    formats: ["human", "json"],
+    defaultFormat: "human",
+  },
+  interactions: {
+    json: true,
+    dryRun: {
+      supported: true,
+    },
+    noColor: true,
+    nonInteractive: true,
+    ttyPrompt: false,
+  },
+  errors: [
+    {
+      kind: "invalid-command-usage",
+      description: "Migration command usage was invalid.",
+    },
+  ],
+  exitCodes: [
+    {
+      code: 0,
+      category: "success",
+      description: "Migration audit plan was produced without mutating repository files.",
+    },
+    {
+      code: 2,
+      category: "usage",
+      description: "Command usage was invalid.",
+    },
+    {
+      code: 1,
+      category: "unexpected",
+      description: "Command failed unexpectedly.",
+    },
+  ],
+});
+
 export const AIU_COMMAND_REGISTRY = createCommandRegistry({
-  commands: [configCommand, doctorCommand, initCommand, pathsCommand],
+  commands: [configCommand, doctorCommand, initCommand, migrateCommand, pathsCommand],
 });
