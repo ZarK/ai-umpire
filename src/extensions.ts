@@ -14,6 +14,14 @@ export interface AiuPromptSectionRender {
 }
 
 export function renderAiuPromptSection(input: AiuPromptSectionInput): AiuPromptSectionRender {
+  if (!Object.hasOwn(input.config.prompts.sections, input.kind)) {
+    return Object.freeze({
+      kind: input.kind,
+      text: input.defaultText,
+      customized: false,
+      source: "package-default" as const,
+    });
+  }
   const customization = input.config.prompts.sections[input.kind];
   if (customization === undefined) {
     return Object.freeze({
@@ -32,4 +40,3 @@ export function renderAiuPromptSection(input: AiuPromptSectionInput): AiuPromptS
     source: "repo-config" as const,
   });
 }
-

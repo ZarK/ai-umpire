@@ -34,15 +34,10 @@ export interface AiuOpenCodePluginOptions {
 const AIU_OPENCODE_COMMAND = Object.freeze(["aiu", "hook", "opencode"] as const);
 
 export function createAiuOpenCodePlugin(options: AiuOpenCodePluginOptions = {}): AiuOpenCodePlugin {
-  const before = composeAiuOpenCodeHandlers(options.before ?? []);
-  const after = composeAiuOpenCodeHandlers(options.after ?? []);
+  const handler = composeAiuOpenCodeHandlers([...(options.before ?? []), delegateToAiuOpenCodeCommand, ...(options.after ?? [])]);
   return Object.freeze({
     name: "@tjalve/aiu/opencode" as const,
-    handle: async (event: AiuOpenCodeEvent, context: AiuOpenCodeContext = {}) => {
-      const normalizedContext = withDefaultContext(context);
-      const result = await before(event, normalizedContext, async () => delegateToAiuOpenCodeCommand(event, normalizedContext));
-      return after(event, Object.freeze({ ...normalizedContext, previousResult: result }), async () => result);
-    },
+    handle: async (event: AiuOpenCodeEvent, context: AiuOpenCodeContext = {}) => handler(event, withDefaultContext(context), terminalOpenCodeHandler),
   });
 }
 
@@ -61,7 +56,11 @@ export function composeAiuOpenCodeHandlers(handlers: readonly AiuOpenCodeHandler
   };
 }
 
-function delegateToAiuOpenCodeCommand(event: AiuOpenCodeEvent, context: AiuOpenCodeContext): AiuOpenCodeHandlerResult {
+async function delegateToAiuOpenCodeCommand(event: AiuOpenCodeEvent, context: AiuOpenCodeContext, next: AiuOpenCodeNext): Promise<AiuOpenCodeHandlerResult> {
+  const nextResult = await next();
+  if (nextResult.handled) {
+    return nextResult;
+  }
   return Object.freeze({
     handled: true,
     command: AIU_OPENCODE_COMMAND,
