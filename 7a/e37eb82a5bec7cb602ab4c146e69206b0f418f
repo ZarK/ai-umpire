@@ -1,0 +1,19 @@
+test/install-smoke.test.ts
+  s_f8aaaf4fdfe4d6::t_50c43bfb0d5e37 3,5,22-26,28,30,71,73,76-86,90,99-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "7ae37eb82a5bec7cb602ab4c146e69206b0f418f",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
