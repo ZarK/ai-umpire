@@ -1,0 +1,48 @@
+test/continuation_store.test.ts
+  s_f8aaaf4fdfe4d6::t_4afc342c11733b 1-52
+src/continuation_store.ts
+  s_f8aaaf4fdfe4d6::t_acfae25606ccbe 178,253-254,258-264
+  s_f8aaaf4fdfe4d6::t_a6ea65cc71c730 191-200
+  s_f8aaaf4fdfe4d6::t_2e4fe02f33688d 1-177,179-190,201-252,255-257,265-324
+test/extensions.test.ts
+  s_f8aaaf4fdfe4d6::t_79311e59779717 67,81
+docs/M3-provider-status-integration-and-stop-hooks.md
+  s_f8aaaf4fdfe4d6::t_05c6e41885f97d 150-151,163,169-170,175-176,229
+test/opencode.test.ts
+  s_f8aaaf4fdfe4d6::t_469cc7b3e21c6d 2-3,8,16,22,42-77,80-84,238-287,291,310-321
+  s_f8aaaf4fdfe4d6::t_4cadf5538705f0 78-79
+  s_f8aaaf4fdfe4d6::t_820ed4d3616f9c 41
+src/opencode.ts
+  s_f8aaaf4fdfe4d6::t_b7e00758ff536f 91,295,357,457
+  s_f8aaaf4fdfe4d6::t_5edec29ecac520 8,528-530
+  s_f8aaaf4fdfe4d6::t_9846e5fdbe58a3 2-7,9-17,59-64,134,147-153,155-165,168,172-277,458-459,462,501-503,512-527,531-568
+test/status.test.ts
+  s_f8aaaf4fdfe4d6::t_5f532daa612826 121-123
+  s_f8aaaf4fdfe4d6::t_ca1cc519125cda 124,137-138
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_985c9c3695f93d 34-36
+  s_f8aaaf4fdfe4d6::t_bb6ceff0e7a7d1 31-33,37-41,133-134,136-141
+  s_f8aaaf4fdfe4d6::t_3ef89f182bd62e 135
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_e9ced098a76b1f 104-105
+README.md
+  s_f8aaaf4fdfe4d6::t_ed1ba1837b8137 12,119
+src/status.ts
+  s_f8aaaf4fdfe4d6::t_8ed7fabcaa985a 3,40-41,49-57,187-188,213-221,238-242
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "e477162f777ed48e6032cc73a6f2869d0bb788bd",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
