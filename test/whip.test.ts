@@ -275,6 +275,32 @@ describe("whip policy", () => {
     assert.equal(persisted.tasks[0]?.source, "cli");
   });
 
+  it("blocks mutating commands when whip is disabled", async () => {
+    const repoRoot = await createRepoRoot();
+    await writeConfig(repoRoot, {
+      version: 1,
+      whip: {
+        enabled: false,
+      },
+    });
+    const config = loadAiuConfig({ cwd: repoRoot }).config;
+    const add = runAiuWhipCommand({
+      action: "add",
+      repoRoot,
+      config,
+      id: "repo-docs",
+      title: "Review repo docs",
+      prompt: "Review repository docs.",
+      priority: 5,
+    });
+    const status = runAiuWhipCommand({ action: "status", repoRoot, config });
+
+    assert.equal(add.changed, false);
+    assert.equal(existsSync(resolveAiuWhipStatePath(repoRoot, config)), false);
+    assert.deepEqual(add.errors.map((error) => error.code), ["whip-disabled"]);
+    assert.equal(status.errors.length, 0);
+  });
+
   it("cancels and completes tasks only through explicit state transitions", async () => {
     const repoRoot = await createRepoRoot();
     const config = loadAiuConfig({ cwd: repoRoot }).config;
@@ -316,7 +342,7 @@ describe("whip policy", () => {
     assert.equal(decision.promptDeliveryCompletesTask, false);
   });
 
-  it("reports malformed state, invalid transitions, unknown ids, and stale ownership", async () => {
+  it("reports malformed state, invalid commands, invalid transitions, unknown ids, and stale ownership", async () => {
     const repoRoot = await createRepoRoot();
     const config = loadAiuConfig({ cwd: repoRoot }).config;
     const statePath = resolveAiuWhipStatePath(repoRoot, config);
@@ -347,14 +373,27 @@ describe("whip policy", () => {
           status: "completed",
           source: "cli",
         },
+        {
+          id: "fallback-owned",
+          title: "Fallback owned task",
+          prompt: "Continue the fallback owned task.",
+          priority: 3,
+          status: "prompted",
+          source: "cli",
+          ownerSessionId: "ses_fallback",
+          promptedAt: "not-a-date",
+          updatedAt: "2026-05-22T00:00:00.000Z",
+        },
       ],
     }), "utf8");
 
     const stale = runAiuWhipCommand({ action: "status", repoRoot, config, observedAt: "2026-05-23T12:00:00.000Z" });
+    const invalidCommand = runAiuWhipCommand({ action: "archive", repoRoot, config });
     const unknown = runAiuWhipCommand({ action: "cancel", repoRoot, config, id: "missing" });
     const invalid = runAiuWhipCommand({ action: "complete", repoRoot, config, id: "done", evidence: "already done" });
 
-    assert.deepEqual(stale.staleOwnership.map((task) => task.id), ["owned"]);
+    assert.deepEqual(stale.staleOwnership.map((task) => task.id), ["owned", "fallback-owned"]);
+    assert.deepEqual(invalidCommand.errors.map((error) => error.code), ["whip-invalid-command"]);
     assert.deepEqual(unknown.errors.map((error) => error.code), ["whip-task-not-found"]);
     assert.deepEqual(invalid.errors.map((error) => error.code), ["whip-invalid-transition"]);
   });

@@ -720,8 +720,16 @@ export const whipCommand = defineCommand({
   },
   errors: [
     {
+      kind: "whip-disabled",
+      description: "Whip is disabled and the requested action would mutate local whip state.",
+    },
+    {
       kind: "whip-invalid-command",
       description: "The whip action or flags are invalid.",
+    },
+    {
+      kind: "whip-invalid-task",
+      description: "The requested whip task input is incomplete or invalid.",
     },
     {
       kind: "whip-state-malformed",

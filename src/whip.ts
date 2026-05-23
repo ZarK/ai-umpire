@@ -126,7 +126,7 @@ export interface AiuWhipReport {
   readonly statePath: string;
   readonly stateOk: boolean;
   readonly dryRun: boolean;
-  readonly action: "list" | "status" | "add" | "cancel" | "complete";
+  readonly action: AiuWhipAction | string;
   readonly tasks: readonly AiuWhipTaskView[];
   readonly counts: Readonly<Record<AiuWhipTaskStatus, number>>;
   readonly staleOwnership: readonly AiuWhipTaskView[];
@@ -135,7 +135,7 @@ export interface AiuWhipReport {
 }
 
 export interface AiuWhipCommandInput {
-  readonly action: AiuWhipReport["action"];
+  readonly action: AiuWhipAction | string;
   readonly repoRoot: string;
   readonly config: AiuConfig;
   readonly dryRun?: boolean;
@@ -150,6 +150,10 @@ export interface AiuWhipCommandInput {
   readonly ownerSessionId?: string;
   readonly selectedSessionId?: string;
 }
+
+export type AiuWhipAction = "list" | "status" | "add" | "cancel" | "complete";
+const AIU_WHIP_ACTIONS = ["list", "status", "add", "cancel", "complete"] as const;
+const AIU_WHIP_MUTATING_ACTIONS = ["add", "cancel", "complete"] as const;
 
 export function resolveAiuWhipTasks(policy: AiuWhipPolicy): readonly AiuWhipTaskDefinition[] {
   const defaults = policy.usePackageDefaults ? AIU_DEFAULT_WHIP_TASKS.map((task) => ({ ...task, source: "package-default" as const })) : [];
@@ -215,8 +219,13 @@ export function runAiuWhipCommand(input: AiuWhipCommandInput): AiuWhipReport {
   const errors = [...read.errors];
   let tasks: readonly AiuWhipStateTask[] = [...read.state.tasks];
   let changed = false;
+  const action = isAiuWhipAction(input.action) ? input.action : undefined;
 
-  if (input.action === "add") {
+  if (!action) {
+    errors.push(whipError("whip-invalid-command", `Unsupported whip action: ${String(input.action)}.`, read.path));
+  } else if (!input.config.whip.enabled && isMutatingWhipAction(action)) {
+    errors.push(whipError("whip-disabled", `Whip is disabled; aiu whip ${action} cannot mutate local state.`, read.path));
+  } else if (action === "add") {
     const validation = validateNewTask(input);
     errors.push(...validation);
     if (validation.length === 0 && effectiveTaskById(input.config.whip, read.state, input.id) !== undefined) {
@@ -236,7 +245,7 @@ export function runAiuWhipCommand(input: AiuWhipCommandInput): AiuWhipReport {
       });
       changed = true;
     }
-  } else if (input.action === "cancel" || input.action === "complete") {
+  } else if (action === "cancel" || action === "complete") {
     const task = effectiveTaskById(input.config.whip, read.state, input.id);
     if (!input.id) {
       errors.push(whipError("whip-invalid-task", "--id is required.", read.path));
@@ -244,11 +253,11 @@ export function runAiuWhipCommand(input: AiuWhipCommandInput): AiuWhipReport {
       errors.push(whipError("whip-task-not-found", `Whip task ${input.id} was not found.`, read.path));
     } else if (task.status === "completed" || task.status === "cancelled") {
       errors.push(whipError("whip-invalid-transition", `Whip task ${task.id} is already ${task.status}.`, read.path));
-    } else if (input.action === "complete" && !input.evidence?.trim()) {
+    } else if (action === "complete" && !input.evidence?.trim()) {
       errors.push(whipError("whip-evidence-required", "--evidence is required to complete a whip task.", read.path));
     } else {
       const nextTask = stateTaskFromView(task, observedAt);
-      tasks = upsertStateTask(tasks, input.action === "cancel"
+      tasks = upsertStateTask(tasks, action === "cancel"
         ? {
             ...nextTask,
             status: "cancelled",
@@ -505,9 +514,18 @@ function countTasks(tasks: readonly AiuWhipTaskView[]): Readonly<Record<AiuWhipT
 
 function isStaleOwnedTask(task: AiuWhipTaskView, observedAt: string): boolean {
   if (task.status !== "prompted" || !task.ownerSessionId) return false;
-  const updatedAt = Date.parse(task.promptedAt ?? task.updatedAt ?? "");
+  const promptedAt = typeof task.promptedAt === "string" ? Date.parse(task.promptedAt) : Number.NaN;
+  const updatedAt = Number.isFinite(promptedAt) ? promptedAt : Date.parse(task.updatedAt ?? "");
   const observed = Date.parse(observedAt);
   return Number.isFinite(updatedAt) && Number.isFinite(observed) && observed - updatedAt >= 24 * 60 * 60 * 1000;
+}
+
+function isAiuWhipAction(action: string): action is AiuWhipAction {
+  return AIU_WHIP_ACTIONS.includes(action as AiuWhipAction);
+}
+
+function isMutatingWhipAction(action: AiuWhipAction): boolean {
+  return AIU_WHIP_MUTATING_ACTIONS.includes(action as (typeof AIU_WHIP_MUTATING_ACTIONS)[number]);
 }
 
 function whipError(code: AiuWhipErrorCode, message: string, pathValue?: string): AiuWhipError {

@@ -359,6 +359,8 @@ describe("metadata-backed CLI", () => {
     assert.equal(whip.mutation?.mutates, true);
     assert.ok(whip.flags?.some((flag) => flag.name === "dry-run" && flag.type === "boolean"));
     assert.ok(whip.flags?.some((flag) => flag.name === "evidence" && flag.type === "string"));
+    assert.ok(whip.errors?.some((error) => error.kind === "whip-disabled"));
+    assert.ok(whip.errors?.some((error) => error.kind === "whip-invalid-task"));
     assert.ok(whip.errors?.some((error) => error.kind === "whip-task-not-found"));
   });
 
