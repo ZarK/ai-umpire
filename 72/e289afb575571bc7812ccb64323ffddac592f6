@@ -1,0 +1,36 @@
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_933616345cbc5c 138-151,162-165,222-237,241-242,247-249
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_2fa7b562cdaf03 189-237,245,248-261,263-275
+  s_f8aaaf4fdfe4d6::t_2a73cf7e2d087f 262
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_656e18106badac 171-173
+  s_f8aaaf4fdfe4d6::t_6783e153cd0c7b 163-170
+src/doctor.ts
+  s_f8aaaf4fdfe4d6::t_2c6b0a31083351 176,369-402,407-409
+  s_f8aaaf4fdfe4d6::t_4a4942cafffdad 403-406
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_23a77e86745bc9 106-107
+README.md
+  s_f8aaaf4fdfe4d6::t_0f49efcb24cc8a 233,237
+docs/M3-provider-status-integration-and-stop-hooks.md
+  s_f8aaaf4fdfe4d6::t_cb81cda0c36a4d 203-213
+test/doctor.test.ts
+  s_f8aaaf4fdfe4d6::t_7d4f0c0636b77e 8,73-118,262-268
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "72e289afb575571bc7812ccb64323ffddac592f6",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
