@@ -1,0 +1,46 @@
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_465438a13c8d3b 387-388,391,524-551
+  s_f8aaaf4fdfe4d6::t_bc35356ed163b2 3
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_3fd58af7d55bb2 22,141-151,410-411
+src/migrate.ts
+  s_f8aaaf4fdfe4d6::t_54f4b77ea31851 372-376,378,382-407,409-417,419-434
+  s_f8aaaf4fdfe4d6::t_4fe6299d51c920 408,1180-1205
+  s_f8aaaf4fdfe4d6::t_0c1d76d99b3496 558-585
+  s_f8aaaf4fdfe4d6::t_f6b924c8cdffb3 377,379-381
+  s_f8aaaf4fdfe4d6::t_c3904257ec69f5 418
+  s_f8aaaf4fdfe4d6::t_e3da5bd2cc03a5 1288-1291
+  s_f8aaaf4fdfe4d6::t_2eaf479cb6ae34 1121-1179,1206-1238
+  s_f8aaaf4fdfe4d6::t_a4825de4c64ed4 1071-1076
+  s_f8aaaf4fdfe4d6::t_7bdb92598790ec 2,14,63,131-156,304
+README.md
+  s_f8aaaf4fdfe4d6::t_d40595c17dd6fb 125-126
+docs/M5-migration-release-readiness-and-provider-architecture.md
+  s_f8aaaf4fdfe4d6::t_7c5795cebd3b89 168
+test/migrate.test.ts
+  s_f8aaaf4fdfe4d6::t_706b1095ac87bf 4,269-300,302-328,341-353,357-358,408-419
+  s_f8aaaf4fdfe4d6::t_2c3f57e873acdb 329-340
+  s_f8aaaf4fdfe4d6::t_1c3b4b93c6796b 356
+  s_f8aaaf4fdfe4d6::t_553addb181aef8 354-355
+  s_f8aaaf4fdfe4d6::t_5e1220084fdbab 301
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_7ac33a365407eb 151
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_9ad0976035947a 593-602,617-624,647-649
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "2ec590311abe674b82cacf3627bacbdcaaba95aa",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
