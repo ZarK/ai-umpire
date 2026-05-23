@@ -1,0 +1,47 @@
+test/install-smoke.test.ts
+  s_f8aaaf4fdfe4d6::t_7c77b0aa80b698 39,43-44,47-48
+docs/M3-provider-status-integration-and-stop-hooks.md
+  s_f8aaaf4fdfe4d6::t_6f531b11cbe2fa 17,75
+  s_f8aaaf4fdfe4d6::t_2fe0a54b088c11 14,118,122
+src/hook_stop.ts
+  s_f8aaaf4fdfe4d6::t_c40fc65fad7670 1-16,18-30,33-34,63
+  s_f8aaaf4fdfe4d6::t_dd89f4f02b6dbb 49
+  s_f8aaaf4fdfe4d6::t_129342f2aec982 17,31-32,35-48,50-62
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_c116a6322cd1c4 335-397,455
+test/doctor.test.ts
+  s_f8aaaf4fdfe4d6::t_37f2a6c2d4e560 65
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_99a2d592e9480c 18,86,88
+  s_f8aaaf4fdfe4d6::t_31ca9091aee14f 103
+  s_f8aaaf4fdfe4d6::t_71aa33a72daa11 16,87,89-102
+README.md
+  s_f8aaaf4fdfe4d6::t_e63d8065d5e2c4 243
+  s_f8aaaf4fdfe4d6::t_c7373ac39bbfc2 10,76-80,94,101,207-220
+src/init.ts
+  s_f8aaaf4fdfe4d6::t_0b4ec12feb4b03 26,82,85,88-89,109-110,112,115-116,120-121,123-140,143-204,206,210-211,213,216-217,221-222,224-235
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_e8736666d9931f 64,102-103
+  s_f8aaaf4fdfe4d6::t_49faee15c06342 99
+test/init.test.ts
+  s_f8aaaf4fdfe4d6::t_a84875671915d3 205
+  s_f8aaaf4fdfe4d6::t_886c0c9be05c88 32,47,51,68-90,105
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_e8c438d07304a1 129,156-162,288-314
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "02c10c4f9cc678ac72b45ee30618660001d5957d",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
