@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -57,6 +58,8 @@ describe("migration planner", () => {
     assert.equal(human.exitCode, 0);
     assert.match(human.stdout, /Conflicts/);
     assert.match(human.stdout, /migration-review-required/);
+    assert.equal(existsSync(path.join(target, ".umpire")), false);
+    assert.equal(existsSync(path.join(target, "aiu.config.json")), false);
   });
 });
 

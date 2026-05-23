@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import type { Dirent } from "node:fs";
 import path from "node:path";
 
 import { loadAiuConfig } from "./config.js";
@@ -188,7 +189,14 @@ function collectTextFiles(repoRoot: string, relativeRoot: string): string[] {
     return [];
   }
 
-  return readdirSync(absoluteRoot, { withFileTypes: true }).flatMap((entry) => {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(absoluteRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  return entries.flatMap((entry) => {
     const relativePath = path.join(relativeRoot, entry.name);
     if (entry.isDirectory()) {
       return collectTextFiles(repoRoot, relativePath);

@@ -39,6 +39,9 @@ describe("packed tarball install smoke", () => {
     assert.equal(parsed.init.files.length, 3);
     assert.equal(parsed.init.config.operation, "create");
     assert.equal(existsSync(path.join(target, "aiu.config.json")), false);
+    assert.equal(existsSync(path.join(target, ".opencode")), false);
+    assert.equal(existsSync(path.join(target, ".codex")), false);
+    assert.equal(existsSync(path.join(target, ".claude")), false);
     assert.equal(existsSync(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts")), false);
     assert.equal(existsSync(path.join(target, ".codex", "hooks", "ai-umpire-stop.json")), false);
     assert.equal(existsSync(path.join(target, ".claude", "hooks", "ai-umpire-stop.json")), false);
@@ -70,7 +73,7 @@ async function packPackage(packDir: string): Promise<string> {
 
 async function createLockedBlankRepo(target: string, tarball: string): Promise<void> {
   await mkdir(path.join(target, ".git"));
-  const tarballSpecifier = `file:${path.relative(target, tarball)}`;
+  const tarballSpecifier = `file:${path.relative(target, tarball).split(path.sep).join("/")}`;
   await writeFile(
     path.join(target, "package.json"),
     `${JSON.stringify(
@@ -98,12 +101,13 @@ async function createTempRoot(prefix: string): Promise<string> {
 
 async function buildSmokeLockfile(tarballSpecifier: string, tarball: string): Promise<string> {
   const rootLock = await readFile(path.join(repoRoot, "pnpm-lock.yaml"), "utf8");
+  const lockfileVersion = readLockfileVersion(rootLock);
   const packages = readLockfileSection(rootLock, "packages", "snapshots");
   const snapshots = readLockfileSection(rootLock, "snapshots");
   const integrity = `sha512-${createHash("sha512").update(await readFile(tarball)).digest("base64")}`;
 
   return [
-    "lockfileVersion: '9.0'",
+    `lockfileVersion: ${lockfileVersion}`,
     "",
     "settings:",
     "  autoInstallPeers: true",
@@ -134,6 +138,12 @@ async function buildSmokeLockfile(tarballSpecifier: string, tarball: string): Pr
     "",
     snapshots,
   ].join("\n");
+}
+
+function readLockfileVersion(lockfile: string): string {
+  const match = /^lockfileVersion:\s*(.+)$/m.exec(lockfile);
+  assert.ok(match?.[1], "Missing lockfileVersion in pnpm-lock.yaml");
+  return match[1];
 }
 
 function readLockfileSection(lockfile: string, heading: "packages" | "snapshots", nextHeading?: "snapshots"): string {
