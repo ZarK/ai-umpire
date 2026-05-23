@@ -1,0 +1,21 @@
+.github/workflows/publish.yml
+  s_f8aaaf4fdfe4d6::t_6901c1003a8262 20-21,38-42
+test/package-surface.test.ts
+  s_f8aaaf4fdfe4d6::t_4adac0ef479eaf 107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "852758586750eeec215d368cbc92d16f98b6e465",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
