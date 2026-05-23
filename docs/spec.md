@@ -89,6 +89,8 @@ Requirements use stable identifiers (`FR-XX-NNN`) so milestones and issues can r
 | FR-06-008 | Prompt renderers return stable fingerprints for deduplication and ownership tracking. | Required |
 | FR-06-009 | Prompt customization is supported through typed config sections for work, planning, quality, and whip prompts. | Required |
 
+M2.3 implements FR-06-001 through FR-06-006 in the pure `decideAiuContinuation` service. Prompt text and fingerprints remain in FR-06-007 through FR-06-009 and are implemented by the prompt renderer milestone.
+
 ## FR-07 - Host Integrations
 
 | ID | Requirement | Status |

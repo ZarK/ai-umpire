@@ -132,6 +132,8 @@ Decision priority:
 
 M2 implements the rules needed for active work/review, planning, quality, repair, wait, and stop. Whip task selection is completed in M4.
 
+M2.3 adds `decideAiuContinuation`, a pure decision service over trusted state envelopes and conservative policy overrides. It emits frozen decision records with decision kind, reason codes, source summaries, selected mode, selected item, confidence, prompt kind, and recommended next action. The module is intentionally independent from CLI command classes, host plugins, filesystem APIs, child-process APIs, and provider-specific fields.
+
 Stop when:
 
 - supply-chain approval is required
