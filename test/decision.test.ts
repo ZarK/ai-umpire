@@ -227,6 +227,57 @@ describe("continuation decision engine", () => {
     assert.equal(qualityDecision.selectedItem?.targetKind, "stage");
     assert.deepEqual(qualityDecision.selectedItem?.affectedPaths, ["src/decision.ts"]);
 
+    const selectedFailDecision = decideAiuContinuation({ states: [env(quality({
+      ready: true,
+      lastRunStatus: "fail",
+      selectedTarget: {
+        kind: "stage",
+        id: "selected-typecheck",
+        status: "fail",
+        affectedPaths: ["src/trusted_adapter.ts"],
+      },
+      stages: [{ id: "lint", status: "fail", affectedPaths: ["src/decision.ts"] }],
+    }))] });
+    assertDecision(selectedFailDecision, "continue", "continue-quality");
+    assert.equal(selectedFailDecision.selectedItem?.id, "selected-typecheck");
+    assert.deepEqual(selectedFailDecision.selectedItem?.affectedPaths, ["src/trusted_adapter.ts"]);
+
+    const selectedPassFallbackDecision = decideAiuContinuation({ states: [env(quality({
+      ready: true,
+      lastRunStatus: "fail",
+      selectedTarget: {
+        kind: "stage",
+        id: "stale-selection",
+        status: "pass",
+        affectedPaths: ["src/stale.ts"],
+      },
+      findings: [{
+        id: "real-failure",
+        status: "fail",
+        affectedPaths: ["src/decision.ts"],
+      }],
+    }))] });
+    assertDecision(selectedPassFallbackDecision, "continue", "continue-quality");
+    assert.equal(selectedPassFallbackDecision.selectedItem?.id, "real-failure");
+    assert.equal(selectedPassFallbackDecision.selectedItem?.targetKind, "finding");
+
+    assertDecision(
+      decideAiuContinuation({
+        states: [env(quality({
+          ready: true,
+          lastRunStatus: "fail",
+          selectedTarget: {
+            kind: "stage",
+            id: "incomplete-selection",
+            status: "unknown",
+            affectedPaths: [],
+          },
+        }))],
+      }),
+      "stop",
+      "stop-unknown-input",
+    );
+
     assertDecision(
       decideAiuContinuation({
         states: [env(quality({

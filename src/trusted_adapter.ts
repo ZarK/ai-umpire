@@ -444,7 +444,7 @@ function normalizeQualitySelectedTarget(value: unknown): AiuQualitySelectedTarge
     id,
     ...(title ? { title } : {}),
     ...(stageId ? { stageId } : {}),
-    status: isStateValueKind(value.status) ? value.status : "fail",
+    status: isStateValueKind(value.status) ? value.status : "unknown",
     affectedPaths: Object.freeze(readStringArray(value.affectedPaths)),
     ...(command ? { command } : {}),
     ...(rerunCommand ? { rerunCommand } : {}),

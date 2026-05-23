@@ -227,6 +227,11 @@ describe("trusted command adapters", () => {
             affectedPaths: ["package.json"],
             supplyChainApprovalRequired: true,
           }],
+          selectedTarget: {
+            kind: "stage",
+            id: "incomplete-selection",
+            affectedPaths: ["src/state.ts"],
+          },
           failingChecks: ["typecheck"],
           affectedPaths: ["src/state.ts"],
         },
@@ -243,6 +248,7 @@ describe("trusted command adapters", () => {
     assert.equal(value?.kind === "quality" ? value.stages[0]?.rerunCommand?.maxOutputBytes : undefined, 16384);
     assert.deepEqual(value?.kind === "quality" ? value.stages[0]?.affectedPaths : [], ["src/state.ts"]);
     assert.equal(value?.kind === "quality" ? value.findings[0]?.supplyChainApprovalRequired : false, true);
+    assert.equal(value?.kind === "quality" ? value.selectedTarget?.status : undefined, "unknown");
     assert.deepEqual(value?.kind === "quality" ? value.failingChecks : [], ["typecheck"]);
   });
 });

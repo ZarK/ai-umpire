@@ -615,7 +615,9 @@ function selectQualityState(item: IndexedState & { readonly value: Extract<AiuTr
 }
 
 function selectQualityTarget(item: IndexedState & { readonly value: Extract<AiuTrustedStatePayload, { readonly kind: "quality" }> }): AiuDecisionSelectedItem | undefined {
-  const target = item.value.selectedTarget ?? firstFailingQualityTarget(item.value.findings, item.value.stages);
+  const target = item.value.selectedTarget?.status === "fail"
+    ? item.value.selectedTarget
+    : firstFailingQualityTarget(item.value.findings, item.value.stages);
   if (!target) return undefined;
   const command = target.command ?? item.value.nextCommand;
   const rerunCommand = target.rerunCommand ?? item.value.rerunCommand;
