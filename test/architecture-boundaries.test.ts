@@ -33,7 +33,7 @@ describe("runtime architecture boundaries", () => {
 
     for (const moduleName of normalRuntimeModules) {
       const module = moduleByName(modules, moduleName);
-      for (const imported of module.imports.map(localModuleName).filter(isPresent)) {
+      for (const imported of dependencyNames(module).filter((item) => !item.includes(":") && !item.startsWith("@"))) {
         assert.equal(forbiddenRuntimeImports.has(imported), false, `${moduleName} must not import ${imported}`);
       }
     }
@@ -59,9 +59,8 @@ describe("runtime architecture boundaries", () => {
 
     for (const moduleName of coreModules) {
       const module = moduleByName(modules, moduleName);
-      for (const imported of module.imports) {
-        const normalized = localModuleName(imported) ?? imported;
-        assert.equal(forbiddenImports.has(normalized), false, `${moduleName} must not import ${imported}`);
+      for (const imported of dependencyNames(module)) {
+        assert.equal(forbiddenImports.has(imported), false, `${moduleName} must not import ${imported}`);
       }
     }
   });
@@ -83,7 +82,7 @@ describe("runtime architecture boundaries", () => {
 
     for (const moduleName of ["hook_stop", "opencode"]) {
       const module = moduleByName(modules, moduleName);
-      const imports = new Set(module.imports.map((item) => localModuleName(item) ?? item));
+      const imports = new Set(dependencyNames(module));
 
       for (const required of requiredSharedImports) {
         assert.equal(imports.has(required), true, `${moduleName} should delegate through ${required}`);
@@ -97,7 +96,7 @@ describe("runtime architecture boundaries", () => {
   it("keeps trusted command execution explicit and shell-free", async () => {
     const modules = await loadSourceModules();
     const trustedAdapter = moduleByName(modules, "trusted_adapter");
-    const imports = new Set(trustedAdapter.imports.map((item) => localModuleName(item) ?? item));
+    const imports = new Set(dependencyNames(trustedAdapter));
 
     assert.equal(imports.has("node:child_process"), true);
     assert.match(trustedAdapter.source, /\bspawn\(executable,\s*args,\s*\{/);
@@ -203,7 +202,7 @@ function sourceModuleName(filePath: string): string {
 
 function parseImportSpecifiers(source: string): readonly string[] {
   const imports: string[] = [];
-  const importPattern = /\bimport\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?["']([^"']+)["']/g;
+  const importPattern = /\b(?:import|export)\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?["']([^"']+)["']/g;
   for (const match of source.matchAll(importPattern)) {
     if (match[1]) {
       imports.push(match[1]);
@@ -218,13 +217,15 @@ function moduleByName(modules: readonly SourceModule[], name: string): SourceMod
   return module;
 }
 
-function localModuleName(specifier: string): string | undefined {
+function dependencyNames(module: SourceModule): readonly string[] {
+  return module.imports.map((specifier) => localModuleName(specifier, module.name) ?? specifier);
+}
+
+function localModuleName(specifier: string, importerName: string): string | undefined {
   if (!specifier.startsWith(".")) {
     return undefined;
   }
-  return specifier.replace(/^\.\//, "").replace(/\.(?:[cm]?js|[cm]?ts)$/, "");
-}
-
-function isPresent<T>(value: T | undefined): value is T {
-  return value !== undefined;
+  const importerDirectory = path.posix.dirname(importerName);
+  const withoutExtension = specifier.replace(/\.(?:[cm]?js|[cm]?ts)$/, "");
+  return path.posix.normalize(path.posix.join(importerDirectory, withoutExtension)).replace(/^\.\//, "");
 }
