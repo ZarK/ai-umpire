@@ -71,31 +71,31 @@ describe("extension API", () => {
       calls.push("after-next");
       return result;
     };
-    const after: AiuOpenCode.AiuOpenCodeHandler = async (_event, _context, next) => {
-      calls.push("after");
+    const after: AiuOpenCode.AiuOpenCodeHandler = async (_event, context, next) => {
+      calls.push(`after:${context.previousResult?.command?.join(" ") ?? "none"}`);
       return next();
     };
     const plugin = createAiuOpenCodePlugin({ before: [before], after: [after] });
 
     const result = await plugin.handle({ type: "idle" }, { cwd: "/repo" });
 
-    assert.deepEqual(calls, ["before", "after", "after-next"]);
+    assert.deepEqual(calls, ["before", "after-next", "after:aiu hook opencode"]);
     assert.equal(result.handled, true);
     assert.deepEqual(result.command, ["aiu", "hook", "opencode"]);
     assert.equal(result.metadata?.eventType, "idle");
   });
 
-  it("allows later OpenCode handlers to override the package delegate", async () => {
+  it("allows after OpenCode handlers to override the package delegate result", async () => {
     const { createAiuOpenCodePlugin } = await import(path.join(repoRoot, "dist/src/opencode.js")) as typeof AiuOpenCode;
-    const override: AiuOpenCode.AiuOpenCodeHandler = () => ({
+    const override: AiuOpenCode.AiuOpenCodeHandler = (_event, context) => ({
       handled: true,
-      command: ["repo", "custom"],
+      command: [...(context.previousResult?.command ?? []), "--repo-custom"],
     });
     const plugin = createAiuOpenCodePlugin({ after: [override] });
 
     const result = await plugin.handle({ type: "idle" });
 
-    assert.deepEqual(result.command, ["repo", "custom"]);
+    assert.deepEqual(result.command, ["aiu", "hook", "opencode", "--repo-custom"]);
   });
 
   it("rejects handlers that call next more than once", async () => {
