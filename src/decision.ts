@@ -383,7 +383,6 @@ function workItemSignature(value: AiuWorkItemState): string {
     status: value.status,
     blockers: [...value.blockers].sort(),
     priority: value.priority ?? "",
-    title: value.title ?? "",
   });
 }
 

@@ -76,6 +76,17 @@ describe("continuation decision engine", () => {
 
     assertDecision(
       decideAiuContinuation({
+        states: [
+          env(workQueue({ activeItems: [workItem("47", "active", { title: "Original title" })] }), { sourceId: "work-a" }),
+          env(workQueue({ activeItems: [workItem("47", "active", { title: "Renamed title" })] }), { sourceId: "work-b" }),
+        ],
+      }),
+      "continue",
+      "continue-active-work",
+    );
+
+    assertDecision(
+      decideAiuContinuation({
         states: [env(workQueue({ activeItems: [workItem("47", "active"), workItem("48", "active")] }))],
       }),
       "stop",
