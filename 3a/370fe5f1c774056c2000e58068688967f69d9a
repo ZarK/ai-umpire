@@ -1,0 +1,23 @@
+test/package-surface.test.ts
+  s_f8aaaf4fdfe4d6::t_6f5884c28f81ba 112-124
+.github/workflows/publish.yml
+  s_f8aaaf4fdfe4d6::t_b8a70457ae5f63 22
+.github/workflows/ci.yml
+  s_f8aaaf4fdfe4d6::t_b8a70457ae5f63 19-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "3a370fe5f1c774056c2000e58068688967f69d9a",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
