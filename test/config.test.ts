@@ -237,6 +237,23 @@ describe("config foundation", () => {
     assert.equal(fileAncestorResult.ok, false);
     assert.ok(fileAncestorResult.diagnostics.some((diagnostic) => diagnostic.kind === "path-not-writable" && diagnostic.path === "$.whip.statePath"));
   });
+
+  it("does not validate unused whip state paths when whip is disabled", async () => {
+    const repoRoot = await createRepoRoot();
+    await mkdir(path.join(repoRoot, "whip-state-dir"));
+    await writeConfig(repoRoot, {
+      version: 1,
+      whip: {
+        enabled: false,
+        statePath: "whip-state-dir",
+      },
+    });
+
+    const result = loadAiuConfig({ cwd: repoRoot });
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.diagnostics, []);
+  });
 });
 
 async function createRepoRoot(): Promise<string> {

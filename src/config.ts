@@ -220,7 +220,9 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
   validateWritablePath("stateDir", pathsConfig.stateDir, repoRoot, diagnostics);
   validateWritablePath("lockDir", pathsConfig.lockDir, repoRoot, diagnostics);
   validateWritablePath("logDir", pathsConfig.logDir, repoRoot, diagnostics);
-  validateWritableFilePath("whip.statePath", whip.statePath, repoRoot, "$.whip.statePath", diagnostics);
+  if (whip.enabled) {
+    validateWritableFilePath("whip.statePath", whip.statePath, repoRoot, "$.whip.statePath", diagnostics);
+  }
 
   return {
     config: Object.freeze({
