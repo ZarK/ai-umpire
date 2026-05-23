@@ -31,7 +31,8 @@ const UNTRUSTED_INPUT_BOUNDARY =
 
 export function renderAiuContinuationPrompt(input: AiuContinuationPromptInput): AiuContinuationPrompt {
   const decision = input.decision;
-  const sourceTimestamps = decision.sourceSummaries.map(sourceTimestamp);
+  const reasonCodes = canonicalReasonCodes(decision.reasonCodes);
+  const sourceTimestamps = decision.sourceSummaries.map(sourceTimestamp).sort(compareSourceTimestamp);
   const defaultBody = defaultPromptBody(decision, sourceTimestamps);
   const body = applyPromptCustomization(decision.promptKind, defaultBody, input.config);
 
@@ -39,13 +40,13 @@ export function renderAiuContinuationPrompt(input: AiuContinuationPromptInput): 
     kind: decision.promptKind,
     decisionKind: decision.kind,
     ...(decision.selectedItem ? { selectedItem: Object.freeze({ ...decision.selectedItem }) } : {}),
-    reasonCodes: Object.freeze([...decision.reasonCodes]),
+    reasonCodes: Object.freeze(reasonCodes),
     sourceTimestamps: Object.freeze(sourceTimestamps),
     body,
     fingerprint: fingerprintPrompt({
       decisionKind: decision.kind,
       selectedItem: decision.selectedItem,
-      reasonCodes: decision.reasonCodes,
+      reasonCodes,
       sourceTimestamps,
       body,
     }),
@@ -126,7 +127,7 @@ function describeSelectedItem(item: AiuDecisionSelectedItem | undefined): string
     return "";
   }
   const label = item.title ?? item.id ?? item.sourceId ?? item.kind;
-  return ` for ${label}`;
+  return ` for ${formatPromptData(label)}`;
 }
 
 function formatSources(sources: readonly AiuPromptSourceTimestamp[]): string {
@@ -142,6 +143,26 @@ function sourceTimestamp(source: AiuDecisionSourceSummary): AiuPromptSourceTimes
     stateKind: source.stateKind,
     observedAt: source.observedAt,
   });
+}
+
+function canonicalReasonCodes(reasonCodes: readonly AiuReasonCode[]): readonly AiuReasonCode[] {
+  return [...reasonCodes].sort((left, right) => left.localeCompare(right));
+}
+
+function compareSourceTimestamp(left: AiuPromptSourceTimestamp, right: AiuPromptSourceTimestamp): number {
+  return left.sourceId.localeCompare(right.sourceId)
+    || left.stateKind.localeCompare(right.stateKind)
+    || left.observedAt.localeCompare(right.observedAt);
+}
+
+function formatPromptData(value: string): string {
+  return JSON.stringify(redactLocalPaths(value).replace(/\s+/g, " ").trim());
+}
+
+function redactLocalPaths(value: string): string {
+  return value
+    .replace(/\/Users\/[^\s"'`]+/g, "[local-path]")
+    .replace(/[A-Za-z]:\\[^\s"'`]+/g, "[local-path]");
 }
 
 function applyPromptCustomization(
