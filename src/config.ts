@@ -516,11 +516,11 @@ function validateWritablePath(name: keyof AiuPathsConfig, configuredPath: string
         diagnostics.push(diagnostic("path-not-directory", `$.paths.${name}`, `${name} resolves to a file, not a directory.`, "Choose a directory path for Umpire state."));
         return;
       }
-      accessSync(resolved, constants.W_OK);
+      accessSync(resolved, constants.W_OK | constants.X_OK);
       return;
     }
 
-    accessSync(findExistingAncestor(resolved), constants.W_OK);
+    accessSync(findExistingDirectoryAncestor(resolved), constants.W_OK | constants.X_OK);
   } catch (error) {
     diagnostics.push(
       diagnostic(
@@ -533,7 +533,7 @@ function validateWritablePath(name: keyof AiuPathsConfig, configuredPath: string
   }
 }
 
-function findExistingAncestor(targetPath: string): string {
+function findExistingDirectoryAncestor(targetPath: string): string {
   let current = targetPath;
   while (!existsSync(current)) {
     const parent = path.dirname(current);
@@ -541,6 +541,10 @@ function findExistingAncestor(targetPath: string): string {
       return parent;
     }
     current = parent;
+  }
+  const stat = statSync(current);
+  if (!stat.isDirectory()) {
+    throw new Error(`Existing ancestor is not a directory: ${current}`);
   }
   return current;
 }

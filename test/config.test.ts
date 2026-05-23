@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -138,6 +138,33 @@ describe("config foundation", () => {
     assert.ok(kinds.includes("path-not-directory"));
     assert.ok(kinds.includes("unsafe-policy"));
     assert.ok(kinds.includes("legacy-fallback-unsupported"));
+  });
+
+  it("rejects state paths below file ancestors and non-searchable directories", async () => {
+    const repoRoot = await createRepoRoot();
+    const blockedDir = path.join(repoRoot, "blocked-dir");
+    await writeFile(path.join(repoRoot, "state-parent-file"), "not a directory\n", "utf8");
+    await mkdir(blockedDir);
+    await chmod(blockedDir, 0o600);
+    try {
+      await writeConfig(repoRoot, {
+        version: 1,
+        paths: {
+          stateDir: "state-parent-file/child",
+          lockDir: "blocked-dir/locks",
+          logDir: ".umpire/logs",
+        },
+      });
+
+      const result = loadAiuConfig({ cwd: repoRoot });
+      const pathDiagnostics = result.diagnostics.filter((diagnostic) => diagnostic.kind === "path-not-writable");
+
+      assert.equal(result.ok, false);
+      assert.ok(pathDiagnostics.some((diagnostic) => diagnostic.path === "$.paths.stateDir"));
+      assert.ok(pathDiagnostics.some((diagnostic) => diagnostic.path === "$.paths.lockDir"));
+    } finally {
+      await chmod(blockedDir, 0o700);
+    }
   });
 });
 
