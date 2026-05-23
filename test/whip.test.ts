@@ -1,11 +1,19 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
 
 import { loadAiuConfig } from "../dist/src/config.js";
-import { AIU_DEFAULT_WHIP_TASKS, decideAiuWhipContinuation, resolveAiuWhipTasks } from "../src/whip.ts";
+import {
+  AIU_DEFAULT_WHIP_TASKS,
+  decideAiuWhipContinuation,
+  readAiuWhipState,
+  resolveAiuWhipStatePath,
+  resolveAiuWhipTasks,
+  runAiuWhipCommand,
+} from "../src/whip.ts";
 
 const tempRoots: string[] = [];
 
@@ -211,6 +219,144 @@ describe("whip policy", () => {
 
     assert.equal(decision.outcome, "prompt");
     assert.equal(decision.task?.id, "repo-docs");
+  });
+
+  it("stores whip state under configurable paths and validates missing state as empty", async () => {
+    const repoRoot = await createRepoRoot();
+    await writeConfig(repoRoot, {
+      version: 1,
+      whip: {
+        statePath: ".umpire/custom-whip.json",
+      },
+    });
+    const config = loadAiuConfig({ cwd: repoRoot }).config;
+    const statePath = resolveAiuWhipStatePath(repoRoot, config);
+    const read = readAiuWhipState(repoRoot, config);
+
+    assert.equal(statePath, path.join(repoRoot, ".umpire", "custom-whip.json"));
+    assert.equal(read.ok, true);
+    assert.deepEqual(read.state.tasks, []);
+  });
+
+  it("adds repo-owned tasks with dry-run support and stable persisted state", async () => {
+    const repoRoot = await createRepoRoot();
+    const config = loadAiuConfig({ cwd: repoRoot }).config;
+    const dryRun = runAiuWhipCommand({
+      action: "add",
+      repoRoot,
+      config,
+      dryRun: true,
+      observedAt: "2026-05-23T12:00:00.000Z",
+      id: "repo-docs",
+      title: "Review repo docs",
+      prompt: "Review repository docs for stale aiu examples.",
+      priority: 5,
+    });
+
+    assert.equal(dryRun.changed, true);
+    assert.equal(existsSync(resolveAiuWhipStatePath(repoRoot, config)), false);
+
+    const applied = runAiuWhipCommand({
+      action: "add",
+      repoRoot,
+      config,
+      observedAt: "2026-05-23T12:00:00.000Z",
+      id: "repo-docs",
+      title: "Review repo docs",
+      prompt: "Review repository docs for stale aiu examples.",
+      priority: 5,
+    });
+    const persisted = JSON.parse(await readFile(resolveAiuWhipStatePath(repoRoot, config), "utf8")) as { tasks: Array<{ id: string; status: string; source: string }> };
+
+    assert.equal(applied.errors.length, 0);
+    assert.equal(applied.tasks[0]?.id, "repo-docs");
+    assert.equal(persisted.tasks[0]?.id, "repo-docs");
+    assert.equal(persisted.tasks[0]?.status, "pending");
+    assert.equal(persisted.tasks[0]?.source, "cli");
+  });
+
+  it("cancels and completes tasks only through explicit state transitions", async () => {
+    const repoRoot = await createRepoRoot();
+    const config = loadAiuConfig({ cwd: repoRoot }).config;
+    const firstDefault = AIU_DEFAULT_WHIP_TASKS[0];
+    const secondDefault = AIU_DEFAULT_WHIP_TASKS[1];
+    assert.ok(firstDefault);
+    assert.ok(secondDefault);
+
+    const missingEvidence = runAiuWhipCommand({
+      action: "complete",
+      repoRoot,
+      config,
+      id: firstDefault.id,
+    });
+    assert.deepEqual(missingEvidence.errors.map((error) => error.code), ["whip-evidence-required"]);
+
+    const complete = runAiuWhipCommand({
+      action: "complete",
+      repoRoot,
+      config,
+      observedAt: "2026-05-23T12:10:00.000Z",
+      id: firstDefault.id,
+      evidence: "Ran focused docs test and updated stale command.",
+    });
+    const cancel = runAiuWhipCommand({
+      action: "cancel",
+      repoRoot,
+      config,
+      observedAt: "2026-05-23T12:20:00.000Z",
+      id: secondDefault.id,
+      reason: "Superseded by tracked issue.",
+    });
+    const decision = decideAiuWhipContinuation({ config, state: readAiuWhipState(repoRoot, config).state });
+
+    assert.equal(complete.errors.length, 0);
+    assert.equal(cancel.errors.length, 0);
+    assert.equal(cancel.tasks.find((task) => task.id === secondDefault.id)?.cancellationReason, "Superseded by tracked issue.");
+    assert.equal(decision.outcome, "idle-no-work");
+    assert.equal(decision.promptDeliveryCompletesTask, false);
+  });
+
+  it("reports malformed state, invalid transitions, unknown ids, and stale ownership", async () => {
+    const repoRoot = await createRepoRoot();
+    const config = loadAiuConfig({ cwd: repoRoot }).config;
+    const statePath = resolveAiuWhipStatePath(repoRoot, config);
+    await mkdir(path.dirname(statePath), { recursive: true });
+    await writeFile(statePath, "{", "utf8");
+
+    const malformed = runAiuWhipCommand({ action: "status", repoRoot, config });
+    assert.deepEqual(malformed.errors.map((error) => error.code), ["whip-state-malformed"]);
+
+    await writeFile(statePath, JSON.stringify({
+      schemaVersion: 1,
+      tasks: [
+        {
+          id: "owned",
+          title: "Owned task",
+          prompt: "Continue the owned task.",
+          priority: 1,
+          status: "prompted",
+          source: "cli",
+          ownerSessionId: "ses_old",
+          promptedAt: "2026-05-22T00:00:00.000Z",
+        },
+        {
+          id: "done",
+          title: "Done task",
+          prompt: "Already done.",
+          priority: 2,
+          status: "completed",
+          source: "cli",
+        },
+      ],
+    }), "utf8");
+
+    const stale = runAiuWhipCommand({ action: "status", repoRoot, config, observedAt: "2026-05-23T12:00:00.000Z" });
+    const unknown = runAiuWhipCommand({ action: "cancel", repoRoot, config, id: "missing" });
+    const invalid = runAiuWhipCommand({ action: "complete", repoRoot, config, id: "done", evidence: "already done" });
+
+    assert.deepEqual(stale.staleOwnership.map((task) => task.id), ["owned"]);
+    assert.deepEqual(unknown.errors.map((error) => error.code), ["whip-task-not-found"]);
+    assert.deepEqual(invalid.errors.map((error) => error.code), ["whip-invalid-transition"]);
   });
 });
 

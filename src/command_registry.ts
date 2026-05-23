@@ -625,6 +625,148 @@ export const migrateCommand = defineCommand({
   ],
 });
 
+export const whipCommand = defineCommand({
+  kind: "command",
+  name: "whip",
+  description: "Inspect and manage durable idle whip tasks.",
+  arguments: [
+    {
+      name: "action",
+      description: "Whip task action: list, status, add, cancel, or complete.",
+      required: true,
+    },
+  ],
+  flags: [
+    jsonFlag,
+    defineFlag({
+      name: "config",
+      description: `Use an explicit ${AIU_CONFIG_FILENAME} path instead of repository-root discovery.`,
+      type: "string",
+      short: "c",
+    }),
+    defineFlag({
+      name: "dry-run",
+      description: "Render the mutation plan without writing whip state.",
+      type: "boolean",
+    }),
+    defineFlag({
+      name: "id",
+      description: "Whip task id for add, cancel, or complete.",
+      type: "string",
+    }),
+    defineFlag({
+      name: "title",
+      description: "Whip task title for add.",
+      type: "string",
+    }),
+    defineFlag({
+      name: "prompt",
+      description: "Concrete whip task prompt for add.",
+      type: "string",
+    }),
+    defineFlag({
+      name: "priority",
+      description: "Non-negative integer priority for add.",
+      type: "integer",
+    }),
+    defineFlag({
+      name: "reason",
+      description: "Cancellation reason for cancel.",
+      type: "string",
+    }),
+    defineFlag({
+      name: "evidence",
+      description: "Completion evidence for complete.",
+      type: "string",
+    }),
+  ],
+  examples: [
+    defineExample({
+      description: "List effective whip tasks.",
+      command: "aiu whip list --json",
+    }),
+    defineExample({
+      description: "Inspect whip state and ownership.",
+      command: "aiu whip status --json",
+    }),
+    defineExample({
+      description: "Add a concrete repo-owned whip task without writing state.",
+      command: "aiu whip add --id repo-docs --title \"Review docs\" --prompt \"Review README command examples.\" --priority 10 --dry-run --json",
+    }),
+    defineExample({
+      description: "Cancel a whip task.",
+      command: "aiu whip cancel --id repo-docs --reason \"Superseded by issue work\"",
+    }),
+    defineExample({
+      description: "Complete a whip task with evidence.",
+      command: "aiu whip complete --id repo-docs --evidence \"Updated README and reran cli tests\"",
+    }),
+  ],
+  output: {
+    formats: ["human", "json"],
+    defaultFormat: "human",
+  },
+  interactions: {
+    json: true,
+    dryRun: {
+      supported: true,
+    },
+    noColor: true,
+    nonInteractive: true,
+    ttyPrompt: false,
+  },
+  mutation: {
+    categories: ["local-files"],
+  },
+  errors: [
+    {
+      kind: "whip-invalid-command",
+      description: "The whip action or flags are invalid.",
+    },
+    {
+      kind: "whip-state-malformed",
+      description: "The configured whip state file is malformed.",
+    },
+    {
+      kind: "whip-task-exists",
+      description: "A whip task with the requested id already exists.",
+    },
+    {
+      kind: "whip-task-not-found",
+      description: "The requested whip task id does not exist.",
+    },
+    {
+      kind: "whip-invalid-transition",
+      description: "The requested status transition is not valid.",
+    },
+    {
+      kind: "whip-evidence-required",
+      description: "Completing a whip task requires explicit evidence.",
+    },
+    {
+      kind: "whip-state-write-failed",
+      description: "Whip state could not be written.",
+    },
+  ],
+  exitCodes: [
+    {
+      code: 0,
+      category: "success",
+      description: "Whip command completed successfully.",
+    },
+    {
+      code: 2,
+      category: "usage",
+      description: "Command usage was invalid.",
+    },
+    {
+      code: 1,
+      category: "validation",
+      description: "Whip state or requested transition was invalid.",
+    },
+  ],
+});
+
 export const AIU_COMMAND_REGISTRY = createCommandRegistry({
-  commands: [configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand, statusCommand],
+  commands: [configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand, statusCommand, whipCommand],
 });

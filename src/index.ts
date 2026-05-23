@@ -15,6 +15,7 @@ export {
   migrateCommand,
   pathsCommand,
   statusCommand,
+  whipCommand,
 } from "./command_registry.js";
 export {
   AIU_CONFIG_FILENAME,
@@ -108,9 +109,18 @@ export {
 } from "./trusted_adapter.js";
 export {
   AIU_DEFAULT_WHIP_TASKS,
+  AIU_WHIP_ERROR_CODES,
+  AIU_WHIP_STATE_SCHEMA_VERSION,
+  AIU_WHIP_TASK_SOURCES,
   AIU_WHIP_TASK_STATUSES,
   decideAiuWhipContinuation,
+  formatAiuWhipReport,
+  readAiuWhipState,
   resolveAiuWhipTasks,
+  resolveAiuWhipStatePath,
+  resolveAiuWhipTaskViews,
+  runAiuWhipCommand,
+  writeAiuWhipState,
 } from "./whip.js";
 export type {
   AiuPackageAssetPaths,
@@ -233,9 +243,16 @@ export type {
 export type {
   AiuWhipContinuationDecision,
   AiuWhipContinuationInput,
+  AiuWhipCommandInput,
+  AiuWhipError,
+  AiuWhipErrorCode,
   AiuWhipOutcome,
+  AiuWhipReadResult,
+  AiuWhipReport,
   AiuWhipSelectedTask,
   AiuWhipState,
   AiuWhipStateTask,
+  AiuWhipTaskSource,
   AiuWhipTaskStatus,
+  AiuWhipTaskView,
 } from "./whip.js";

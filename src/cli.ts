@@ -13,7 +13,7 @@ import {
   getDefaultAiuConfig,
   loadAiuConfig,
 } from "./config.js";
-import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand, statusCommand } from "./command_registry.js";
+import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, hookStopCommand, initCommand, migrateCommand, pathsCommand, statusCommand, whipCommand } from "./command_registry.js";
 import { AIU_DECISION_MODES, AIU_DECISION_PROMPT_KINDS } from "./decision.js";
 import { formatAiuDoctorReport, formatAiuPaths, getAiuResolvedPaths, runAiuDoctor } from "./doctor.js";
 import { AIU_HOST_CAPABILITY_SUPPORT, AIU_HOST_SUPPORT_LEVELS, getAllAiuHostCapabilityProfiles } from "./host_policy.js";
@@ -31,6 +31,7 @@ import {
   AIU_TRUST_LEVELS,
 } from "./state.js";
 import { AIU_TRUSTED_ADAPTER_ERROR_CODES } from "./trusted_adapter.js";
+import { AIU_WHIP_ERROR_CODES, AIU_WHIP_STATE_SCHEMA_VERSION, AIU_WHIP_TASK_SOURCES, AIU_WHIP_TASK_STATUSES, formatAiuWhipReport, runAiuWhipCommand, type AiuWhipReport } from "./whip.js";
 
 interface PackageJson {
   readonly name: string;
@@ -145,6 +146,36 @@ export const aiuCli = createCli({
         },
       };
     }),
+    createCommand(whipCommand, (context) => {
+      const configPath = typeof context.flags.config === "string" ? context.flags.config : undefined;
+      const configLoad = loadAiuConfig(configPath ? { configPath } : {});
+      const action = readWhipAction(context.args.action);
+      if (!action) {
+        return {
+          stderr: `Invalid whip action: ${String(context.args.action)}\n`,
+          exitCode: 2,
+        };
+      }
+      const report = runAiuWhipCommand({
+        action,
+        repoRoot: configLoad.repoRoot,
+        config: configLoad.config,
+        dryRun: context.flags["dry-run"] === true,
+        id: typeof context.flags.id === "string" ? context.flags.id : undefined,
+        title: typeof context.flags.title === "string" ? context.flags.title : undefined,
+        prompt: typeof context.flags.prompt === "string" ? context.flags.prompt : undefined,
+        priority: typeof context.flags.priority === "number" ? context.flags.priority : undefined,
+        reason: typeof context.flags.reason === "string" ? context.flags.reason : undefined,
+        evidence: typeof context.flags.evidence === "string" ? context.flags.evidence : undefined,
+      });
+      return {
+        human: formatAiuWhipReport(report),
+        json: {
+          whip: report,
+        },
+        exitCode: report.errors.length > 0 ? 1 : 0,
+      };
+    }),
     createCommand(pathsCommand, (context) => {
       const configPath = typeof context.flags.config === "string" ? context.flags.config : undefined;
       const paths = getAiuResolvedPaths(configPath ? { configPath } : {});
@@ -245,6 +276,15 @@ export const aiuCli = createCli({
           outputShape: ["config", "inputEnvelopes", "adapterRuns", "normalizedStateSummary", "decision", "prompt", "paths", "continuationState", "reasonLabels", "staleSources", "unknownSources", "errors", "warnings"],
           errorCodes: AIU_STATUS_ERROR_CODES,
         },
+        whip: {
+          commands: ["aiu whip list", "aiu whip status", "aiu whip add", "aiu whip cancel", "aiu whip complete"],
+          stateSchemaVersion: AIU_WHIP_STATE_SCHEMA_VERSION,
+          taskStatuses: AIU_WHIP_TASK_STATUSES,
+          taskSources: AIU_WHIP_TASK_SOURCES,
+          statePathDefault: getDefaultAiuConfig().whip.statePath,
+          taskFields: ["id", "title", "prompt", "priority", "status", "createdAt", "updatedAt", "source", "ownerSessionId", "selectedSessionId", "promptFingerprint", "promptedAt", "completionEvidence", "completedAt", "cancellationReason", "cancelledAt"],
+          errorCodes: AIU_WHIP_ERROR_CODES,
+        },
         doctor: {
           checkCategories: ["node", "package", "repository", "config", "host", "state", "trusted-command"],
           stableDiagnosticKinds: [
@@ -300,6 +340,10 @@ export const aiuCli = createCli({
 
 function readHookStopTool(value: unknown): "codex" | "claude-code" | undefined {
   return value === "codex" || value === "claude-code" ? value : undefined;
+}
+
+function readWhipAction(value: unknown): AiuWhipReport["action"] | undefined {
+  return value === "list" || value === "status" || value === "add" || value === "cancel" || value === "complete" ? value : undefined;
 }
 
 runtimeRegistry = aiuCli.registry;

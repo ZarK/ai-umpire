@@ -1,15 +1,22 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, it } from "node:test";
+import { afterEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const aiuBin = path.join(repoRoot, "dist/src/bin/aiu.js");
+const tempRoots: string[] = [];
 
 describe("metadata-backed CLI", () => {
+  afterEach(async () => {
+    await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  });
+
   it("renders root help from command metadata", async () => {
     const result = await runCli([]);
 
@@ -159,6 +166,15 @@ describe("metadata-backed CLI", () => {
           outputShape?: string[];
           errorCodes?: string[];
         };
+        whip?: {
+          commands?: string[];
+          stateSchemaVersion?: number;
+          taskStatuses?: string[];
+          taskSources?: string[];
+          statePathDefault?: string;
+          taskFields?: string[];
+          errorCodes?: string[];
+        };
         doctor?: {
           checkCategories?: string[];
           stableDiagnosticKinds?: string[];
@@ -173,7 +189,7 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.package.name, "@tjalve/aiu");
 
     const commandNames = parsed.commands.map((command) => command.name);
-    assert.deepEqual(commandNames, ["config", "doctor", "hook-stop", "init", "migrate", "paths", "schema", "status"]);
+    assert.deepEqual(commandNames, ["config", "doctor", "hook-stop", "init", "migrate", "paths", "schema", "status", "whip"]);
 
     const config = parsed.commands.find((command) => command.name === "config");
     assert.ok(config);
@@ -244,6 +260,14 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.sections?.status?.outputShape?.includes("prompt"));
     assert.ok(parsed.sections?.status?.errorCodes?.includes("trusted-command-malformed-json"));
     assert.ok(parsed.sections?.status?.errorCodes?.includes("status-config-invalid"));
+    assert.deepEqual(parsed.sections?.whip?.commands, ["aiu whip list", "aiu whip status", "aiu whip add", "aiu whip cancel", "aiu whip complete"]);
+    assert.equal(parsed.sections?.whip?.stateSchemaVersion, 1);
+    assert.deepEqual(parsed.sections?.whip?.taskStatuses, ["pending", "prompted", "completed", "cancelled"]);
+    assert.deepEqual(parsed.sections?.whip?.taskSources, ["package-default", "repo-config", "cli"]);
+    assert.equal(parsed.sections?.whip?.statePathDefault, ".umpire/whip.json");
+    assert.ok(parsed.sections?.whip?.taskFields?.includes("completionEvidence"));
+    assert.ok(parsed.sections?.whip?.errorCodes?.includes("whip-state-malformed"));
+    assert.ok(parsed.sections?.whip?.errorCodes?.includes("whip-evidence-required"));
     assert.ok(parsed.sections?.doctor?.checkCategories?.includes("host"));
     assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("package-json-present"));
     assert.ok(parsed.sections?.doctor?.stableDiagnosticKinds?.includes("repository-root-not-found"));
@@ -326,6 +350,16 @@ describe("metadata-backed CLI", () => {
     assert.equal(schema.mutation?.mutates, false);
     assert.ok(schema.flags?.some((flag) => flag.name === "json" && flag.type === "boolean"));
     assert.ok(schema.examples?.some((example) => example.command === "aiu schema --json"));
+
+    const whip = parsed.commands.find((command) => command.name === "whip");
+    assert.ok(whip);
+    assert.deepEqual(whip.output?.formats, ["human", "json"]);
+    assert.equal(whip.interactions?.json, true);
+    assert.equal(whip.dryRun?.supported, true);
+    assert.equal(whip.mutation?.mutates, true);
+    assert.ok(whip.flags?.some((flag) => flag.name === "dry-run" && flag.type === "boolean"));
+    assert.ok(whip.flags?.some((flag) => flag.name === "evidence" && flag.type === "string"));
+    assert.ok(whip.errors?.some((error) => error.kind === "whip-task-not-found"));
   });
 
   it("emits clean JSON for discovered config defaults", async () => {
@@ -406,6 +440,62 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.migrate.recommendedNextCommand, "aiu init --dry-run --json");
   });
 
+  it("emits clean JSON for whip status and dry-run mutations", async () => {
+    const target = await createRepoRoot();
+    const status = await runCli(["whip", "status", "--json"], target);
+    const statusJson = JSON.parse(status.stdout) as {
+      ok: boolean;
+      command: string;
+      whip: {
+        action: string;
+        stateOk: boolean;
+        statePath: string;
+        tasks: Array<{ id: string; status: string }>;
+        errors: unknown[];
+      };
+    };
+
+    assert.equal(status.exitCode, 0);
+    assert.equal(status.stderr, "");
+    assert.equal(statusJson.ok, true);
+    assert.equal(statusJson.command, "whip");
+    assert.equal(statusJson.whip.action, "status");
+    assert.equal(statusJson.whip.stateOk, true);
+    assert.ok(statusJson.whip.statePath.endsWith(path.join(".umpire", "whip.json")));
+    assert.ok(statusJson.whip.tasks.some((task) => task.status === "pending"));
+    assert.deepEqual(statusJson.whip.errors, []);
+
+    const add = await runCli([
+      "whip",
+      "add",
+      "--id",
+      "repo-docs",
+      "--title",
+      "Review repo docs",
+      "--prompt",
+      "Review repository docs for stale command examples.",
+      "--priority",
+      "5",
+      "--dry-run",
+      "--json",
+    ], target);
+    const addJson = JSON.parse(add.stdout) as {
+      whip: {
+        action: string;
+        changed: boolean;
+        dryRun: boolean;
+        tasks: Array<{ id: string }>;
+      };
+    };
+
+    assert.equal(add.exitCode, 0);
+    assert.equal(add.stderr, "");
+    assert.equal(addJson.whip.action, "add");
+    assert.equal(addJson.whip.changed, true);
+    assert.equal(addJson.whip.dryRun, true);
+    assert.ok(addJson.whip.tasks.some((task) => task.id === "repo-docs"));
+  });
+
   it("emits host Stop hook responses without extra output", async () => {
     const hostResponse = await runCli(["hook-stop", "--tool", "codex"]);
 
@@ -450,10 +540,10 @@ describe("metadata-backed CLI", () => {
   });
 });
 
-async function runCli(input: readonly string[]) {
+async function runCli(input: readonly string[], cwd = repoRoot) {
   try {
     const result = await execFileAsync(process.execPath, [aiuBin, ...input], {
-      cwd: repoRoot,
+      cwd,
     });
     return {
       exitCode: 0,
@@ -473,4 +563,11 @@ async function runCli(input: readonly string[]) {
       stderr: failed.stderr ?? "",
     };
   }
+}
+
+async function createRepoRoot(): Promise<string> {
+  const target = await mkdtemp(path.join(tmpdir(), "aiu-cli-"));
+  tempRoots.push(target);
+  await mkdir(path.join(target, ".git"));
+  return target;
 }

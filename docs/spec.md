@@ -129,6 +129,8 @@ M3.5 closes the host integration milestone with explicit diagnostics and schema 
 | FR-08-004 | Umpire can continue quality work when configured trusted quality state reports a concrete failing stage or finding group and no supply-chain or human policy block exists. | Required |
 | FR-08-005 | Idle prompts must not ask agents to perform broad, vague, unrelated, or dependency/tooling work without explicit repository policy and required approval. | Required |
 
+M4.1 adds the durable whip task management surface. Whip state is stored in the configured `whip.statePath` (`.umpire/whip.json` by default), validated on read, and managed through `aiu whip list`, `aiu whip status --json`, `aiu whip add`, `aiu whip cancel`, and `aiu whip complete`. Mutating commands support `--dry-run`, write only local whip state, require explicit completion evidence, and preserve the rule that prompt delivery alone never completes a task.
+
 ## FR-09 - Existing Repository Migration
 
 | ID | Requirement | Status |

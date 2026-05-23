@@ -242,6 +242,8 @@ Tests cover:
 
 Add durable task state, commands, validation, dry-run support, JSON output, and task fixtures.
 
+Status: implemented by the shared `whip` module and `aiu whip` command. Whip state is read from the configured `whip.statePath`, defaults to `.umpire/whip.json`, validates schema version and task records on read, and exposes stable JSON reports for list/status/add/cancel/complete. Mutating commands support `--dry-run`, write only local whip state, preserve disabled state without deleting tasks, reject unknown ids and invalid transitions, require explicit completion evidence, and surface stale prompted ownership in status output. Prompt delivery remains non-completing.
+
 ### M4.2 - Implement Quality Idle Continuation
 
 Read Quality Control trusted state, select failing stages, render concrete prompts, and stop on unsafe findings.

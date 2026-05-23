@@ -135,6 +135,17 @@ Disable all idle whip prompts with committed config:
 
 When disabled, existing `.umpire/whip.json` state is preserved and Umpire reports a disabled/no-prompt outcome instead of editing generated state by hand.
 
+Inspect and manage durable task state with the package CLI:
+
+```bash
+pnpm exec aiu whip status --json
+pnpm exec aiu whip list
+pnpm exec aiu whip add --id repo-docs --title "Review repo docs" --prompt "Review repository docs for stale aiu examples, update only incorrect examples, then run the affected checks." --priority 10 --dry-run --json
+pnpm exec aiu whip complete --id repo-docs --evidence "Updated README examples and reran CLI tests"
+```
+
+Mutating whip commands write only the configured `.umpire/whip.json` state file, support `--dry-run`, and never mutate host files, providers, work items, reviews, or git history.
+
 Replace package defaults with repo-owned tasks:
 
 ```json
@@ -244,6 +255,7 @@ Use `pnpm exec aiu paths --json` to inspect the resolved package root, config pa
 - `@tjalve/aiu/opencode` - OpenCode plugin composition helpers
 - `aiu` - package CLI foundation
 - `aiu hook-stop` - experimental Codex and Claude Code Stop hook entrypoint backed by trusted-state decisions and explicit stop-hook blocking policy
+- `aiu whip` - durable idle task state inspection and explicit add/cancel/complete transitions
 - `loadAiuConfig` - typed config discovery, defaults, and validation
 - `renderAiuPromptSection` - repo-level prompt section customization helper
 - `runAiuDoctor` and `getAiuResolvedPaths` - read-only diagnostics and path inspection helpers
