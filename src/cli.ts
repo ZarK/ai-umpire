@@ -2,7 +2,7 @@ import { createCli, createCommand, createSchemaCommand, runCli } from "@tjalve/q
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { getAiuPackageAssetPaths, getAiuPackageRoot } from "./assets.js";
+import { getAiuPackageRoot } from "./assets.js";
 import {
   AIU_CONFIG_FILENAME,
   AIU_CONFIG_SCHEMA_VERSION,
@@ -12,7 +12,8 @@ import {
   getDefaultAiuConfig,
   loadAiuConfig,
 } from "./config.js";
-import { AIU_COMMAND_REGISTRY, configCommand, initCommand, pathsCommand } from "./command_registry.js";
+import { AIU_COMMAND_REGISTRY, configCommand, doctorCommand, initCommand, pathsCommand } from "./command_registry.js";
+import { formatAiuDoctorReport, formatAiuPaths, getAiuResolvedPaths, runAiuDoctor } from "./doctor.js";
 import { applyAiuInitPlan, formatInitPlan, planAiuInit, type AiuInitTool } from "./init.js";
 
 interface PackageJson {
@@ -57,6 +58,16 @@ export const aiuCli = createCli({
         },
       };
     }),
+    createCommand(doctorCommand, (context) => {
+      const configPath = typeof context.flags.config === "string" ? context.flags.config : undefined;
+      const report = runAiuDoctor(configPath ? { configPath } : {});
+      return {
+        human: formatAiuDoctorReport(report),
+        json: {
+          doctor: report,
+        },
+      };
+    }),
     createCommand(initCommand, (context) => {
       const tool = typeof context.flags.tool === "string" ? (context.flags.tool as AiuInitTool) : undefined;
       const dryRun = context.flags["dry-run"] === true;
@@ -69,16 +80,13 @@ export const aiuCli = createCli({
         },
       };
     }),
-    createCommand(pathsCommand, () => {
-      const assetPaths = getAiuPackageAssetPaths();
+    createCommand(pathsCommand, (context) => {
+      const configPath = typeof context.flags.config === "string" ? context.flags.config : undefined;
+      const paths = getAiuResolvedPaths(configPath ? { configPath } : {});
       return {
-        human: [
-          `packageRoot: ${assetPaths.packageRoot}`,
-          `pluginWrapperRelativePath: ${assetPaths.pluginWrapperRelativePath}`,
-          "",
-        ].join("\n"),
+        human: formatAiuPaths(paths),
         json: {
-          paths: assetPaths,
+          paths,
         },
       };
     }),

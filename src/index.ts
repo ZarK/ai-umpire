@@ -10,6 +10,7 @@ export {
 export {
   AIU_COMMAND_REGISTRY,
   configCommand,
+  doctorCommand,
   initCommand,
   pathsCommand,
 } from "./command_registry.js";
@@ -24,9 +25,16 @@ export {
   loadAiuConfig,
 } from "./config.js";
 export {
+  formatAiuDoctorReport,
+  formatAiuPaths,
+  getAiuResolvedPaths,
+  runAiuDoctor,
+} from "./doctor.js";
+export {
   AIU_INIT_TOOLS,
   applyAiuInitPlan,
   formatInitPlan,
+  getAiuHostCapabilityProfiles,
   planAiuInit,
 } from "./init.js";
 export type {
@@ -42,6 +50,17 @@ export type {
   AiuHostCapabilityName,
   AiuTrustedStateCommandDescriptor,
 } from "./config.js";
+export type {
+  AiuDoctorCheck,
+  AiuDoctorReport,
+  AiuHealthStatus,
+  AiuHostFilePath,
+  AiuHostPathSet,
+  AiuInspectionOptions,
+  AiuPackageBinPath,
+  AiuResolvedPaths,
+  AiuTrustedCommandPath,
+} from "./doctor.js";
 export type {
   AiuHostCapabilityProfile,
   AiuInitFileAction,

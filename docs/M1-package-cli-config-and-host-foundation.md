@@ -135,7 +135,7 @@ Prompts are TTY-only. Every prompt has a flag or config equivalent so non-intera
 `aiu doctor` checks:
 
 - Node version
-- package metadata and asset paths
+- package metadata and built asset paths
 - repository root
 - config validity
 - host install files
@@ -143,6 +143,16 @@ Prompts are TTY-only. Every prompt has a flag or config equivalent so non-intera
 - trusted command availability where configured
 
 Doctor does not mutate by default.
+
+Doctor reports stable check statuses and error kinds for human and agent diagnostics. It does not execute trusted state commands while checking availability, and rendered diagnostics redact token-like values where practical.
+
+`aiu paths --json` reports:
+
+- package root, package metadata, bin, main, and type declaration paths
+- selected config path and repository root
+- resolved state, lock, and log paths
+- OpenCode, Codex, and Claude Code host install paths
+- configured trusted command executable paths where known
 
 `aiu schema --json` emits implemented command metadata, flags, arguments, examples, mutation behavior, dry-run support, JSON support, stable error kinds, exit codes, config schema version, and host capability names.
 

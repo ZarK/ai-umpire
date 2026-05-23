@@ -8,17 +8,18 @@
 - shared CLI metadata, help, schema, and JSON behavior through `@tjalve/qube-cli`
 - typed `aiu.config.json` discovery, defaults, and validation diagnostics
 - dry-runnable `aiu init` plans for OpenCode, Codex, and Claude Code host files
+- non-mutating `aiu doctor` diagnostics for package, config, host, state, and trusted command health
 - package metadata for the `@tjalve/aiu` npm package
 - a package-backed `aiu` executable
 - TypeScript source, build, typecheck, test, and package dry-run checks
-- a minimal `aiu paths` command for package asset inspection
+- `aiu paths` output for package, config, state, host, and trusted command paths
 
 It does not bundle companion CLIs or keep copied helper scripts as a runtime fallback path. Repositories configure trusted commands explicitly.
 
 ## Install
 
 ```bash
-pnpm add -D --save-exact --ignore-scripts @tjalve/aiu
+pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.0
 ```
 
 System requirements:
@@ -37,6 +38,7 @@ Inspect package paths:
 pnpm exec aiu paths
 pnpm exec aiu paths --json
 pnpm exec aiu config --json
+pnpm exec aiu doctor --json
 pnpm exec aiu init --dry-run --json
 pnpm exec aiu schema --json
 ```
@@ -45,19 +47,35 @@ If `aiu.config.json` is missing, Umpire reports typed conservative defaults. Con
 
 `aiu init` defaults to `--tool all` and produces the same plan shape in dry-run and apply mode. Existing managed files that differ are reported as conflicts unless `--force` is provided explicitly.
 
+Apply a reviewed init plan:
+
+```bash
+pnpm exec aiu init --tool all
+pnpm exec aiu doctor
+```
+
+After init writes host files, review and enable the host-specific trust step named in the init output. OpenCode, Codex, and Claude Code integrations delegate to the package-backed `aiu` command; Umpire does not install fallback scripts.
+
 Run release checks:
 
 ```bash
 pnpm run release:check
 ```
 
-Doctor, status, and stop-hook commands are planned package functionality. They should be added only as real commands with tests and dry-run behavior where applicable.
+`aiu doctor` is read-only. It reports Node version, package metadata and built assets, repository/config health, host install files for enabled hosts, state path writability, and configured trusted command executable availability. It does not execute trusted commands.
+
+## Troubleshooting
+
+Use `pnpm exec aiu doctor --json` as the first diagnostic command. Stable check `kind` values identify setup problems such as `config-missing`, `config-invalid`, `host-file-missing`, `state-path-not-writable`, and `trusted-command-missing`.
+
+Use `pnpm exec aiu paths --json` to inspect the resolved package root, config path, `.umpire/` state paths, host install paths, and trusted command executable paths. Diagnostic output redacts token-like values where practical.
 
 ## Package Surfaces
 
 - `@tjalve/aiu` - public package asset helpers
 - `aiu` - package CLI foundation
 - `loadAiuConfig` - typed config discovery, defaults, and validation
+- `runAiuDoctor` and `getAiuResolvedPaths` - read-only diagnostics and path inspection helpers
 
 ## Development
 

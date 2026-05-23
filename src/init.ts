@@ -139,6 +139,8 @@ const HOST_PROFILES: Readonly<Record<AiuHost, AiuHostCapabilityProfile>> = Objec
   }),
 });
 
+const DEFAULT_HOSTS = Object.freeze(Object.keys(HOST_PROFILES) as AiuHost[]);
+
 export function planAiuInit(options: AiuInitOptions = {}): AiuInitPlan {
   const configLoad = loadAiuConfig({ cwd: options.cwd });
   const repoRoot = configLoad.repoRoot;
@@ -204,6 +206,10 @@ export function applyAiuInitPlan(plan: AiuInitPlan): AiuInitPlan {
   }
 
   return refreshed;
+}
+
+export function getAiuHostCapabilityProfiles(tools: readonly AiuHost[] = DEFAULT_HOSTS): readonly AiuHostCapabilityProfile[] {
+  return Object.freeze(tools.map((tool) => HOST_PROFILES[tool]));
 }
 
 export function formatInitPlan(plan: AiuInitPlan): string {

@@ -14,16 +14,28 @@ const jsonFlag = defineFlag({
 export const pathsCommand = defineCommand({
   kind: "command",
   name: "paths",
-  description: "Show package asset paths for the installed AI Umpire package.",
-  flags: [jsonFlag],
+  description: "Show package, config, state, host, and trusted command paths.",
+  flags: [
+    jsonFlag,
+    defineFlag({
+      name: "config",
+      description: `Use an explicit ${AIU_CONFIG_FILENAME} path instead of repository-root discovery.`,
+      type: "string",
+      short: "c",
+    }),
+  ],
   examples: [
     defineExample({
-      description: "Show package asset paths.",
+      description: "Show package and repository paths.",
       command: "aiu paths",
     }),
     defineExample({
-      description: "Show package asset paths as JSON.",
+      description: "Show package and repository paths as JSON.",
       command: "aiu paths --json",
+    }),
+    defineExample({
+      description: "Inspect paths for an explicit config file.",
+      command: "aiu paths --config ./aiu.config.json --json",
     }),
   ],
   output: {
@@ -51,6 +63,92 @@ export const pathsCommand = defineCommand({
       code: 0,
       category: "success",
       description: "Command completed successfully.",
+    },
+    {
+      code: 2,
+      category: "usage",
+      description: "Command usage was invalid.",
+    },
+    {
+      code: 1,
+      category: "unexpected",
+      description: "Command failed unexpectedly.",
+    },
+  ],
+});
+
+export const doctorCommand = defineCommand({
+  kind: "command",
+  name: "doctor",
+  description: "Inspect installation health, config, host files, state paths, and trusted commands.",
+  flags: [
+    jsonFlag,
+    defineFlag({
+      name: "config",
+      description: `Use an explicit ${AIU_CONFIG_FILENAME} path instead of repository-root discovery.`,
+      type: "string",
+      short: "c",
+    }),
+  ],
+  examples: [
+    defineExample({
+      description: "Inspect Umpire health.",
+      command: "aiu doctor",
+    }),
+    defineExample({
+      description: "Inspect Umpire health as clean JSON.",
+      command: "aiu doctor --json",
+    }),
+    defineExample({
+      description: "Inspect Umpire health for an explicit config file.",
+      command: "aiu doctor --config ./aiu.config.json --json",
+    }),
+  ],
+  output: {
+    formats: ["human", "json"],
+    defaultFormat: "human",
+  },
+  interactions: {
+    json: true,
+    dryRun: {
+      supported: false,
+      reason: "Doctor is non-mutating and only reports diagnostics.",
+    },
+    noColor: true,
+    nonInteractive: true,
+    ttyPrompt: false,
+  },
+  errors: [
+    {
+      kind: "node-version-unsupported",
+      description: "The active Node.js runtime does not satisfy the package engine requirement.",
+    },
+    {
+      kind: "config-invalid",
+      description: "The selected config has validation diagnostics.",
+    },
+    {
+      kind: "config-missing",
+      description: "No repository config file was found, so conservative defaults are in use.",
+    },
+    {
+      kind: "host-file-missing",
+      description: "A configured host integration file is not installed.",
+    },
+    {
+      kind: "state-path-not-writable",
+      description: "A configured state, lock, or log path cannot be written or created.",
+    },
+    {
+      kind: "trusted-command-missing",
+      description: "A configured trusted command executable is not available.",
+    },
+  ],
+  exitCodes: [
+    {
+      code: 0,
+      category: "success",
+      description: "Doctor completed and reported health diagnostics.",
     },
     {
       code: 2,
@@ -235,5 +333,5 @@ export const initCommand = defineCommand({
 });
 
 export const AIU_COMMAND_REGISTRY = createCommandRegistry({
-  commands: [configCommand, initCommand, pathsCommand],
+  commands: [configCommand, doctorCommand, initCommand, pathsCommand],
 });
