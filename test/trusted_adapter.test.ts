@@ -260,6 +260,23 @@ describe("trusted command adapters", () => {
     assert.equal(value?.kind === "planning" ? value.providers[0]?.status : undefined, "unknown");
     assert.equal(value?.kind === "planning" ? value.stopCondition?.category : undefined, "human-question");
     assert.equal(value?.kind === "planning" ? value.supplyChainApprovalRequired : undefined, "unknown");
+
+    const incomplete = parseAiuTrustedStateJson({
+      sourceId: "planning",
+      command,
+      stdout: JSON.stringify({
+        schemaVersion: 1,
+        observedAt,
+        value: {
+          kind: "planning",
+          status: "pass",
+          needsPlanning: true,
+        },
+      }),
+      observedAt,
+    });
+    assert.equal(incomplete.ok, true);
+    assert.equal(incomplete.states[0]?.value.kind === "planning" ? incomplete.states[0].value.humanInputRequired : undefined, "unknown");
   });
 
   it("normalizes quality stages, findings, commands, and approval blocks", async () => {

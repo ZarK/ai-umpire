@@ -220,6 +220,24 @@ describe("continuation decision engine", () => {
     assert.equal(planningDecision.selectedItem?.id, "refresh-milestone");
     assert.deepEqual(planningDecision.selectedItem?.artifactChecks, ["docs/spec.md"]);
 
+    const inactiveStopConditionDecision = decideAiuContinuation({ states: [env(planning({
+      needsPlanning: true,
+      stopCondition: {
+        id: "resolved-schema",
+        category: "human-question",
+        status: "pass",
+        affectedPaths: ["docs/spec.md"],
+      },
+      nextAction: {
+        id: "continue-after-resolution",
+        status: "pass",
+        artifactChecks: ["docs/spec.md"],
+        draftPaths: [],
+      },
+    }))] });
+    assertDecision(inactiveStopConditionDecision, "continue", "continue-planning");
+    assert.equal(inactiveStopConditionDecision.selectedItem?.id, "continue-after-resolution");
+
     assertDecision(
       decideAiuContinuation({
         states: [env(planning({ needsPlanning: "unknown", humanInputRequired: "unknown" })), env(workQueue({ readyItems: [workItem("47", "ready")] }))],

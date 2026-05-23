@@ -324,9 +324,11 @@ function findPlanningHumanBlock(indexed: readonly IndexedState[]): AiuDecisionSe
       item.value.humanInputRequired === true
       || item.value.unresolvedQuestions.some((question) => question.requiresHuman === true || isHumanPlanningQuestion(question.category))
       || item.value.stopCondition?.requiresHuman === true
-      || item.value.stopCondition?.category === "human-question"
-      || item.value.stopCondition?.category === "ambiguous-mapping"
-      || item.value.stopCondition?.category === "artifact-inconsistency"
+      || (item.value.stopCondition?.status !== "pass" && (
+        item.value.stopCondition?.category === "human-question"
+        || item.value.stopCondition?.category === "ambiguous-mapping"
+        || item.value.stopCondition?.category === "artifact-inconsistency"
+      ))
     ) {
       return selectPlanningState(item);
     }
@@ -339,7 +341,7 @@ function findPlanningSupplyChainBlock(indexed: readonly IndexedState[]): AiuDeci
     if (!hasKind(item, "planning")) continue;
     if (
       item.value.supplyChainApprovalRequired === true
-      || item.value.stopCondition?.category === "supply-chain-approval"
+      || (item.value.stopCondition?.status !== "pass" && item.value.stopCondition?.category === "supply-chain-approval")
       || item.value.unresolvedQuestions.some((question) => question.category === "supply-chain" && question.requiresHuman !== false)
     ) {
       return selectPlanningState(item);
@@ -676,7 +678,7 @@ function selectPlanningAction(item: IndexedState & { readonly value: Extract<Aiu
     affectedPaths: Object.freeze([...action.draftPaths, ...item.value.draftPaths].filter((path, index, all) => all.indexOf(path) === index)),
     ...(action.command ? { command: action.command } : {}),
     artifactChecks: Object.freeze([...action.artifactChecks]),
-    expectedEvidence: action.expectedEvidence ?? "Updated trusted Bootstrap planning state plus artifact check output.",
+    expectedEvidence: action.expectedEvidence ?? "Updated trusted Bootstrap planning state plus the configured planning action evidence.",
   });
 }
 

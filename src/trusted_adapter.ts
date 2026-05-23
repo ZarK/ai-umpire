@@ -379,7 +379,7 @@ function normalizePlanningState(value: Record<string, unknown>): AiuPlanningStat
     status: value.status as AiuStateValueKind,
     ...(summary ? { summary } : {}),
     needsPlanning: readBooleanUnknownUnsupported(value.needsPlanning, false),
-    humanInputRequired: readBooleanUnknown(value.humanInputRequired) ?? false,
+    humanInputRequired: readBooleanUnknown(value.humanInputRequired) ?? "unknown",
     ...(currentPhase ? { currentPhase } : {}),
     decisions: normalizePlanningDecisions(value.decisions),
     unresolvedQuestions: normalizePlanningQuestions(value.unresolvedQuestions),

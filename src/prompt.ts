@@ -111,7 +111,7 @@ function planningLead(decision: AiuContinuationDecision, item: string): string {
     selected?.command ? `Next configured command: ${formatCommand(selected.command)}.` : "Next configured command: inspect the trusted planning source for the configured Bootstrap command.",
     selected?.artifactChecks && selected.artifactChecks.length > 0 ? `Artifact checks: ${selected.artifactChecks.map(formatPromptData).join(", ")}.` : "Artifact checks: verify the generated planning artifacts named by trusted state.",
     selected?.affectedPaths && selected.affectedPaths.length > 0 ? `Draft paths: ${selected.affectedPaths.map(formatPromptData).join(", ")}.` : "Draft paths: use only trusted planning state paths when provided.",
-    `Expected evidence: ${selected?.expectedEvidence ?? "updated trusted Bootstrap planning state plus artifact check output"}.`,
+    `Expected evidence: ${selected?.expectedEvidence ?? "updated trusted Bootstrap planning state plus the configured planning action evidence"}.`,
     "Do not invent missing product decisions, provider schema fields, work-item mappings, or acceptance criteria.",
   ];
   return details.join("\n");
