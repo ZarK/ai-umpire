@@ -75,6 +75,48 @@ describe("trusted state models", () => {
     assert.ok(catalog.some((item) => item.code === "continue-quality"));
   });
 
+  it("freezes envelope snapshots without retaining mutable nested input references", () => {
+    const argv: [string, ...string[]] = ["fixture"];
+    const blockers: string[] = [];
+    const value: AiuWorkItemState = {
+      kind: "work-item",
+      status: "pass",
+      id: "45",
+      lifecycle: "active",
+      blockers,
+    };
+
+    const result = createAiuTrustedStateEnvelope({
+      sourceId: "fixture",
+      command: {
+        id: "fixture-command",
+        argv,
+      },
+      observedAt: "2026-05-23T00:00:00.000Z",
+      trustLevel: "trusted",
+      capabilities: {
+        queue: "supported",
+      },
+      freshness: {
+        kind: "fresh",
+        observedAt: "2026-05-23T00:00:00.000Z",
+      },
+      value,
+    });
+
+    argv.push("mutated");
+    blockers.push("late-blocker");
+
+    assert.deepEqual(result.command.argv, ["fixture"]);
+    assert.deepEqual(result.value.blockers, []);
+    assert.equal(Object.isFrozen(result), true);
+    assert.equal(Object.isFrozen(result.command), true);
+    assert.equal(Object.isFrozen(result.command.argv), true);
+    assert.equal(Object.isFrozen(result.freshness), true);
+    assert.equal(Object.isFrozen(result.value), true);
+    assert.equal(Object.isFrozen(result.value.blockers), true);
+  });
+
   it("fixtures cover valid, failed, missing, stale, unknown, unsupported, untrusted, and malformed states", () => {
     const statuses = collectFixtureStatuses(fixtures());
 
@@ -88,8 +130,8 @@ describe("trusted state models", () => {
 
     assert.doesNotMatch(source, /from\s+["']node:fs/);
     assert.doesNotMatch(source, /from\s+["']node:child_process/);
-    assert.doesNotMatch(source, /from\s+["']\.\/cli\.js["']/);
-    assert.doesNotMatch(source, /from\s+["']\.\/command_registry\.js["']/);
+    assert.doesNotMatch(source, /from\s+["']\.\/cli(?:\.(?:[cm]?ts|[cm]?js))?["']/);
+    assert.doesNotMatch(source, /from\s+["']\.\/command_registry(?:\.(?:[cm]?ts|[cm]?js))?["']/);
     assert.doesNotMatch(source, /from\s+["']\.\/opencode/);
     assert.doesNotMatch(source, /\bgithub\b/i);
   });

@@ -231,9 +231,12 @@ export function createAiuTrustedStateEnvelope<TState extends AiuTrustedStatePayl
     ...input,
     schemaVersion: AIU_TRUSTED_STATE_SCHEMA_VERSION,
     stateKind: input.value.kind,
-    capabilities: Object.freeze({ ...input.capabilities }),
-    unknownFields: Object.freeze([...(input.unknownFields ?? [])]),
-    diagnostics: Object.freeze([...(input.diagnostics ?? [])]),
+    command: deepFreezeClone(input.command),
+    capabilities: deepFreezeClone(input.capabilities),
+    freshness: deepFreezeClone(input.freshness),
+    value: deepFreezeClone(input.value),
+    unknownFields: deepFreezeClone([...(input.unknownFields ?? [])]),
+    diagnostics: deepFreezeClone([...(input.diagnostics ?? [])]),
   });
 }
 
@@ -261,4 +264,23 @@ function reasonCode(
     decision,
     description,
   });
+}
+
+function deepFreezeClone<TValue>(value: TValue): TValue {
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map((item: unknown) => deepFreezeClone(item))) as TValue;
+  }
+  if (isRecord(value)) {
+    const clone: Record<string, unknown> = {};
+    for (const [key, nested] of Object.entries(value)) {
+      clone[key] = deepFreezeClone(nested);
+    }
+    return Object.freeze(clone) as TValue;
+  }
+
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
