@@ -120,6 +120,7 @@ export function formatMigrationPlan(plan: AiuMigrationPlan): string {
     formatFindingGroup("Repo-local hooks", plan.repoLocalHooks),
     formatFindingGroup("Local-checkout references", plan.localCheckoutReferences),
     formatFindingGroup("Cleanup candidates", plan.cleanupCandidates),
+    formatFindingGroup("Conflicts", plan.conflicts),
     "Package-managed sections:",
     ...plan.managedSections.map((section) => `- ${section.relativePath}: ${section.reason}`),
     "",
@@ -224,6 +225,6 @@ function readText(absolutePath: string): string {
 }
 
 function formatFindingGroup(title: string, findings: readonly AiuMigrationFinding[]): string {
-  const body = findings.length === 0 ? ["- none"] : findings.map((finding) => `- ${finding.relativePath}: ${finding.reason}`);
+  const body = findings.length === 0 ? ["- none"] : findings.map((finding) => `- ${finding.relativePath} [${finding.category}]: ${finding.reason}`);
   return [title, ...body, ""].join("\n");
 }

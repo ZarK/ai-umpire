@@ -52,6 +52,11 @@ describe("migration planner", () => {
     assert.ok(parsed.migrate.conflicts.length >= 2);
     assert.equal(parsed.migrate.statePreservation.action, "preserve");
     assert.equal(parsed.migrate.recommendedNextCommand, "aiu init --dry-run --json");
+
+    const human = await runCli(target, ["migrate", "--dry-run"]);
+    assert.equal(human.exitCode, 0);
+    assert.match(human.stdout, /Conflicts/);
+    assert.match(human.stdout, /migration-review-required/);
   });
 });
 
