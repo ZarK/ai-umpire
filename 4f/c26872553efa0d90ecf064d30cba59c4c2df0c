@@ -1,0 +1,55 @@
+src/status.ts
+  s_f8aaaf4fdfe4d6::t_e0b6c97ff480e1 151-164
+  s_f8aaaf4fdfe4d6::t_5bdc3bdc110804 1,166,176,284-315
+  s_f8aaaf4fdfe4d6::t_60a4fa01c3ca9a 2-118,120-150,165,167-173,175,177-181,183-243,275-283,316-344
+  s_f8aaaf4fdfe4d6::t_793707c6cfbe3c 182,244-274
+  s_f8aaaf4fdfe4d6::t_98c31c1ebd0501 119,174
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_5dea62af7f93fc 17,58-63,155-165
+src/command_registry.ts
+  s_f8aaaf4fdfe4d6::t_ff1b3fcda5aad5 221-244,247-250
+  s_f8aaaf4fdfe4d6::t_76078fd5454485 170-218,245-246,251-271,561
+  s_f8aaaf4fdfe4d6::t_935a0b1da27173 146-149
+test/status.test.ts
+  s_f8aaaf4fdfe4d6::t_3d8cf07b17039d 67,162,176-179
+  s_f8aaaf4fdfe4d6::t_ee2bdca55d08c5 78-89,207-217
+  s_f8aaaf4fdfe4d6::t_3a76061cf732c7 118
+  s_f8aaaf4fdfe4d6::t_1dba933e5cfe88 65,72,75
+  s_f8aaaf4fdfe4d6::t_0fe449298c6f33 1-6,8-51,53-63,70-71,73-74,76-77,90-115,119-134,136-138,140-142,144-161,163-175,180-206,218-314
+  s_f8aaaf4fdfe4d6::t_deead181218c8c 7,135,139,143
+  s_f8aaaf4fdfe4d6::t_af360d4ae466a1 68-69
+  s_f8aaaf4fdfe4d6::t_32c85d2f9532c8 116-117
+  s_f8aaaf4fdfe4d6::t_0eccac1023880b 52,64,66
+src/doctor.ts
+  s_f8aaaf4fdfe4d6::t_b111c584d823ca 164,168,292-303,337-338
+  s_f8aaaf4fdfe4d6::t_b912195d43b500 339
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_5790c9202d039e 16,22,86-95,185-189
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_28ecd6ba211731 96-97
+test/config.test.ts
+  s_f8aaaf4fdfe4d6::t_f0278e5453d598 142-149,199
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_8d2716c8104591 253-254
+  s_f8aaaf4fdfe4d6::t_966c96638c939a 32-33
+  s_f8aaaf4fdfe4d6::t_67e9b7b7acecc3 138-142,196-200,244-252
+  s_f8aaaf4fdfe4d6::t_722afcafd6f0cf 154
+docs/M2-continuation-state-and-policy-engine.md
+  s_f8aaaf4fdfe4d6::t_7674b5e7b7f52f 198-199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "4fc26872553efa0d90ecf064d30cba59c4c2df0c",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
