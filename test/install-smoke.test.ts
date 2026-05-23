@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -18,11 +19,15 @@ describe("packed tarball install smoke", () => {
   });
 
   it("installs the packed package into a blank repo and runs init dry-run", async () => {
-    const packDir = await createTempRoot("aiu-pack-");
-    const target = await createBlankRepo();
+    const root = await createTempRoot("aiu-install-smoke-");
+    const packDir = path.join(root, "pack");
+    const target = path.join(root, "repo");
+    await mkdir(packDir);
+    await mkdir(target);
     const tarball = await packPackage(packDir);
+    await createLockedBlankRepo(target, tarball);
 
-    await runPnpm(["add", "-D", "--save-exact", "--ignore-scripts", tarball], target);
+    await runPnpm(["install", "--frozen-lockfile", "--ignore-scripts", "--offline"], target);
     const result = await runPnpm(["exec", "aiu", "init", "--dry-run", "--json"], target);
     const parsed = JSON.parse(result.stdout) as InitEnvelope;
 
@@ -63,22 +68,82 @@ async function packPackage(packDir: string): Promise<string> {
   return path.isAbsolute(packedName) ? packedName : path.join(packDir, packedName);
 }
 
-async function createBlankRepo(): Promise<string> {
-  const target = await createTempRoot("aiu-install-");
+async function createLockedBlankRepo(target: string, tarball: string): Promise<void> {
   await mkdir(path.join(target, ".git"));
+  const tarballSpecifier = `file:${path.relative(target, tarball)}`;
   await writeFile(
     path.join(target, "package.json"),
-    `${JSON.stringify({ private: true, packageManager: "pnpm@11.0.4", devDependencies: {} }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        private: true,
+        packageManager: "pnpm@11.0.4",
+        devDependencies: {
+          "@tjalve/aiu": tarballSpecifier,
+        },
+      },
+      null,
+      2,
+    )}\n`,
     "utf8",
   );
   await writeFile(path.join(target, ".npmrc"), "ignore-scripts=true\nsave-exact=true\n", "utf8");
-  return target;
+  await writeFile(path.join(target, "pnpm-lock.yaml"), await buildSmokeLockfile(tarballSpecifier, tarball), "utf8");
 }
 
 async function createTempRoot(prefix: string): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), prefix));
   tempRoots.push(root);
   return root;
+}
+
+async function buildSmokeLockfile(tarballSpecifier: string, tarball: string): Promise<string> {
+  const rootLock = await readFile(path.join(repoRoot, "pnpm-lock.yaml"), "utf8");
+  const packages = readLockfileSection(rootLock, "packages", "snapshots");
+  const snapshots = readLockfileSection(rootLock, "snapshots");
+  const integrity = `sha512-${createHash("sha512").update(await readFile(tarball)).digest("base64")}`;
+
+  return [
+    "lockfileVersion: '9.0'",
+    "",
+    "settings:",
+    "  autoInstallPeers: true",
+    "  excludeLinksFromLockfile: false",
+    "",
+    "importers:",
+    "",
+    "  .:",
+    "    devDependencies:",
+    "      '@tjalve/aiu':",
+    `        specifier: ${tarballSpecifier}`,
+    `        version: ${tarballSpecifier}`,
+    "",
+    "packages:",
+    "",
+    `  '@tjalve/aiu@${tarballSpecifier}':`,
+    `    resolution: {integrity: ${integrity}, tarball: ${tarballSpecifier}}`,
+    "    version: 0.0.0",
+    "    engines: {node: '>=24.0.0'}",
+    "    hasBin: true",
+    "",
+    packages,
+    "snapshots:",
+    "",
+    `  '@tjalve/aiu@${tarballSpecifier}':`,
+    "    dependencies:",
+    "      '@tjalve/qube-cli': 0.1.1",
+    "",
+    snapshots,
+  ].join("\n");
+}
+
+function readLockfileSection(lockfile: string, heading: "packages" | "snapshots", nextHeading?: "snapshots"): string {
+  const startMarker = `${heading}:\n\n`;
+  const start = lockfile.indexOf(startMarker);
+  assert.notEqual(start, -1, `Missing ${heading} section in pnpm-lock.yaml`);
+  const contentStart = start + startMarker.length;
+  const contentEnd = nextHeading === undefined ? lockfile.length : lockfile.indexOf(`\n${nextHeading}:\n\n`, contentStart);
+  assert.notEqual(contentEnd, -1, `Missing ${nextHeading} section in pnpm-lock.yaml`);
+  return `${lockfile.slice(contentStart, contentEnd).trimEnd()}\n`;
 }
 
 async function runPnpm(args: readonly string[], cwd: string) {
