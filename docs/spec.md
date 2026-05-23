@@ -131,6 +131,8 @@ M3.5 closes the host integration milestone with explicit diagnostics and schema 
 
 M4.1 adds the durable whip task management surface. Whip state is stored in the configured `whip.statePath` (`.umpire/whip.json` by default), validated on read, and managed through `aiu whip list`, `aiu whip status --json`, `aiu whip add`, `aiu whip cancel`, and `aiu whip complete`. Mutating commands support `--dry-run`, write only local whip state, require explicit completion evidence, and preserve the rule that prompt delivery alone never completes a task.
 
+M4.2 adds quality idle continuation from structured trusted state. The `quality` state kind now carries normalized stages, findings, affected paths, failing checks, configured next/rerun commands, selected targets, and human or supply-chain approval blocks. Umpire selects one failing stage or finding only when `quality.enabled` is true and higher-priority work is idle; prompts name the trusted source, target, affected paths, next command, rerun check, and expected evidence. Agent narration, logs, issue prose, comments, and checklist edits are not accepted as passing quality evidence.
+
 ## FR-09 - Existing Repository Migration
 
 | ID | Requirement | Status |

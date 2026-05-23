@@ -199,6 +199,7 @@ export async function runAiuOpenCodeContinuation(event: AiuOpenCodeEvent, contex
         stopOnUnknownState: normalizedContext.config.continuation.stopOnUnknownState,
         stopOnUnsafeState: normalizedContext.config.continuation.stopOnUnsafeState,
         stopOnSupplyChainApprovalBlock: normalizedContext.config.continuation.stopOnSupplyChainApprovalBlock,
+        qualityEnabled: normalizedContext.config.quality.enabled,
         cooldownActive: isCooldownActive(normalizedContext, persisted),
       },
     });

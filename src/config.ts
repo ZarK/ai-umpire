@@ -26,6 +26,7 @@ export interface AiuConfig {
   readonly paths: AiuPathsConfig;
   readonly supplyChain: AiuSupplyChainPolicy;
   readonly prompts: AiuPromptPolicy;
+  readonly quality: AiuQualityPolicy;
   readonly whip: AiuWhipPolicy;
 }
 
@@ -87,6 +88,10 @@ export interface AiuWhipPolicy {
   readonly usePackageDefaults: boolean;
   readonly tasks: readonly AiuWhipTaskDefinition[];
   readonly statePath: string;
+}
+
+export interface AiuQualityPolicy {
+  readonly enabled: boolean;
 }
 
 export interface AiuWhipTaskDefinition {
@@ -154,6 +159,9 @@ const DEFAULT_CONFIG: AiuConfig = Object.freeze({
   }),
   prompts: Object.freeze({
     sections: Object.freeze({}),
+  }),
+  quality: Object.freeze({
+    enabled: true,
   }),
   whip: Object.freeze({
     enabled: true,
@@ -233,6 +241,7 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
   const pathsConfig = normalizePaths(raw.paths, diagnostics);
   const supplyChain = normalizeSupplyChain(raw.supplyChain, diagnostics);
   const prompts = normalizePrompts(raw.prompts, diagnostics);
+  const quality = normalizeQuality(raw.quality, diagnostics);
   const whip = normalizeWhip(raw.whip, diagnostics);
 
   validateNoLegacyFallback(raw, "$", diagnostics);
@@ -259,6 +268,7 @@ function normalizeAiuConfig(rawConfig: unknown, repoRoot: string): { readonly co
       paths: pathsConfig,
       supplyChain,
       prompts,
+      quality,
       whip,
     }),
     diagnostics: Object.freeze(diagnostics),
@@ -610,6 +620,19 @@ function normalizeOptionalPromptText(value: unknown, fieldPath: string, diagnost
   return value.trim();
 }
 
+function normalizeQuality(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuQualityPolicy {
+  if (value === undefined) {
+    return DEFAULT_CONFIG.quality;
+  }
+  if (!isRecord(value)) {
+    diagnostics.push(diagnostic("invalid-quality-policy", "$.quality", "quality must be an object.", "Use { \"enabled\": false } to disable quality idle continuation."));
+    return DEFAULT_CONFIG.quality;
+  }
+  return Object.freeze({
+    enabled: normalizeBoolean(value.enabled, DEFAULT_CONFIG.quality.enabled, "$.quality.enabled", diagnostics),
+  });
+}
+
 function normalizeWhip(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuWhipPolicy {
   if (value === undefined) {
     return DEFAULT_CONFIG.whip;
@@ -909,6 +932,7 @@ function cloneConfig(config: AiuConfig): AiuConfig {
     cooldowns: Object.freeze({ ...config.cooldowns }),
     paths: Object.freeze({ ...config.paths }),
     supplyChain: Object.freeze({ ...config.supplyChain }),
+    quality: Object.freeze({ ...config.quality }),
     prompts: Object.freeze({
       sections: Object.freeze(
         Object.fromEntries(

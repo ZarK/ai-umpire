@@ -26,6 +26,7 @@ export const AIU_STATE_VALUE_KINDS = [
 export const AIU_TRUST_LEVELS = ["trusted", "advisory", "untrusted"] as const;
 export const AIU_STATE_FRESHNESS_KINDS = ["fresh", "stale", "unknown"] as const;
 export const AIU_STATE_CAPABILITY_SUPPORT = ["supported", "unsupported", "unknown"] as const;
+export const AIU_QUALITY_TARGET_KINDS = ["stage", "finding"] as const;
 
 export const AIU_REASON_CODES = [
   "continue-active-work",
@@ -86,6 +87,7 @@ export type AiuStateValueKind = (typeof AIU_STATE_VALUE_KINDS)[number];
 export type AiuTrustLevel = (typeof AIU_TRUST_LEVELS)[number];
 export type AiuStateFreshnessKind = (typeof AIU_STATE_FRESHNESS_KINDS)[number];
 export type AiuStateCapabilitySupport = (typeof AIU_STATE_CAPABILITY_SUPPORT)[number];
+export type AiuQualityTargetKind = (typeof AIU_QUALITY_TARGET_KINDS)[number];
 export type AiuReasonCode = (typeof AIU_REASON_CODES)[number];
 export type AiuReasonCodeCategory = "continuation" | "repair" | "wait" | "stop" | "input" | "safety";
 export type AiuContinuationDecisionKind = "continue" | "repair" | "wait" | "stop";
@@ -198,6 +200,49 @@ export interface AiuPlanningState extends AiuBaseState<"planning"> {
 export interface AiuQualityState extends AiuBaseState<"quality"> {
   readonly ready: boolean | "unknown" | "unsupported";
   readonly lastRunStatus: AiuStateValueKind;
+  readonly stages: readonly AiuQualityStage[];
+  readonly findings: readonly AiuQualityFinding[];
+  readonly failingChecks: readonly string[];
+  readonly affectedPaths: readonly string[];
+  readonly nextCommand?: AiuTrustedStateCommandRef;
+  readonly rerunCommand?: AiuTrustedStateCommandRef;
+  readonly selectedTarget?: AiuQualitySelectedTarget;
+  readonly humanApprovalRequired?: boolean | "unknown";
+  readonly supplyChainApprovalRequired?: boolean | "unknown";
+}
+
+export interface AiuQualityStage {
+  readonly id: string;
+  readonly title?: string;
+  readonly status: AiuStateValueKind;
+  readonly affectedPaths: readonly string[];
+  readonly command?: AiuTrustedStateCommandRef;
+  readonly rerunCommand?: AiuTrustedStateCommandRef;
+}
+
+export interface AiuQualityFinding {
+  readonly id: string;
+  readonly title?: string;
+  readonly stageId?: string;
+  readonly status: AiuStateValueKind;
+  readonly severity?: "low" | "medium" | "high" | "critical" | "unknown";
+  readonly affectedPaths: readonly string[];
+  readonly command?: AiuTrustedStateCommandRef;
+  readonly rerunCommand?: AiuTrustedStateCommandRef;
+  readonly humanApprovalRequired?: boolean | "unknown";
+  readonly supplyChainApprovalRequired?: boolean | "unknown";
+}
+
+export interface AiuQualitySelectedTarget {
+  readonly kind: AiuQualityTargetKind;
+  readonly id: string;
+  readonly title?: string;
+  readonly stageId?: string;
+  readonly status: AiuStateValueKind;
+  readonly affectedPaths: readonly string[];
+  readonly command?: AiuTrustedStateCommandRef;
+  readonly rerunCommand?: AiuTrustedStateCommandRef;
+  readonly expectedEvidence?: string;
 }
 
 export interface AiuHostSessionState extends AiuBaseState<"host-session"> {

@@ -269,6 +269,10 @@ function fixtures(): readonly AiuTrustedStatePayload[] {
     status: "untrusted",
     ready: "unknown",
     lastRunStatus: "untrusted",
+    stages: [],
+    findings: [],
+    failingChecks: [],
+    affectedPaths: [],
     reasonCodes: ["stop-untrusted-input"],
   };
 

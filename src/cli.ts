@@ -23,6 +23,7 @@ import { formatMigrationPlan, planAiuMigration } from "./migrate.js";
 import { AIU_STATUS_ERROR_CODES, formatAiuStatusReport, runAiuStatus } from "./status.js";
 import {
   AIU_REASON_CODE_CATALOG,
+  AIU_QUALITY_TARGET_KINDS,
   AIU_STATE_CAPABILITY_SUPPORT,
   AIU_STATE_FRESHNESS_KINDS,
   AIU_STATE_VALUE_KINDS,
@@ -201,7 +202,7 @@ export const aiuCli = createCli({
           hostSupportLevels: AIU_HOST_SUPPORT_LEVELS,
           hostCapabilitySupport: AIU_HOST_CAPABILITY_SUPPORT,
           hostProfiles: getAllAiuHostCapabilityProfiles(),
-          policyFields: ["hosts.enabled", "hosts.capabilities", "hosts.modes", "hosts.stopHookBlocking", "continuation.modes", "cooldowns.promptMs", "paths.stateDir", "paths.lockDir", "paths.logDir"],
+          policyFields: ["hosts.enabled", "hosts.capabilities", "hosts.modes", "hosts.stopHookBlocking", "continuation.modes", "quality.enabled", "cooldowns.promptMs", "paths.stateDir", "paths.lockDir", "paths.logDir"],
           promptSectionKinds: AIU_PROMPT_SECTION_KINDS,
         },
         trustedState: {
@@ -275,6 +276,15 @@ export const aiuCli = createCli({
         status: {
           outputShape: ["config", "inputEnvelopes", "adapterRuns", "normalizedStateSummary", "decision", "prompt", "paths", "continuationState", "reasonLabels", "staleSources", "unknownSources", "errors", "warnings"],
           errorCodes: AIU_STATUS_ERROR_CODES,
+        },
+        quality: {
+          enabledDefault: getDefaultAiuConfig().quality.enabled,
+          targetKinds: AIU_QUALITY_TARGET_KINDS,
+          stateFields: ["ready", "lastRunStatus", "stages", "findings", "failingChecks", "affectedPaths", "nextCommand", "rerunCommand", "selectedTarget", "humanApprovalRequired", "supplyChainApprovalRequired"],
+          stageFields: ["id", "title", "status", "affectedPaths", "command", "rerunCommand"],
+          findingFields: ["id", "title", "stageId", "status", "severity", "affectedPaths", "command", "rerunCommand", "humanApprovalRequired", "supplyChainApprovalRequired"],
+          selectedTargetFields: ["kind", "id", "title", "stageId", "status", "affectedPaths", "command", "rerunCommand", "expectedEvidence"],
+          stopReasons: ["stop-supply-chain-approval", "stop-human-input-required", "stop-malformed-input", "stop-stale-input", "stop-unknown-input", "stop-unsupported-input", "stop-untrusted-input"],
         },
         whip: {
           commands: ["aiu whip list", "aiu whip status", "aiu whip add", "aiu whip cancel", "aiu whip complete"],

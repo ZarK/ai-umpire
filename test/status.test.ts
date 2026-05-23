@@ -127,6 +127,43 @@ describe("status reporting", () => {
     }
   });
 
+  it("surfaces quality idle targets in status and prompt output", async () => {
+    const { createAiuStatusReport } = await loadStatus();
+    const report = createAiuStatusReport(await configLoad(), [
+      await successResult(envelope("quality", qualityState({
+        ready: true,
+        lastRunStatus: "fail",
+        stages: [{
+          id: "typecheck",
+          status: "fail",
+          affectedPaths: ["src/state.ts"],
+          command: { id: "quality-typecheck", argv: ["pnpm", "run", "typecheck"] },
+          rerunCommand: { id: "quality-typecheck", argv: ["pnpm", "run", "typecheck"] },
+        }],
+        failingChecks: ["typecheck"],
+        affectedPaths: ["src/state.ts"],
+      }))),
+    ]);
+
+    assert.deepEqual(report.decision.reasonCodes, ["continue-quality"]);
+    assert.equal(report.decision.selectedItem?.id, "typecheck");
+    assert.equal(report.decision.selectedItem?.targetKind, "stage");
+    assert.equal(report.normalizedStateSummary.quality[0]?.selectedTarget, undefined);
+    assert.deepEqual(report.normalizedStateSummary.quality[0]?.failingChecks, ["typecheck"]);
+    assert.deepEqual(report.normalizedStateSummary.quality[0]?.affectedPaths, ["src/state.ts"]);
+    assert.match(report.prompt.body, /Next configured command: "pnpm" "run" "typecheck"/);
+    assert.match(report.prompt.body, /Do not treat agent narration/);
+
+    const disabled = createAiuStatusReport(await configLoad({ qualityEnabled: false }), [
+      await successResult(envelope("quality", qualityState({
+        ready: true,
+        lastRunStatus: "fail",
+        stages: [{ id: "typecheck", status: "fail", affectedPaths: [] }],
+      }))),
+    ]);
+    assert.deepEqual(disabled.decision.reasonCodes, ["stop-clean"]);
+  });
+
   it("emits concise human status output from the typed report", async () => {
     const result = await runCli(["status"]);
 
@@ -169,7 +206,7 @@ async function envelope(sourceId: string, value: State.AiuTrustedStatePayload, o
   });
 }
 
-async function configLoad(options: { readonly supplyChainApprovalRequired?: boolean; readonly modes?: Config.AiuContinuationMode[] } = {}): Promise<Config.AiuConfigLoadResult> {
+async function configLoad(options: { readonly supplyChainApprovalRequired?: boolean; readonly modes?: Config.AiuContinuationMode[]; readonly qualityEnabled?: boolean } = {}): Promise<Config.AiuConfigLoadResult> {
   const { getDefaultAiuConfig } = await loadConfig();
   const config = getDefaultAiuConfig();
   return {
@@ -187,6 +224,10 @@ async function configLoad(options: { readonly supplyChainApprovalRequired?: bool
       continuation: {
         ...config.continuation,
         modes: options.modes ?? config.continuation.modes,
+      },
+      quality: {
+        ...config.quality,
+        enabled: options.qualityEnabled ?? config.quality.enabled,
       },
     },
     diagnostics: [],
@@ -280,6 +321,20 @@ function planningState(overrides: Partial<State.AiuPlanningState> = {}): State.A
     status: "pass",
     needsPlanning: false,
     humanInputRequired: false,
+    ...overrides,
+  };
+}
+
+function qualityState(overrides: Partial<State.AiuQualityState> = {}): State.AiuQualityState {
+  return {
+    kind: "quality",
+    status: "pass",
+    ready: false,
+    lastRunStatus: "pass",
+    stages: [],
+    findings: [],
+    failingChecks: [],
+    affectedPaths: [],
     ...overrides,
   };
 }

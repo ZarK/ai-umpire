@@ -166,6 +166,13 @@ describe("metadata-backed CLI", () => {
           outputShape?: string[];
           errorCodes?: string[];
         };
+        quality?: {
+          enabledDefault?: boolean;
+          targetKinds?: string[];
+          stateFields?: string[];
+          selectedTargetFields?: string[];
+          stopReasons?: string[];
+        };
         whip?: {
           commands?: string[];
           stateSchemaVersion?: number;
@@ -260,6 +267,12 @@ describe("metadata-backed CLI", () => {
     assert.ok(parsed.sections?.status?.outputShape?.includes("prompt"));
     assert.ok(parsed.sections?.status?.errorCodes?.includes("trusted-command-malformed-json"));
     assert.ok(parsed.sections?.status?.errorCodes?.includes("status-config-invalid"));
+    assert.equal(parsed.sections?.quality?.enabledDefault, true);
+    assert.deepEqual(parsed.sections?.quality?.targetKinds, ["stage", "finding"]);
+    assert.ok(parsed.sections?.quality?.stateFields?.includes("selectedTarget"));
+    assert.ok(parsed.sections?.quality?.stateFields?.includes("supplyChainApprovalRequired"));
+    assert.ok(parsed.sections?.quality?.selectedTargetFields?.includes("expectedEvidence"));
+    assert.ok(parsed.sections?.quality?.stopReasons?.includes("stop-supply-chain-approval"));
     assert.deepEqual(parsed.sections?.whip?.commands, ["aiu whip list", "aiu whip status", "aiu whip add", "aiu whip cancel", "aiu whip complete"]);
     assert.equal(parsed.sections?.whip?.stateSchemaVersion, 1);
     assert.deepEqual(parsed.sections?.whip?.taskStatuses, ["pending", "prompted", "completed", "cancelled"]);

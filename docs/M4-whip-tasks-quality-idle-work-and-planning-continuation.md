@@ -248,6 +248,8 @@ Status: implemented by the shared `whip` module and `aiu whip` command. Whip sta
 
 Read Quality Control trusted state, select failing stages, render concrete prompts, and stop on unsafe findings.
 
+Status: implemented by extending the trusted `quality` state model and shared decision/prompt/status flow. Quality state now normalizes stages, findings, affected paths, failing checks, configured next and rerun commands, selected targets, and human or supply-chain approval blocks. `quality.enabled: false` suppresses quality idle prompts. When enabled and idle, Umpire selects one concrete failing stage or finding group and renders a bounded prompt that names the trusted source, target, affected paths, configured command, rerun check, and expected evidence. Malformed, stale, unknown, unsupported, untrusted, human-approval, and supply-chain-approval states stop instead of prompting.
+
 ### M4.3 - Implement Bootstrap Planning Continuation
 
 Read Bootstrap planning state, continue concrete planning actions, and stop on human-blocking questions.

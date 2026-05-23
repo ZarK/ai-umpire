@@ -6,6 +6,7 @@ import {
   AIU_STATE_CAPABILITY_SUPPORT,
   AIU_STATE_FRESHNESS_KINDS,
   AIU_STATE_VALUE_KINDS,
+  AIU_QUALITY_TARGET_KINDS,
   AIU_TRUSTED_STATE_KINDS,
   AIU_TRUSTED_STATE_SCHEMA_VERSION,
   AIU_TRUST_LEVELS,
@@ -14,6 +15,11 @@ import {
   type AiuStateFreshness,
   type AiuStateFreshnessKind,
   type AiuStateValueKind,
+  type AiuQualityFinding,
+  type AiuQualitySelectedTarget,
+  type AiuQualityStage,
+  type AiuQualityState,
+  type AiuQualityTargetKind,
   type AiuTrustLevel,
   type AiuTrustedStateCommandRef,
   type AiuTrustedStateEnvelope,
@@ -319,6 +325,7 @@ function normalizeTrustedStateEntry(
   if (!isRecord(value) || !isTrustedStateKind(value.kind) || !isStateValueKind(value.status)) {
     return parseFailure(input, "trusted-command-invalid-state", "Trusted state value must include a supported kind and status.", `${path}.value`);
   }
+  const normalizedValue = normalizeTrustedStateValue(value);
   const capabilities = normalizeCapabilities(envelopeInput.capabilities);
   if (Object.values(capabilities).some((support) => support === "unsupported")) {
     return parseFailure(input, "trusted-command-unsupported-capability", "Trusted state reports an unsupported required capability.", `${path}.capabilities`);
@@ -337,11 +344,125 @@ function normalizeTrustedStateEntry(
       trustLevel: readTrustLevel(envelopeInput.trustLevel),
       capabilities,
       freshness,
-      value: value as unknown as AiuTrustedStatePayload,
+      value: normalizedValue,
       unknownFields: readStringArray(envelopeInput.unknownFields),
       diagnostics: [],
     }),
   };
+}
+
+function normalizeTrustedStateValue(value: Record<string, unknown>): AiuTrustedStatePayload {
+  if (value.kind === "quality") {
+    return normalizeQualityState(value);
+  }
+  return value as unknown as AiuTrustedStatePayload;
+}
+
+function normalizeQualityState(value: Record<string, unknown>): AiuQualityState {
+  const stages = normalizeQualityStages(value.stages);
+  const findings = normalizeQualityFindings(value.findings);
+  const selectedTarget = normalizeQualitySelectedTarget(value.selectedTarget);
+  const summary = readString(value.summary);
+  const nextCommand = normalizeCommandRef(value.nextCommand);
+  const rerunCommand = normalizeCommandRef(value.rerunCommand);
+  const humanApprovalRequired = readBooleanUnknown(value.humanApprovalRequired);
+  const supplyChainApprovalRequired = readBooleanUnknown(value.supplyChainApprovalRequired);
+  return Object.freeze({
+    kind: "quality",
+    status: value.status as AiuStateValueKind,
+    ...(summary ? { summary } : {}),
+    ready: readBooleanUnknownUnsupported(value.ready, false),
+    lastRunStatus: isStateValueKind(value.lastRunStatus) ? value.lastRunStatus : value.status as AiuStateValueKind,
+    stages,
+    findings,
+    failingChecks: Object.freeze(readStringArray(value.failingChecks)),
+    affectedPaths: Object.freeze(readStringArray(value.affectedPaths)),
+    ...(nextCommand ? { nextCommand } : {}),
+    ...(rerunCommand ? { rerunCommand } : {}),
+    ...(selectedTarget ? { selectedTarget } : {}),
+    ...(humanApprovalRequired !== undefined ? { humanApprovalRequired } : {}),
+    ...(supplyChainApprovalRequired !== undefined ? { supplyChainApprovalRequired } : {}),
+    ...(Array.isArray(value.reasonCodes) ? { reasonCodes: readStringArray(value.reasonCodes) as AiuQualityState["reasonCodes"] } : {}),
+  });
+}
+
+function normalizeQualityStages(value: unknown): readonly AiuQualityStage[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze(value.flatMap((item): AiuQualityStage[] => {
+    if (!isRecord(item) || !readString(item.id)) return [];
+    const id = readString(item.id) as string;
+    const title = readString(item.title);
+    const command = normalizeCommandRef(item.command);
+    const rerunCommand = normalizeCommandRef(item.rerunCommand);
+    return [Object.freeze({
+      id,
+      ...(title ? { title } : {}),
+      status: isStateValueKind(item.status) ? item.status : "unknown",
+      affectedPaths: Object.freeze(readStringArray(item.affectedPaths)),
+      ...(command ? { command } : {}),
+      ...(rerunCommand ? { rerunCommand } : {}),
+    })];
+  }));
+}
+
+function normalizeQualityFindings(value: unknown): readonly AiuQualityFinding[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  return Object.freeze(value.flatMap((item): AiuQualityFinding[] => {
+    if (!isRecord(item) || !readString(item.id)) return [];
+    const id = readString(item.id) as string;
+    const title = readString(item.title);
+    const stageId = readString(item.stageId);
+    const command = normalizeCommandRef(item.command);
+    const rerunCommand = normalizeCommandRef(item.rerunCommand);
+    const humanApprovalRequired = readBooleanUnknown(item.humanApprovalRequired);
+    const supplyChainApprovalRequired = readBooleanUnknown(item.supplyChainApprovalRequired);
+    return [Object.freeze({
+      id,
+      ...(title ? { title } : {}),
+      ...(stageId ? { stageId } : {}),
+      status: isStateValueKind(item.status) ? item.status : "unknown",
+      ...(isQualitySeverity(item.severity) ? { severity: item.severity } : {}),
+      affectedPaths: Object.freeze(readStringArray(item.affectedPaths)),
+      ...(command ? { command } : {}),
+      ...(rerunCommand ? { rerunCommand } : {}),
+      ...(humanApprovalRequired !== undefined ? { humanApprovalRequired } : {}),
+      ...(supplyChainApprovalRequired !== undefined ? { supplyChainApprovalRequired } : {}),
+    })];
+  }));
+}
+
+function normalizeQualitySelectedTarget(value: unknown): AiuQualitySelectedTarget | undefined {
+  if (!isRecord(value) || !isQualityTargetKind(value.kind) || !readString(value.id)) return undefined;
+  const id = readString(value.id) as string;
+  const title = readString(value.title);
+  const stageId = readString(value.stageId);
+  const command = normalizeCommandRef(value.command);
+  const rerunCommand = normalizeCommandRef(value.rerunCommand);
+  const expectedEvidence = readString(value.expectedEvidence);
+  return Object.freeze({
+    kind: value.kind,
+    id,
+    ...(title ? { title } : {}),
+    ...(stageId ? { stageId } : {}),
+    status: isStateValueKind(value.status) ? value.status : "fail",
+    affectedPaths: Object.freeze(readStringArray(value.affectedPaths)),
+    ...(command ? { command } : {}),
+    ...(rerunCommand ? { rerunCommand } : {}),
+    ...(expectedEvidence ? { expectedEvidence } : {}),
+  });
+}
+
+function normalizeCommandRef(value: unknown): AiuTrustedStateCommandRef | undefined {
+  if (!isRecord(value) || !readString(value.id) || !Array.isArray(value.argv) || value.argv.length === 0 || !value.argv.every((item) => typeof item === "string" && item.length > 0)) {
+    return undefined;
+  }
+  return Object.freeze({
+    id: readString(value.id) as string,
+    argv: Object.freeze([...value.argv]) as readonly [string, ...string[]],
+    ...(readString(value.cwd) ? { cwd: readString(value.cwd) } : {}),
+    ...(typeof value.timeoutMs === "number" ? { timeoutMs: value.timeoutMs } : {}),
+    ...(typeof value.maxOutputBytes === "number" ? { maxOutputBytes: value.maxOutputBytes } : {}),
+  });
 }
 
 function parseFailure(
@@ -434,6 +555,14 @@ function readStringArray(value: unknown): readonly string[] {
   return Array.isArray(value) ? Object.freeze(value.filter((item): item is string => typeof item === "string")) : Object.freeze([]);
 }
 
+function readBooleanUnknown(value: unknown): boolean | "unknown" | undefined {
+  return typeof value === "boolean" || value === "unknown" ? value : undefined;
+}
+
+function readBooleanUnknownUnsupported(value: unknown, fallback: boolean): boolean | "unknown" | "unsupported" {
+  return typeof value === "boolean" || value === "unknown" || value === "unsupported" ? value : fallback;
+}
+
 function readTrustLevel(value: unknown): AiuTrustLevel {
   return AIU_TRUST_LEVELS.some((item) => item === value) ? value as AiuTrustLevel : "trusted";
 }
@@ -452,6 +581,14 @@ function isFreshnessKind(value: unknown): value is AiuStateFreshnessKind {
 
 function isCapabilitySupport(value: unknown): value is AiuStateCapabilitySupport {
   return AIU_STATE_CAPABILITY_SUPPORT.some((item) => item === value);
+}
+
+function isQualityTargetKind(value: unknown): value is AiuQualityTargetKind {
+  return AIU_QUALITY_TARGET_KINDS.some((item) => item === value);
+}
+
+function isQualitySeverity(value: unknown): value is AiuQualityFinding["severity"] {
+  return value === "low" || value === "medium" || value === "high" || value === "critical" || value === "unknown";
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {

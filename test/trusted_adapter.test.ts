@@ -197,6 +197,51 @@ describe("trusted command adapters", () => {
     assert.equal(result.states[0]?.command.argv[0], "fixture");
     assert.equal(result.states[0]?.value.status, "pass");
   });
+
+  it("normalizes quality stages, findings, commands, and approval blocks", async () => {
+    const { parseAiuTrustedStateJson, toAiuTrustedStateCommandRef } = await loadTrustedAdapter();
+    const command = toAiuTrustedStateCommandRef("quality", { argv: ["fixture"] });
+    const result = parseAiuTrustedStateJson({
+      sourceId: "quality",
+      command,
+      stdout: JSON.stringify({
+        schemaVersion: 1,
+        observedAt,
+        value: {
+          kind: "quality",
+          status: "pass",
+          ready: true,
+          lastRunStatus: "fail",
+          stages: [{
+            id: "typecheck",
+            title: "Typecheck",
+            status: "fail",
+            affectedPaths: ["src/state.ts", 42],
+            command: { id: "quality-typecheck", argv: ["pnpm", "run", "typecheck"] },
+            rerunCommand: { id: "quality-typecheck", argv: ["pnpm", "run", "typecheck"] },
+          }],
+          findings: [{
+            id: "supply-chain-risk",
+            status: "fail",
+            severity: "critical",
+            affectedPaths: ["package.json"],
+            supplyChainApprovalRequired: true,
+          }],
+          failingChecks: ["typecheck"],
+          affectedPaths: ["src/state.ts"],
+        },
+      }),
+      observedAt,
+    });
+
+    assert.equal(result.ok, true);
+    const value = result.states[0]?.value;
+    assert.equal(value?.kind, "quality");
+    assert.equal(value?.kind === "quality" ? value.stages[0]?.command?.argv.join(" ") : "", "pnpm run typecheck");
+    assert.deepEqual(value?.kind === "quality" ? value.stages[0]?.affectedPaths : [], ["src/state.ts"]);
+    assert.equal(value?.kind === "quality" ? value.findings[0]?.supplyChainApprovalRequired : false, true);
+    assert.deepEqual(value?.kind === "quality" ? value.failingChecks : [], ["typecheck"]);
+  });
 });
 
 async function loadTrustedAdapter(): Promise<typeof TrustedAdapter> {

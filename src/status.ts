@@ -115,6 +115,13 @@ export interface AiuStatusQualitySummary {
   readonly status: AiuStateValueKind;
   readonly ready: boolean | "unknown" | "unsupported";
   readonly lastRunStatus: AiuStateValueKind;
+  readonly selectedTarget?: string;
+  readonly failingChecks: readonly string[];
+  readonly affectedPaths: readonly string[];
+  readonly stageCount: number;
+  readonly findingCount: number;
+  readonly humanApprovalRequired?: boolean | "unknown";
+  readonly supplyChainApprovalRequired?: boolean | "unknown";
 }
 
 export interface AiuStatusError {
@@ -193,6 +200,7 @@ export function createAiuStatusReport(
       stopOnUnknownState: configLoad.config.continuation.stopOnUnknownState,
       stopOnUnsafeState: configLoad.config.continuation.stopOnUnsafeState,
       stopOnSupplyChainApprovalBlock: configLoad.config.continuation.stopOnSupplyChainApprovalBlock,
+      qualityEnabled: configLoad.config.quality.enabled,
       supplyChainApprovalRequired: false,
     },
   });
@@ -249,7 +257,7 @@ export function formatAiuStatusReport(report: AiuStatusReport): string {
     `activeWork: ${report.normalizedStateSummary.activeWork.length}`,
     `activeReviews: ${report.normalizedStateSummary.activeReviews.length}`,
     `planning: ${report.normalizedStateSummary.planning.map((item) => `${item.sourceId} needs=${String(item.needsPlanning)} human=${String(item.humanInputRequired)}`).join(", ") || "none"}`,
-    `quality: ${report.normalizedStateSummary.quality.map((item) => `${item.sourceId} ready=${String(item.ready)} last=${item.lastRunStatus}`).join(", ") || "none"}`,
+    `quality: ${report.normalizedStateSummary.quality.map((item) => `${item.sourceId} ready=${String(item.ready)} last=${item.lastRunStatus} target=${item.selectedTarget ?? "none"}`).join(", ") || "none"}`,
     `errors: ${report.errors.length}`,
     `warnings: ${report.warnings.length}`,
   ];
@@ -298,6 +306,13 @@ function summarizeStates(states: readonly AiuTrustedStateEnvelope[]): AiuStatusS
         status: value.status,
         ready: value.ready,
         lastRunStatus: value.lastRunStatus,
+        ...(value.selectedTarget ? { selectedTarget: `${value.selectedTarget.kind}:${value.selectedTarget.id}` } : {}),
+        failingChecks: Object.freeze([...value.failingChecks]),
+        affectedPaths: Object.freeze([...value.affectedPaths]),
+        stageCount: value.stages.length,
+        findingCount: value.findings.length,
+        ...(value.humanApprovalRequired !== undefined ? { humanApprovalRequired: value.humanApprovalRequired } : {}),
+        ...(value.supplyChainApprovalRequired !== undefined ? { supplyChainApprovalRequired: value.supplyChainApprovalRequired } : {}),
       }];
     })),
   });

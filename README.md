@@ -70,6 +70,8 @@ pnpm exec aiu schema --json
 
 If `aiu.config.json` is missing, Umpire reports typed conservative defaults. Configured trusted state commands use argv arrays instead of shell strings, and state, lock, and log paths default under `.umpire/`.
 
+Quality idle continuation is driven only by configured trusted state commands that emit the `quality` state kind. Umpire can continue quality work when that structured state reports a concrete failing stage or finding group, optional affected paths, a configured next command, expected evidence, and a rerun command. Set `quality.enabled: false` to suppress quality idle prompts while preserving the trusted state command configuration. Supply-chain approval findings, human approval findings, stale state, unknown state, unsupported state, malformed state, and untrusted state stop continuation instead of producing a prompt.
+
 `aiu init` defaults to `--tool all` and produces the same plan shape in dry-run and apply mode. Existing managed files that differ are reported as conflicts unless `--force` is provided explicitly. Init writes only these managed assets:
 
 - `aiu.config.json`
@@ -255,6 +257,7 @@ Use `pnpm exec aiu paths --json` to inspect the resolved package root, config pa
 - `@tjalve/aiu/opencode` - OpenCode plugin composition helpers
 - `aiu` - package CLI foundation
 - `aiu hook-stop` - experimental Codex and Claude Code Stop hook entrypoint backed by trusted-state decisions and explicit stop-hook blocking policy
+- quality idle continuation - trusted `quality` state selection and prompt rendering through `aiu status`, `aiu hook-stop`, and supported host runtimes
 - `aiu whip` - durable idle task state inspection and explicit add/cancel/complete transitions
 - `loadAiuConfig` - typed config discovery, defaults, and validation
 - `renderAiuPromptSection` - repo-level prompt section customization helper

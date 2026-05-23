@@ -3,6 +3,9 @@ import {
   type AiuGateState,
   type AiuReasonCode,
   type AiuReviewState,
+  type AiuQualityFinding,
+  type AiuQualitySelectedTarget,
+  type AiuQualityStage,
   type AiuStateFreshnessKind,
   type AiuStateValueKind,
   type AiuTrustLevel,
@@ -35,6 +38,7 @@ export interface AiuContinuationDecisionPolicy {
   readonly stopOnSupplyChainApprovalBlock?: boolean;
   readonly allowParallelWork?: boolean;
   readonly allowParallelReview?: boolean;
+  readonly qualityEnabled?: boolean;
   readonly cooldownActive?: boolean;
   readonly supplyChainApprovalRequired?: boolean;
 }
@@ -72,6 +76,11 @@ export interface AiuDecisionSelectedItem {
   readonly title?: string;
   readonly sourceId?: string;
   readonly status?: string;
+  readonly targetKind?: string;
+  readonly affectedPaths?: readonly string[];
+  readonly command?: { readonly id: string; readonly argv: readonly [string, ...string[]]; readonly cwd?: string; readonly timeoutMs?: number; readonly maxOutputBytes?: number };
+  readonly rerunCommand?: { readonly id: string; readonly argv: readonly [string, ...string[]]; readonly cwd?: string; readonly timeoutMs?: number; readonly maxOutputBytes?: number };
+  readonly expectedEvidence?: string;
 }
 
 interface DecisionPolicy {
@@ -82,6 +91,7 @@ interface DecisionPolicy {
   readonly stopOnSupplyChainApprovalBlock: boolean;
   readonly allowParallelWork: boolean;
   readonly allowParallelReview: boolean;
+  readonly qualityEnabled: boolean;
   readonly cooldownActive: boolean;
   readonly supplyChainApprovalRequired: boolean;
 }
@@ -100,6 +110,7 @@ const DEFAULT_POLICY: DecisionPolicy = Object.freeze({
   stopOnSupplyChainApprovalBlock: true,
   allowParallelWork: false,
   allowParallelReview: false,
+  qualityEnabled: true,
   cooldownActive: false,
   supplyChainApprovalRequired: false,
 });
@@ -119,6 +130,28 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
   const hardStop = findHardInputStop(indexed, policy);
   if (hardStop) {
     return decision(policy, "stop", hardStop.reasonCode, summaries, "stop", hardStop.selectedItem, hardStop.nextAction);
+  }
+
+  if (policy.qualityEnabled) {
+    const qualitySupplyChainBlock = findQualitySupplyChainBlock(indexed);
+    if (qualitySupplyChainBlock && policy.stopOnSupplyChainApprovalBlock) {
+      return decision(policy, "stop", "stop-supply-chain-approval", summaries, "stop", qualitySupplyChainBlock, "Stop: quality state reports supply-chain risk requiring human approval.");
+    }
+
+    const qualityHumanBlock = findQualityHumanBlock(indexed);
+    if (qualityHumanBlock) {
+      return decision(policy, "stop", "stop-human-input-required", summaries, "stop", qualityHumanBlock, "Stop: quality state requires human approval before continuing.");
+    }
+
+    const qualityUnsupportedBlock = findQualityUnsupportedBlock(indexed);
+    if (qualityUnsupportedBlock) {
+      return decision(policy, "stop", "stop-unsupported-input", summaries, "stop", qualityUnsupportedBlock, "Stop: quality state reports unsupported quality continuation.");
+    }
+
+    const qualityUnknownBlock = findQualityUnknownBlock(indexed, policy);
+    if (qualityUnknownBlock) {
+      return decision(policy, "stop", "stop-unknown-input", summaries, "stop", qualityUnknownBlock, "Stop: refresh quality state before continuing.");
+    }
   }
 
   const planningHumanBlock = findPlanningHumanBlock(indexed);
@@ -178,7 +211,7 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
     return decision(policy, "continue", "continue-ready-work", summaries, "work", selectWorkItem(readyWork), "Continue: start the highest-priority ready work item.");
   }
 
-  const quality = findQualityContinuation(indexed);
+  const quality = findQualityContinuation(indexed, policy);
   if (quality) {
     return decision(policy, "continue", "continue-quality", summaries, "quality", quality, "Continue: run the ready quality or idle-work action.");
   }
@@ -203,6 +236,7 @@ function normalizeDecisionPolicy(input: AiuContinuationDecisionInput): DecisionP
     stopOnSupplyChainApprovalBlock: normalizeBoolean(configured.stopOnSupplyChainApprovalBlock, statePolicy?.kind === "continuation-policy" ? statePolicy.stopOnSupplyChainApprovalBlock : undefined, DEFAULT_POLICY.stopOnSupplyChainApprovalBlock),
     allowParallelWork: configured.allowParallelWork ?? DEFAULT_POLICY.allowParallelWork,
     allowParallelReview: configured.allowParallelReview ?? DEFAULT_POLICY.allowParallelReview,
+    qualityEnabled: configured.qualityEnabled ?? DEFAULT_POLICY.qualityEnabled,
     cooldownActive: configured.cooldownActive ?? DEFAULT_POLICY.cooldownActive,
     supplyChainApprovalRequired: configured.supplyChainApprovalRequired ?? DEFAULT_POLICY.supplyChainApprovalRequired,
   });
@@ -278,6 +312,56 @@ function findPlanningUnknownBlock(indexed: readonly IndexedState[], policy: Deci
     (item) => item.value.kind === "planning" && (item.value.needsPlanning === "unknown" || item.value.humanInputRequired === "unknown"),
   );
   return planning ? selectState(planning) : undefined;
+}
+
+function findQualitySupplyChainBlock(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
+  for (const item of indexed) {
+    if (!hasKind(item, "quality")) continue;
+    if (item.value.supplyChainApprovalRequired === true || item.value.findings.some((finding) => finding.supplyChainApprovalRequired === true)) {
+      return selectQualityState(item);
+    }
+  }
+  return undefined;
+}
+
+function findQualityHumanBlock(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
+  for (const item of indexed) {
+    if (!hasKind(item, "quality")) continue;
+    if (item.value.humanApprovalRequired === true || item.value.findings.some((finding) => finding.humanApprovalRequired === true)) {
+      return selectQualityState(item);
+    }
+  }
+  return undefined;
+}
+
+function findQualityUnsupportedBlock(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
+  for (const item of indexed) {
+    if (!hasKind(item, "quality")) continue;
+    if (item.value.ready === "unsupported" || item.value.lastRunStatus === "unsupported") {
+      return selectQualityState(item);
+    }
+  }
+  return undefined;
+}
+
+function findQualityUnknownBlock(indexed: readonly IndexedState[], policy: DecisionPolicy): AiuDecisionSelectedItem | undefined {
+  if (!policy.stopOnUnknownState) {
+    return undefined;
+  }
+  for (const item of indexed) {
+    if (!hasKind(item, "quality")) continue;
+    if (
+      item.value.ready === "unknown"
+      || item.value.lastRunStatus === "unknown"
+      || item.value.humanApprovalRequired === "unknown"
+      || item.value.supplyChainApprovalRequired === "unknown"
+      || item.value.findings.some((finding) => finding.humanApprovalRequired === "unknown" || finding.supplyChainApprovalRequired === "unknown")
+      || (item.value.ready === true && selectQualityTarget(item) === undefined)
+    ) {
+      return selectQualityState(item);
+    }
+  }
+  return undefined;
 }
 
 function findContradiction(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
@@ -399,9 +483,20 @@ function findPlanningContinuation(indexed: readonly IndexedState[]): AiuDecision
   return planning ? selectState(planning) : undefined;
 }
 
-function findQualityContinuation(indexed: readonly IndexedState[]): AiuDecisionSelectedItem | undefined {
-  const quality = indexed.find((item) => item.value.kind === "quality" && item.value.ready === true);
-  return quality ? selectState(quality) : undefined;
+function findQualityContinuation(indexed: readonly IndexedState[], policy: DecisionPolicy): AiuDecisionSelectedItem | undefined {
+  if (!policy.qualityEnabled) {
+    return undefined;
+  }
+  for (const quality of indexed.filter((item) => hasKind(item, "quality"))) {
+    if (quality.value.ready !== true) {
+      continue;
+    }
+    const target = selectQualityTarget(quality);
+    if (target) {
+      return target;
+    }
+  }
+  return undefined;
 }
 
 function uniqueWorkItems(items: readonly AiuWorkItemState[]): AiuWorkItemState[] {
@@ -509,6 +604,67 @@ function selectGate(gate: AiuGateState, sourceId: string): AiuDecisionSelectedIt
     sourceId,
     status: gate.status,
   });
+}
+
+function selectQualityState(item: IndexedState & { readonly value: Extract<AiuTrustedStatePayload, { readonly kind: "quality" }> }): AiuDecisionSelectedItem {
+  return Object.freeze({
+    kind: "quality",
+    sourceId: item.sourceId,
+    status: item.value.status,
+  });
+}
+
+function selectQualityTarget(item: IndexedState & { readonly value: Extract<AiuTrustedStatePayload, { readonly kind: "quality" }> }): AiuDecisionSelectedItem | undefined {
+  const target = item.value.selectedTarget ?? firstFailingQualityTarget(item.value.findings, item.value.stages);
+  if (!target) return undefined;
+  const command = target.command ?? item.value.nextCommand;
+  const rerunCommand = target.rerunCommand ?? item.value.rerunCommand;
+  return Object.freeze({
+    kind: "quality",
+    id: target.id,
+    ...(target.title ? { title: target.title } : {}),
+    sourceId: item.sourceId,
+    status: target.status,
+    targetKind: target.kind,
+    affectedPaths: Object.freeze([...target.affectedPaths]),
+    ...(command ? { command } : {}),
+    ...(rerunCommand ? { rerunCommand } : {}),
+    expectedEvidence: target.expectedEvidence ?? "Updated trusted quality state plus the rerun check output.",
+  });
+}
+
+function firstFailingQualityTarget(
+  findings: readonly AiuQualityFinding[],
+  stages: readonly AiuQualityStage[],
+): AiuQualitySelectedTarget | undefined {
+  const finding = findings.find((item) => item.status === "fail");
+  if (finding) {
+    return Object.freeze({
+      kind: "finding" as const,
+      id: finding.id,
+      ...(finding.title ? { title: finding.title } : {}),
+      ...(finding.stageId ? { stageId: finding.stageId } : {}),
+      status: finding.status,
+      affectedPaths: Object.freeze([...finding.affectedPaths]),
+      ...(finding.command ? { command: finding.command } : {}),
+      ...(finding.rerunCommand ? { rerunCommand: finding.rerunCommand } : {}),
+      expectedEvidence: "Resolve the finding and rerun the configured quality check.",
+    });
+  }
+  const stage = stages.find((item) => item.status === "fail");
+  if (stage) {
+    return Object.freeze({
+      kind: "stage" as const,
+      id: stage.id,
+      ...(stage.title ? { title: stage.title } : {}),
+      status: stage.status,
+      affectedPaths: Object.freeze([...stage.affectedPaths]),
+      ...(stage.command ? { command: stage.command } : {}),
+      ...(stage.rerunCommand ? { rerunCommand: stage.rerunCommand } : {}),
+      expectedEvidence: "Fix one concrete failure in this stage and rerun the configured quality check.",
+    });
+  }
+  return undefined;
 }
 
 function statusReasonCode(value: AiuStateValueKind): AiuReasonCode {

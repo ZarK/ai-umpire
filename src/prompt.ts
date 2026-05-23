@@ -77,7 +77,7 @@ function promptLead(decision: AiuContinuationDecision): string {
     return `Continue planning${item}. Use the trusted planning state to make the next concrete planning update.`;
   }
   if (decision.kind === "continue" && decision.promptKind === "quality") {
-    return `Continue quality work${item}. Run the ready quality action and report the result.`;
+    return qualityLead(decision, item);
   }
   if (decision.kind === "continue" && decision.promptKind === "whip") {
     return `Continue idle work${item}. Use the ready whip task slot only because higher-priority workflow state is idle.`;
@@ -89,6 +89,19 @@ function promptLead(decision: AiuContinuationDecision): string {
     return `Wait before prompting${item}. Do not deliver a continuation prompt until the wait condition clears.`;
   }
   return stopLead(decision);
+}
+
+function qualityLead(decision: AiuContinuationDecision, item: string): string {
+  const selected = decision.selectedItem;
+  const details = [
+    `Continue quality work${item}. Fix one concrete ${selected?.targetKind ?? "quality"} target from trusted quality state.`,
+    selected?.command ? `Next configured command: ${formatCommand(selected.command)}.` : "Next configured command: inspect the trusted quality source for the configured command.",
+    selected?.rerunCommand ? `Rerun check: ${formatCommand(selected.rerunCommand)}.` : "Rerun check: rerun the relevant configured quality check.",
+    selected?.affectedPaths && selected.affectedPaths.length > 0 ? `Affected paths: ${selected.affectedPaths.map(formatPromptData).join(", ")}.` : "Affected paths: use the trusted quality state when provided.",
+    `Expected evidence: ${selected?.expectedEvidence ?? "updated trusted quality state plus rerun output"}.`,
+    "Do not treat agent narration, terminal logs, issue prose, comments, or checklist edits as passing quality evidence.",
+  ];
+  return details.join("\n");
 }
 
 function repairLead(decision: AiuContinuationDecision): string {
@@ -135,6 +148,10 @@ function formatSources(sources: readonly AiuPromptSourceTimestamp[]): string {
     return "no trusted state source was provided";
   }
   return sources.map((source) => `${source.sourceId} ${source.stateKind} observed ${source.observedAt}`).join("; ");
+}
+
+function formatCommand(command: { readonly argv: readonly [string, ...string[]] }): string {
+  return command.argv.map((part) => JSON.stringify(part)).join(" ");
 }
 
 function sourceTimestamp(source: AiuDecisionSourceSummary): AiuPromptSourceTimestamp {
