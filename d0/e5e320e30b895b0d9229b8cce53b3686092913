@@ -1,0 +1,38 @@
+src/cli.ts
+  s_f8aaaf4fdfe4d6::t_d1b2cafab42b41 21-29,155-162
+src/index.ts
+  s_f8aaaf4fdfe4d6::t_8f34dba78eee7f 50-62,117-119,121-144
+  s_f8aaaf4fdfe4d6::t_b162d7af05d1e3 120
+test/cli.test.ts
+  s_f8aaaf4fdfe4d6::t_42d390024e192d 119-127,155-164,166-172
+  s_f8aaaf4fdfe4d6::t_bc20f477451e1b 165
+test/state.test.ts
+  s_f8aaaf4fdfe4d6::t_4f5557eaa5566e 11,209-220
+  s_f8aaaf4fdfe4d6::t_7f193ccedb181f 1-10,12-26,28-77,80,82-133,143-147,149-208,239
+  s_f8aaaf4fdfe4d6::t_d09acaf5ab3a36 78-79,81,134-142,148,221-238
+  s_f8aaaf4fdfe4d6::t_1aa03ff3555080 27
+src/state.ts
+  s_f8aaaf4fdfe4d6::t_7700bdca3b9476 1-11,13-206,216-223,226-264
+  s_f8aaaf4fdfe4d6::t_9978384eff4868 12,207-215,224-225
+docs/spec.md
+  s_f8aaaf4fdfe4d6::t_38b30b158e0aec 76
+docs/M2-continuation-state-and-policy-engine.md
+  s_f8aaaf4fdfe4d6::t_014606fd902aa0 74-76,78-83
+  s_f8aaaf4fdfe4d6::t_c165dad979684e 49,77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "d0e5e320e30b895b0d9229b8cce53b3686092913",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
