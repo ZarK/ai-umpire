@@ -250,6 +250,11 @@ describe("continuation decision engine", () => {
       "stop-supply-chain-approval",
     );
     assertDecision(
+      decideAiuContinuation({ states: allIdleModes, whipTask, whipStateError: { kind: "whip", status: "malformed" } }),
+      "stop",
+      "stop-malformed-input",
+    );
+    assertDecision(
       decideAiuContinuation({ states: [env(repository({ dirty: "fail" })), ...allIdleModes], whipTask }),
       "repair",
       "repair-repository-state",

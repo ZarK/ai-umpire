@@ -150,6 +150,10 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
     return decision(policy, "stop", hardStop.reasonCode, summaries, "stop", hardStop.selectedItem, hardStop.nextAction);
   }
 
+  if (input.whipStateError) {
+    return decision(policy, "stop", "stop-malformed-input", summaries, "stop", input.whipStateError, "Stop: fix malformed whip task state before continuing idle work.");
+  }
+
   if (policy.qualityEnabled) {
     const qualitySupplyChainBlock = findQualitySupplyChainBlock(indexed);
     if (qualitySupplyChainBlock && policy.stopOnSupplyChainApprovalBlock) {
@@ -192,10 +196,6 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
     if (planningUnknownBlock) {
       return decision(policy, "stop", "stop-unknown-input", summaries, "stop", planningUnknownBlock, "Stop: refresh planning state before continuing.");
     }
-  }
-
-  if (input.whipStateError) {
-    return decision(policy, "stop", "stop-malformed-input", summaries, "stop", input.whipStateError, "Stop: fix malformed whip task state before continuing idle work.");
   }
 
   const contradiction = findContradiction(indexed);
