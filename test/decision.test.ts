@@ -260,6 +260,15 @@ describe("continuation decision engine", () => {
       "repair-repository-state",
     );
     assertDecision(
+      decideAiuContinuation({
+        states: [env(repository({ dirty: "fail" })), ...allIdleModes],
+        whipTask,
+        whipStateError: { kind: "whip", status: "malformed" },
+      }),
+      "repair",
+      "repair-repository-state",
+    );
+    assertDecision(
       decideAiuContinuation({ states: [env(review("active", { targetId: "pr-1" })), ...allIdleModes], whipTask }),
       "continue",
       "continue-active-review",
@@ -272,6 +281,19 @@ describe("continuation decision engine", () => {
           env(qualityFailure("quality-next")),
         ],
         whipTask,
+      }),
+      "continue",
+      "continue-active-work",
+    );
+    assertDecision(
+      decideAiuContinuation({
+        states: [
+          env(workQueue({ activeItems: [workItem("active", "active")] })),
+          env(planning({ needsPlanning: true, nextAction: planningAction("plan-next") })),
+          env(qualityFailure("quality-next")),
+        ],
+        whipTask,
+        whipStateError: { kind: "whip", status: "malformed" },
       }),
       "continue",
       "continue-active-work",

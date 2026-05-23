@@ -150,10 +150,6 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
     return decision(policy, "stop", hardStop.reasonCode, summaries, "stop", hardStop.selectedItem, hardStop.nextAction);
   }
 
-  if (input.whipStateError) {
-    return decision(policy, "stop", "stop-malformed-input", summaries, "stop", input.whipStateError, "Stop: fix malformed whip task state before continuing idle work.");
-  }
-
   if (policy.qualityEnabled) {
     const qualitySupplyChainBlock = findQualitySupplyChainBlock(indexed);
     if (qualitySupplyChainBlock && policy.stopOnSupplyChainApprovalBlock) {
@@ -233,6 +229,10 @@ export function decideAiuContinuation(input: AiuContinuationDecisionInput): AiuC
 
   if (activeWork.length >= 1) {
     return decision(policy, "continue", "continue-active-work", summaries, "work", selectWorkItem(activeWork[0]), "Continue: resume the active work item before starting new work.");
+  }
+
+  if (input.whipStateError) {
+    return decision(policy, "stop", "stop-malformed-input", summaries, "stop", input.whipStateError, "Stop: fix malformed whip task state before continuing idle work.");
   }
 
   const planning = findPlanningContinuation(indexed, policy);
