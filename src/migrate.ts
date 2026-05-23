@@ -105,6 +105,8 @@ interface ManagedHostPath {
 
 const SEARCH_ROOTS = Object.freeze([".opencode", ".agents", "plugins", ".claude", ".codex", "scripts", ".umpire"]);
 const SEARCH_FILES = Object.freeze(["package.json", "pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lock", "aiu.config.json", "AGENTS.md", "CLAUDE.md", "README.md"]);
+const MANIFEST_FILE_NAMES = new Set(["package.json", "pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lock"]);
+const RECURSIVE_SCAN_IGNORES = new Set([".git", "node_modules", "dist", "coverage", ".turbo", ".next", ".cache"]);
 const LOCAL_CHECKOUT_PATTERN = /(?:file:|link:|workspace:|(?:\.\.\/)+)[:./\\\w-]*(?:ai-umpire|@tjalve\/aiu)|(?:^|["'\s])\/[^"'\s]*(?:ai-umpire|@tjalve\/aiu)(?:\/|["'\s]|$)/i;
 const AIU_TEXT_PATTERN = /\b(?:aiu|ai-umpire|umpire)\b/i;
 const PACKAGE_BACKED_COMMANDS: readonly AiuMigrationPackageCommand[] = Object.freeze([
@@ -569,8 +571,9 @@ function findUnknownAiuFiles(repoRoot: string, candidates: readonly string[], kn
 
 function candidateTextFiles(repoRoot: string, scanErrors: AiuMigrationFinding[]): string[] {
   const directFiles = SEARCH_FILES.filter((relativePath) => existsSync(path.join(repoRoot, relativePath)));
+  const nestedManifestFiles = collectManifestFiles(repoRoot, ".", scanErrors);
   const nestedFiles = SEARCH_ROOTS.flatMap((relativeRoot) => collectTextFiles(repoRoot, relativeRoot, scanErrors));
-  return [...new Set([...directFiles, ...nestedFiles])];
+  return [...new Set([...directFiles, ...nestedManifestFiles, ...nestedFiles])];
 }
 
 function collectTextFiles(repoRoot: string, relativeRoot: string, scanErrors: AiuMigrationFinding[]): string[] {
@@ -602,6 +605,38 @@ function collectTextFiles(repoRoot: string, relativeRoot: string, scanErrors: Ai
       return [];
     }
     return isTextCandidate(relativePath) ? [relativePath] : [];
+  });
+}
+
+function collectManifestFiles(repoRoot: string, relativeRoot: string, scanErrors: AiuMigrationFinding[]): string[] {
+  const absoluteRoot = path.join(repoRoot, relativeRoot);
+  if (!existsSync(absoluteRoot) || !safeStat(absoluteRoot)?.isDirectory()) {
+    return [];
+  }
+
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(absoluteRoot, { withFileTypes: true });
+  } catch {
+    scanErrors.push({
+      relativePath: relativeRoot,
+      category: "scan-error",
+      reason: "Directory could not be read during migration manifest scan; review permissions before trusting the migration plan.",
+      confidence: "low",
+      requiredReview: true,
+    });
+    return [];
+  }
+
+  return entries.flatMap((entry) => {
+    const relativePath = relativeRoot === "." ? entry.name : path.join(relativeRoot, entry.name);
+    if (entry.isDirectory()) {
+      return RECURSIVE_SCAN_IGNORES.has(entry.name) ? [] : collectManifestFiles(repoRoot, relativePath, scanErrors);
+    }
+    if (!entry.isFile()) {
+      return [];
+    }
+    return MANIFEST_FILE_NAMES.has(entry.name) ? [relativePath] : [];
   });
 }
 
@@ -645,9 +680,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isPackageBackedManagedContent(content: string, expectedContent: string): boolean {
   return normalizeText(content) === normalizeText(expectedContent)
     || content.includes("Managed by @tjalve/aiu")
-    || content.includes('"managedBy": "@tjalve/aiu"')
-    || content.includes("@tjalve/aiu/opencode")
-    || content.includes("pnpm exec aiu hook-stop");
+    || content.includes('"managedBy": "@tjalve/aiu"');
 }
 
 function normalizeText(value: string): string {

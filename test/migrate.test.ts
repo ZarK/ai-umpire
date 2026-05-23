@@ -61,11 +61,14 @@ describe("migration planner", () => {
     await mkdir(path.join(target, ".opencode", "plugins"), { recursive: true });
     await mkdir(path.join(target, ".opencode", "commands"), { recursive: true });
     await mkdir(path.join(target, ".codex", "hooks"), { recursive: true });
+    await mkdir(path.join(target, ".claude"), { recursive: true });
+    await mkdir(path.join(target, "packages", "app"), { recursive: true });
     await mkdir(path.join(target, "plugins", "ai-umpire", "hooks"), { recursive: true });
     await mkdir(path.join(target, "scripts"), { recursive: true });
     await mkdir(path.join(target, ".umpire"), { recursive: true });
     await writeFile(path.join(target, ".opencode", "plugins", "ai-umpire-continuation.ts"), "export const local = true;\n", "utf8");
     await writeFile(path.join(target, ".codex", "hooks", "ai-umpire-stop.json"), JSON.stringify({ Stop: [{ hooks: [{ type: "command", command: "node scripts/aiu-stop.js" }] }] }), "utf8");
+    await writeFile(path.join(target, ".claude", "settings.json"), JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: "command", command: "pnpm exec aiu hook-stop --tool claude-code" }] }] }, custom: true }), "utf8");
     await writeFile(path.join(target, "plugins", "ai-umpire", "hooks", "hooks.json"), JSON.stringify({ Stop: [{ hooks: [{ type: "command", command: "node scripts/aiu-stop.js" }] }] }), "utf8");
     await writeFile(path.join(target, "scripts", "aiu-stop.js"), "console.log('ai-umpire hook-stop helper');\n", "utf8");
     await writeFile(path.join(target, ".opencode", "commands", "make-it-so.md"), "Run the local AI Umpire continuation prompt.\n", "utf8");
@@ -93,6 +96,12 @@ describe("migration planner", () => {
       ),
       "utf8",
     );
+    await writeFile(path.join(target, "packages", "app", "package.json"), JSON.stringify({
+      private: true,
+      dependencies: {
+        "@tjalve/aiu": "link:../../ai-umpire",
+      },
+    }, null, 2), "utf8");
 
     const result = await runCli(target, ["migrate", "--dry-run", "--json"]);
     const parsed = JSON.parse(result.stdout) as MigrationEnvelope;
@@ -104,11 +113,12 @@ describe("migration planner", () => {
     assert.equal(parsed.migrate.dryRun, true);
     assert.equal(parsed.migrate.configPath.endsWith("aiu.config.json"), true);
     assert.deepEqual(parsed.migrate.repoLocalHooks.map((finding) => finding.relativePath).sort(), [
+      ".claude/settings.json",
       ".codex/hooks/ai-umpire-stop.json",
       path.join(".opencode", "plugins", "ai-umpire-continuation.ts"),
       path.join("plugins", "ai-umpire", "hooks", "hooks.json"),
     ]);
-    assert.deepEqual(parsed.migrate.localCheckoutReferences.map((finding) => finding.relativePath).sort(), ["AGENTS.md", "package.json"]);
+    assert.deepEqual(parsed.migrate.localCheckoutReferences.map((finding) => finding.relativePath).sort(), ["AGENTS.md", "package.json", path.join("packages", "app", "package.json")]);
     assert.ok(parsed.migrate.copiedHelpers.some((finding) => finding.relativePath === path.join("scripts", "aiu-stop.js")));
     assert.ok(parsed.migrate.commandWrappers.some((finding) => finding.relativePath === path.join(".opencode", "commands", "make-it-so.md")));
     assert.ok(parsed.migrate.promptCustomizations.some((finding) => finding.relativePath === "aiu.config.json"));
