@@ -89,8 +89,10 @@ const HOST_PROFILES: Readonly<Record<AiuHost, AiuHostCapabilityProfile>> = Objec
         description: "OpenCode AI Umpire plugin wrapper.",
         content: [
           "// Managed by @tjalve/aiu.",
-          "// Delegates OpenCode continuation events to the package-backed aiu command.",
-          "export const aiUmpireCommand = [\"aiu\", \"hook\", \"opencode\"] as const;",
+          "// Compose custom behavior outside this package-managed file.",
+          "import { createAiuOpenCodePlugin } from \"@tjalve/aiu/opencode\";",
+          "",
+          "export default createAiuOpenCodePlugin();",
           "",
         ].join("\n"),
       }),

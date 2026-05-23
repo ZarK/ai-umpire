@@ -114,6 +114,7 @@ describe("metadata-backed CLI", () => {
           defaultPath?: string;
           hostNames?: string[];
           hostCapabilityNames?: string[];
+          promptSectionKinds?: string[];
         };
       };
       package: { name: string };
@@ -141,6 +142,7 @@ describe("metadata-backed CLI", () => {
     assert.equal(parsed.sections?.config?.defaultPath, "aiu.config.json");
     assert.deepEqual(parsed.sections?.config?.hostNames, ["opencode", "codex", "claude-code"]);
     assert.deepEqual(parsed.sections?.config?.hostCapabilityNames, ["stopHook", "sessionState", "promptDelivery"]);
+    assert.deepEqual(parsed.sections?.config?.promptSectionKinds, ["work", "planning", "quality", "whip"]);
 
     const init = parsed.commands.find((command) => command.name === "init");
     assert.ok(init);

@@ -85,6 +85,7 @@ Requirements use stable identifiers (`FR-XX-NNN`) so milestones and issues can r
 | FR-06-006 | Umpire does not prompt merge, submit, or completion actions when required gates are failed, missing, unknown, or stale. | Required |
 | FR-06-007 | Prompt renderers produce concrete bounded prompts that name the trusted state source or command the agent should inspect first. | Required |
 | FR-06-008 | Prompt renderers return stable fingerprints for deduplication and ownership tracking. | Required |
+| FR-06-009 | Prompt customization is supported through typed config sections for work, planning, quality, and whip prompts. | Required |
 
 ## FR-07 - Host Integrations
 
@@ -96,7 +97,8 @@ Requirements use stable identifiers (`FR-XX-NNN`) so milestones and issues can r
 | FR-07-004 | Host adapters respect active user typing, selected-session changes, helper sessions, prompt ownership, cooldowns, and locks to avoid duplicate or competing prompts. | Required |
 | FR-07-005 | `aiu hook stop --tool codex|claude-code` reads host stop-hook input and writes the host's expected JSON response to stdout. | Required |
 | FR-07-006 | Stop hooks block stopping only when trusted state loaded successfully, the decision is safe `continue` or `repair`, the prompt is concrete, and host policy allows blocking. | Required |
-| FR-07-007 | Stop hooks allow stopping when no work is ready, all work is blocked, trusted state cannot be loaded, policy requires human input, or the decision is `wait` or `stop`. | Required |
+| FR-07-007 | `@tjalve/aiu/opencode` exposes typed OpenCode wrapper composition without requiring repositories to import package internals. | Required |
+| FR-07-008 | Stop hooks allow stopping when no work is ready, all work is blocked, trusted state cannot be loaded, policy requires human input, or the decision is `wait` or `stop`. | Required |
 
 ## FR-08 - Idle Work Modes
 
