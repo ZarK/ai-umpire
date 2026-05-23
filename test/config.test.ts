@@ -245,7 +245,7 @@ describe("config foundation", () => {
       version: 1,
       whip: {
         enabled: false,
-        statePath: "whip-state-dir",
+        statePath: "",
       },
     });
 
@@ -253,6 +253,7 @@ describe("config foundation", () => {
 
     assert.equal(result.ok, true);
     assert.deepEqual(result.diagnostics, []);
+    assert.equal(result.config.whip.statePath, ".umpire/whip.json");
   });
 });
 

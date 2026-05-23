@@ -462,13 +462,18 @@ function normalizeWhip(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuW
     diagnostics.push(diagnostic("invalid-whip-policy", "$.whip", "whip must be an object.", "Use { \"enabled\": false } or configure concrete whip tasks."));
     return DEFAULT_CONFIG.whip;
   }
+  const enabled = normalizeBoolean(value.enabled, DEFAULT_CONFIG.whip.enabled, "$.whip.enabled", diagnostics);
 
   return Object.freeze({
-    enabled: normalizeBoolean(value.enabled, DEFAULT_CONFIG.whip.enabled, "$.whip.enabled", diagnostics),
+    enabled,
     usePackageDefaults: normalizeBoolean(value.usePackageDefaults, DEFAULT_CONFIG.whip.usePackageDefaults, "$.whip.usePackageDefaults", diagnostics),
     tasks: Object.freeze(normalizeWhipTasks(value.tasks, diagnostics)),
-    statePath: normalizePathValue(value.statePath, DEFAULT_CONFIG.whip.statePath, "$.whip.statePath", diagnostics),
+    statePath: enabled ? normalizePathValue(value.statePath, DEFAULT_CONFIG.whip.statePath, "$.whip.statePath", diagnostics) : normalizeDisabledWhipStatePath(value.statePath),
   });
+}
+
+function normalizeDisabledWhipStatePath(value: unknown): string {
+  return typeof value === "string" && value.length > 0 && !value.includes("\0") ? value : DEFAULT_CONFIG.whip.statePath;
 }
 
 function normalizeWhipTasks(value: unknown, diagnostics: AiuConfigDiagnostic[]): AiuWhipTaskDefinition[] {
