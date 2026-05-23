@@ -573,7 +573,7 @@ function candidateTextFiles(repoRoot: string, scanErrors: AiuMigrationFinding[])
   const directFiles = SEARCH_FILES.filter((relativePath) => existsSync(path.join(repoRoot, relativePath)));
   const nestedManifestFiles = collectManifestFiles(repoRoot, ".", scanErrors);
   const nestedFiles = SEARCH_ROOTS.flatMap((relativeRoot) => collectTextFiles(repoRoot, relativeRoot, scanErrors));
-  return [...new Set([...directFiles, ...nestedManifestFiles, ...nestedFiles])];
+  return [...new Set([...directFiles, ...nestedManifestFiles, ...nestedFiles])].sort(comparePath);
 }
 
 function collectTextFiles(repoRoot: string, relativeRoot: string, scanErrors: AiuMigrationFinding[]): string[] {
@@ -596,7 +596,7 @@ function collectTextFiles(repoRoot: string, relativeRoot: string, scanErrors: Ai
     return [];
   }
 
-  return entries.flatMap((entry) => {
+  return entries.sort(compareDirent).flatMap((entry) => {
     const relativePath = path.join(relativeRoot, entry.name);
     if (entry.isDirectory()) {
       return collectTextFiles(repoRoot, relativePath, scanErrors);
@@ -628,7 +628,7 @@ function collectManifestFiles(repoRoot: string, relativeRoot: string, scanErrors
     return [];
   }
 
-  return entries.flatMap((entry) => {
+  return entries.sort(compareDirent).flatMap((entry) => {
     const relativePath = relativeRoot === "." ? entry.name : path.join(relativeRoot, entry.name);
     if (entry.isDirectory()) {
       return RECURSIVE_SCAN_IGNORES.has(entry.name) ? [] : collectManifestFiles(repoRoot, relativePath, scanErrors);
@@ -642,6 +642,14 @@ function collectManifestFiles(repoRoot: string, relativeRoot: string, scanErrors
 
 function isTextCandidate(relativePath: string): boolean {
   return [".json", ".jsonc", ".md", ".ts", ".js", ".mjs", ".cjs", ".yaml", ".yml", ".toml", ".txt"].includes(path.extname(relativePath));
+}
+
+function compareDirent(left: Dirent, right: Dirent): number {
+  return left.name.localeCompare(right.name);
+}
+
+function comparePath(left: string, right: string): number {
+  return left.localeCompare(right);
 }
 
 function safeStat(absolutePath: string) {
