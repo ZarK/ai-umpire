@@ -134,7 +134,7 @@ Remove the package with the project package manager only after host files and tr
 pnpm remove @tjalve/aiu
 ```
 
-Umpire does not provide a blanket uninstall command because host files may contain repository-owned policy. Review `aiu doctor --json`, `aiu paths --json`, and normal git diffs before deleting host configuration. For old copied helper assets, use `aiu migrate --cleanup --dry-run --json` first and confirm only the exact cleanup candidates you intend to remove.
+Umpire does not provide a blanket uninstall command because host files may contain repository-owned policy. Review `pnpm exec aiu doctor --json`, `pnpm exec aiu paths --json`, and normal git diffs before deleting host configuration. For old copied helper assets, use `pnpm exec aiu migrate --cleanup --dry-run --json` first and confirm only the exact cleanup candidates you intend to remove.
 
 Local `.umpire/` state, locks, and logs are runtime diagnostics. Delete them only when you intentionally want to discard local continuation history; never treat them as provider truth or release artifacts.
 
