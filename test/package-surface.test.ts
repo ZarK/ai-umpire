@@ -1,18 +1,35 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, it } from "node:test";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const execFileAsync = promisify(execFile);
 
 type PackageJson = {
+  bin?: Record<string, string>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   exports?: Record<string, { import?: string; types?: string }>;
   files?: string[];
+  license?: string;
+  main?: string;
+  name?: string;
   packageManager?: string;
+  publishConfig?: Record<string, string>;
   scripts?: Record<string, string>;
+  types?: string;
+  version?: string;
+};
+
+type PackDryRun = {
+  name: string;
+  version: string;
+  filename: string;
+  files: Array<{ path: string }>;
 };
 
 describe("package foundation", () => {
@@ -43,6 +60,55 @@ describe("package foundation", () => {
     assert.deepEqual(packageJson.files, ["dist/src", "README.md"]);
     assert.equal(packageJson.files?.includes("scripts"), false);
     assert.equal(packageJson.files?.includes("queue-policy.json"), false);
+  });
+
+  it("publishes only the stable package runtime surface", async () => {
+    const packageJson = await readPackageJson();
+    const pack = await readPackDryRun();
+    const packedPaths = pack.files.map((file) => file.path).sort();
+
+    assert.equal(pack.name, "@tjalve/aiu");
+    assert.equal(pack.version, packageJson.version);
+    assert.equal(pack.filename, "tjalve-aiu-0.0.0.tgz");
+    assert.equal(packageJson.name, "@tjalve/aiu");
+    assert.equal(packageJson.license, "MIT");
+    assert.equal(packageJson.main, "./dist/src/index.js");
+    assert.equal(packageJson.types, "./dist/src/index.d.ts");
+    assert.equal(packageJson.bin?.aiu, "./dist/src/bin/aiu.js");
+    assert.equal(packageJson.publishConfig?.access, "public");
+
+    for (const required of [
+      "README.md",
+      "package.json",
+      "dist/src/index.js",
+      "dist/src/index.d.ts",
+      "dist/src/opencode.js",
+      "dist/src/opencode.d.ts",
+      "dist/src/bin/aiu.js",
+      "dist/src/cli.js",
+      "dist/src/command_registry.js",
+    ]) {
+      assert.ok(packedPaths.includes(required), `${required} must be packed`);
+    }
+
+    for (const packedPath of packedPaths) {
+      assert.equal(packedPath.startsWith("src/"), false, `${packedPath} must not publish TypeScript source`);
+      assert.equal(packedPath.startsWith("test/"), false, `${packedPath} must not publish tests`);
+      assert.equal(packedPath.startsWith("docs/"), false, `${packedPath} must not publish planning docs`);
+      assert.equal(packedPath.startsWith(".github/"), false, `${packedPath} must not publish workflow internals`);
+      assert.equal(packedPath.startsWith(".aie/"), false, `${packedPath} must not publish Executor state`);
+      assert.equal(packedPath.startsWith(".umpire/"), false, `${packedPath} must not publish local Umpire state`);
+      assert.equal(packedPath.endsWith(".ts") && !packedPath.endsWith(".d.ts"), false, `${packedPath} must not publish TypeScript source artifacts`);
+      assert.notEqual(packedPath, "pnpm-lock.yaml");
+      assert.notEqual(packedPath, "aiu.config.json");
+      assert.notEqual(packedPath, ".npmrc");
+    }
+  });
+
+  it("does not track generated build output or private local state", async () => {
+    const tracked = await gitLsFiles(["dist", ".aie", ".umpire", "tjalve-aiu-0.0.0.tgz"]);
+
+    assert.deepEqual(tracked, []);
   });
 
   it("exports only documented stable package entrypoints", async () => {
@@ -141,10 +207,42 @@ describe("package foundation", () => {
     assert.match(codeowners, /^pnpm-lock\.yaml @ZarK$/m);
     assert.match(codeowners, /^\.npmrc @ZarK$/m);
   });
+
+  it("documents safe release and install guidance", async () => {
+    const docs = [
+      await readFile(path.join(repoRoot, "README.md"), "utf8"),
+      await readFile(path.join(repoRoot, "docs", "release-controls.md"), "utf8"),
+    ].join("\n");
+
+    assert.match(docs, /--save-exact --ignore-scripts/);
+    assert.match(docs, /pnpm install --frozen-lockfile --ignore-scripts/);
+    assert.match(docs, /trusted publishing/);
+    assert.match(docs, /npm-publish/);
+    assert.match(docs, /pnpm remove @tjalve\/aiu/);
+    assert.doesNotMatch(docs, /@latest\b/);
+    assert.doesNotMatch(docs, /curl\b[^|\n]*\|\s*(?:sh|bash)/i);
+    assert.doesNotMatch(docs, /git\+https?:\/\/|github:[^\s`"]+/i);
+  });
 });
 
 async function readPackageJson(): Promise<PackageJson> {
   return JSON.parse(await readFile(path.join(repoRoot, "package.json"), "utf8")) as PackageJson;
+}
+
+async function readPackDryRun(): Promise<PackDryRun> {
+  const result = await execFileAsync("pnpm", ["pack", "--dry-run", "--json"], {
+    cwd: repoRoot,
+    maxBuffer: 1024 * 1024,
+  });
+  return JSON.parse(result.stdout) as PackDryRun;
+}
+
+async function gitLsFiles(paths: readonly string[]): Promise<readonly string[]> {
+  const result = await execFileAsync("git", ["ls-files", "--", ...paths], {
+    cwd: repoRoot,
+    maxBuffer: 1024 * 1024,
+  });
+  return result.stdout.trim().split(/\r?\n/).filter(Boolean);
 }
 
 function parseNpmrc(raw: string): Map<string, string> {

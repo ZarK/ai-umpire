@@ -175,6 +175,8 @@ Verify core runtime has no old-helper compatibility adapters, copied script sema
 
 Update README, CI, publish workflow, pack tests, install safety docs, migration docs, and release checklist.
 
+Status: implemented by release-check coverage for build, typecheck, tests, package dry-run, published file assertions, generated-output exclusion, install lifecycle checks, workflow pinning, trusted publishing controls, host support docs, migration docs, troubleshooting/log guidance, and safe uninstall/cleanup guidance.
+
 ## Exit Criteria
 
 - A repository using old repo-local Umpire hooks can dry-run and apply migration to package-backed entrypoints.

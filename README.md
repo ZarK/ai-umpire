@@ -126,6 +126,18 @@ Cleanup is also explicit and dry-run first. `pnpm exec aiu migrate --cleanup --d
 
 OpenCode continuation uses `.umpire/state/continuation.json`, `.umpire/locks/continuation.lock`, and `.umpire/logs/continuation.jsonl` by default. These paths are configurable in `aiu.config.json`, exposed by `aiu paths` and `aiu status --json`, and remain local state that should not be committed or uploaded as provider truth.
 
+## Safe Uninstall And Cleanup
+
+Remove the package with the project package manager only after host files and trusted command descriptors no longer depend on `aiu`:
+
+```bash
+pnpm remove @tjalve/aiu
+```
+
+Umpire does not provide a blanket uninstall command because host files may contain repository-owned policy. Review `aiu doctor --json`, `aiu paths --json`, and normal git diffs before deleting host configuration. For old copied helper assets, use `aiu migrate --cleanup --dry-run --json` first and confirm only the exact cleanup candidates you intend to remove.
+
+Local `.umpire/` state, locks, and logs are runtime diagnostics. Delete them only when you intentionally want to discard local continuation history; never treat them as provider truth or release artifacts.
+
 ## Whip Tasks
 
 Whip tasks are optional idle work. They are considered only after higher-priority continuation work is unavailable, and prompt delivery alone never completes a whip task. Default package tasks are concrete maintenance prompts; Umpire must not generate hidden backlog work or vague "make it better" prompts.
