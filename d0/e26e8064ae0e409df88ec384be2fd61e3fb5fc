@@ -1,0 +1,23 @@
+test/package-surface.test.ts
+  s_f8aaaf4fdfe4d6::t_021ae5e3079148 2,6,10,13,18-20,22,24-32,65-113,210-225,232-245
+docs/M5-migration-release-readiness-and-provider-architecture.md
+  s_f8aaaf4fdfe4d6::t_021ae5e3079148 178-179
+README.md
+  s_f8aaaf4fdfe4d6::t_021ae5e3079148 129-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "d0e26e8064ae0e409df88ec384be2fd61e3fb5fc",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
