@@ -101,7 +101,7 @@ describe("runtime architecture boundaries", () => {
     assert.equal(imports.has("node:child_process"), true);
     assert.match(trustedAdapter.source, /\bspawn\(executable,\s*args,\s*\{/);
     assert.match(trustedAdapter.source, /\bshell:\s*false\b/);
-    assert.doesNotMatch(trustedAdapter.source, /\bexec(?:File)?(?:Sync)?\(/);
+    assert.doesNotMatch(trustedAdapter.source, /\bexec(?:File)?(?:Sync)?\s*\(/);
   });
 
   it("keeps CLI dispatch and metadata on qube-cli", async () => {
