@@ -102,6 +102,7 @@ async function createTempRoot(prefix: string): Promise<string> {
 
 async function buildSmokeLockfile(tarballSpecifier: string, tarball: string): Promise<string> {
   const rootLock = await readFile(path.join(repoRoot, "pnpm-lock.yaml"), "utf8");
+  const packageJson = JSON.parse(await readFile(path.join(repoRoot, "package.json"), "utf8")) as { version: string };
   const lockfileVersion = readLockfileVersion(rootLock);
   const packages = readLockfileSection(rootLock, "packages", "snapshots");
   const snapshots = readLockfileSection(rootLock, "snapshots");
@@ -126,7 +127,7 @@ async function buildSmokeLockfile(tarballSpecifier: string, tarball: string): Pr
     "",
     `  '@tjalve/aiu@${tarballSpecifier}':`,
     `    resolution: {integrity: ${integrity}, tarball: ${tarballSpecifier}}`,
-    "    version: 0.0.0",
+    `    version: ${packageJson.version}`,
     "    engines: {node: '>=24.0.0'}",
     "    hasBin: true",
     "",

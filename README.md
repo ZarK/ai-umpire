@@ -20,7 +20,7 @@ It does not bundle companion CLIs or keep copied helper scripts as a runtime fal
 ## Human Install
 
 ```bash
-pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.0
+pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.1
 ```
 
 System requirements:
@@ -44,7 +44,7 @@ pnpm exec aiu doctor --json
 Agents should use deterministic commands and inspect JSON before mutating repository files:
 
 ```bash
-pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.0
+pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.1
 pnpm exec aiu doctor --json
 pnpm exec aiu init --dry-run --json
 ```
@@ -317,7 +317,7 @@ Repository controls before public publish:
 - `.github/CODEOWNERS` owns release-sensitive files
 - workflow permissions default to read-only
 - the `npm-publish` environment requires explicit reviewer approval
-- npm trusted publishing is configured for `ZarK/ai-umpire`, workflow file `publish.yml`, environment `npm-publish`
+- npm trusted publishing is configured for `ZarK/ai-umpire`, workflow file `publish.yml`, environment `npm-publish`, and only `npm stage publish`
 - no long-lived `NPM_TOKEN` is required for the primary publish path
 
 Before tagging:
@@ -332,12 +332,12 @@ Release flow:
 
 ```bash
 pnpm run release:check
-git tag v0.1.0
-git push origin main v0.1.0
+git tag publish-0.0.1
+git push origin main publish-0.0.1
 ```
 
-The tagged release workflow publishes with npm provenance from the protected `npm-publish` environment:
+The tagged release workflow stages the package with npm provenance from the protected `npm-publish` environment. A maintainer must approve or reject the staged package in npm before it becomes public:
 
 ```bash
-npm publish --access public --provenance --ignore-scripts
+npm stage publish . --access public --ignore-scripts
 ```

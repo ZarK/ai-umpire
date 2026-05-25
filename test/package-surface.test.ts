@@ -19,7 +19,7 @@ type PackageJson = {
   main?: string;
   name?: string;
   packageManager?: string;
-  publishConfig?: Record<string, string>;
+  publishConfig?: Record<string, boolean | string>;
   scripts?: Record<string, string>;
   types?: string;
   version?: string;
@@ -69,13 +69,14 @@ describe("package foundation", () => {
 
     assert.equal(pack.name, "@tjalve/aiu");
     assert.equal(pack.version, packageJson.version);
-    assert.equal(pack.filename, "tjalve-aiu-0.0.0.tgz");
+    assert.equal(pack.filename, `tjalve-aiu-${packageJson.version}.tgz`);
     assert.equal(packageJson.name, "@tjalve/aiu");
     assert.equal(packageJson.license, "MIT");
     assert.equal(packageJson.main, "./dist/src/index.js");
     assert.equal(packageJson.types, "./dist/src/index.d.ts");
     assert.equal(packageJson.bin?.aiu, "./dist/src/bin/aiu.js");
     assert.equal(packageJson.publishConfig?.access, "public");
+    assert.equal(packageJson.publishConfig?.provenance, true);
 
     for (const required of [
       "README.md",
@@ -106,7 +107,8 @@ describe("package foundation", () => {
   });
 
   it("does not track generated build output or private local state", async () => {
-    const tracked = await gitLsFiles(["dist", ".aie", ".umpire", "tjalve-aiu-0.0.0.tgz"]);
+    const packageJson = await readPackageJson();
+    const tracked = await gitLsFiles(["dist", ".aie", ".umpire", `tjalve-aiu-${packageJson.version}.tgz`]);
 
     assert.deepEqual(tracked, []);
   });
@@ -179,10 +181,18 @@ describe("package foundation", () => {
 
     assert.match(publishWorkflow, /id-token:\s*write/);
     assert.match(publishWorkflow, /environment:\s*npm-publish/);
+    assert.doesNotMatch(publishWorkflow, /workflow_dispatch:/);
+    assert.match(publishWorkflow, /if:\s*startsWith\(github\.ref, 'refs\/tags\/publish-'\)/);
+    assert.doesNotMatch(publishWorkflow, /refs\/heads\/main/);
+    assert.match(publishWorkflow, /package-manager-cache:\s*false/);
+    assert.match(publishWorkflow, /corepack prepare pnpm@11\.0\.4 --activate/);
+    assert.match(publishWorkflow, /pnpm install --frozen-lockfile --ignore-scripts/);
+    assert.match(publishWorkflow, /npm install -g npm@11\.15\.0 --ignore-scripts/);
     assert.match(publishWorkflow, /git merge-base --is-ancestor "\$tag_commit" origin\/main/);
-    assert.match(publishWorkflow, /npm publish --access public --provenance --ignore-scripts/);
+    assert.match(publishWorkflow, /npm stage publish \. --access public --ignore-scripts/);
     assert.doesNotMatch(publishWorkflow, /pnpm publish/);
-    assert.doesNotMatch(publishWorkflow, /NPM_TOKEN/);
+    assert.doesNotMatch(publishWorkflow, /(?:^|\s)npm publish(?:\s|$)/);
+    assert.doesNotMatch(publishWorkflow, /NODE_AUTH_TOKEN|NPM_TOKEN|secrets\./);
   });
 
   it("does not persist checkout credentials in workflows", async () => {
