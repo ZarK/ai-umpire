@@ -1,0 +1,40 @@
+test/package-surface.test.ts
+  s_f8aaaf4fdfe4d6::t_c051c3daa146f4 72,110-111,194
+  s_f8aaaf4fdfe4d6::t_762275c8ad3fdf 22,79,187-190,195
+  s_f8aaaf4fdfe4d6::t_f49ac6cc421cce 185-186,192
+  s_f8aaaf4fdfe4d6::t_f0aee4de32b4c4 184
+.github/workflows/publish.yml
+  s_f8aaaf4fdfe4d6::t_5de0f10031d3cf 55,58
+  s_f8aaaf4fdfe4d6::t_47e3010f52e78d 1,6,15,19,34-40,54,56-57
+  s_f8aaaf4fdfe4d6::t_f49ac6cc421cce 14,60
+README.md
+  s_f8aaaf4fdfe4d6::t_f49ac6cc421cce 342
+  s_f8aaaf4fdfe4d6::t_762275c8ad3fdf 335-336
+  s_f8aaaf4fdfe4d6::t_c051c3daa146f4 23,47,320,339
+test/install-smoke.test.ts
+  s_f8aaaf4fdfe4d6::t_c051c3daa146f4 105,130
+docs/release-controls.md
+  s_f8aaaf4fdfe4d6::t_762275c8ad3fdf 29
+  s_f8aaaf4fdfe4d6::t_c051c3daa146f4 33,35
+docs/M5-migration-release-readiness-and-provider-architecture.md
+  s_f8aaaf4fdfe4d6::t_c051c3daa146f4 153
+package.json
+  s_f8aaaf4fdfe4d6::t_762275c8ad3fdf 36-37
+  s_f8aaaf4fdfe4d6::t_c051c3daa146f4 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "9f5a371fd786f26374739be54ef1dfebb3adac92",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
