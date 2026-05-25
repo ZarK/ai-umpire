@@ -150,7 +150,7 @@ Repository release controls include:
 - disabled force pushes and branch deletion on `main`
 - secret scanning and push protection when repository visibility supports them
 - protected `npm-publish` environment with reviewer approval
-- npm trusted publishing for `ZarK/ai-umpire`, workflow `Publish`, environment `npm-publish`
+- npm trusted publishing for `ZarK/ai-umpire`, workflow file `publish.yml`, environment `npm-publish`
 - no long-lived `NPM_TOKEN` for the primary publish path
 
 ## Proposed GitHub Issues

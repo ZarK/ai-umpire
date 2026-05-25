@@ -26,11 +26,11 @@ This file records the expected public-release controls for `@tjalve/aiu`.
 - Publish workflow: `.github/workflows/publish.yml`.
 - Third-party actions are pinned to full commit SHAs.
 - CI installs with `pnpm install --frozen-lockfile --ignore-scripts`.
-- Publish uses the protected `npm-publish` environment and `id-token: write` for npm provenance.
+- Publish uses the protected `npm-publish` environment, `id-token: write`, and `npm publish` for npm Trusted Publishing provenance.
 
 ## npm Publishing
 
-- Primary publish path: npm trusted publishing for `ZarK/ai-umpire`, workflow `Publish`, environment `npm-publish`.
+- Primary publish path: npm trusted publishing for `ZarK/ai-umpire`, workflow file `publish.yml`, environment `npm-publish`.
 - Long-lived `NPM_TOKEN` secrets are not required for the primary publish path.
 - The `npm-publish` GitHub environment must require reviewer approval before a tag publish can proceed.
 

@@ -317,7 +317,7 @@ Repository controls before public publish:
 - `.github/CODEOWNERS` owns release-sensitive files
 - workflow permissions default to read-only
 - the `npm-publish` environment requires explicit reviewer approval
-- npm trusted publishing is configured for `ZarK/ai-umpire`, workflow `Publish`, environment `npm-publish`
+- npm trusted publishing is configured for `ZarK/ai-umpire`, workflow file `publish.yml`, environment `npm-publish`
 - no long-lived `NPM_TOKEN` is required for the primary publish path
 
 Before tagging:
@@ -339,5 +339,5 @@ git push origin main v0.1.0
 The tagged release workflow publishes with npm provenance from the protected `npm-publish` environment:
 
 ```bash
-pnpm publish --access public --provenance --no-git-checks
+npm publish --access public --provenance --ignore-scripts
 ```
