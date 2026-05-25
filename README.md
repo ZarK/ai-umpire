@@ -20,7 +20,7 @@ It does not bundle companion CLIs or keep copied helper scripts as a runtime fal
 ## Human Install
 
 ```bash
-pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.1
+pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.2
 ```
 
 System requirements:
@@ -44,7 +44,7 @@ pnpm exec aiu doctor --json
 Agents should use deterministic commands and inspect JSON before mutating repository files:
 
 ```bash
-pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.1
+pnpm add -D --save-exact --ignore-scripts @tjalve/aiu@0.0.2
 pnpm exec aiu doctor --json
 pnpm exec aiu init --dry-run --json
 ```
@@ -332,8 +332,8 @@ Release flow:
 
 ```bash
 pnpm run release:check
-git tag publish-0.0.1
-git push origin main publish-0.0.1
+git tag publish-0.0.2
+git push origin main publish-0.0.2
 ```
 
 The tagged release workflow stages the package with npm provenance from the protected `npm-publish` environment. A maintainer must approve or reject the staged package in npm before it becomes public:

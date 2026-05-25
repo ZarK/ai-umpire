@@ -1,6 +1,6 @@
 {
   "name": "@tjalve/aiu",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "AI Umpire package foundation and CLI for safe agent continuation.",
   "type": "module",
   "license": "MIT",
@@ -16,7 +16,7 @@
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
   "bin": {
-    "aiu": "./dist/src/bin/aiu.js"
+    "aiu": "dist/src/bin/aiu.js"
   },
   "exports": {
     ".": {

@@ -74,7 +74,7 @@ describe("package foundation", () => {
     assert.equal(packageJson.license, "MIT");
     assert.equal(packageJson.main, "./dist/src/index.js");
     assert.equal(packageJson.types, "./dist/src/index.d.ts");
-    assert.equal(packageJson.bin?.aiu, "./dist/src/bin/aiu.js");
+    assert.equal(packageJson.bin?.aiu, "dist/src/bin/aiu.js");
     assert.equal(packageJson.publishConfig?.access, "public");
     assert.equal(packageJson.publishConfig?.provenance, true);
 
