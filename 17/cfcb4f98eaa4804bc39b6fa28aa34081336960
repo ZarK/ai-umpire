@@ -1,0 +1,29 @@
+.github/workflows/publish.yml
+  s_f8aaaf4fdfe4d6::t_ec6686abfdd3e3 48
+docs/release-controls.md
+  s_f8aaaf4fdfe4d6::t_d5be7e8c6c3905 33
+  s_f8aaaf4fdfe4d6::t_ec6686abfdd3e3 29
+README.md
+  s_f8aaaf4fdfe4d6::t_d5be7e8c6c3905 320
+  s_f8aaaf4fdfe4d6::t_ec6686abfdd3e3 342
+docs/M5-migration-release-readiness-and-provider-architecture.md
+  s_f8aaaf4fdfe4d6::t_d5be7e8c6c3905 153
+test/package-surface.test.ts
+  s_f8aaaf4fdfe4d6::t_ec6686abfdd3e3 183-184
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "17cfcb4f98eaa4804bc39b6fa28aa34081336960",
+  "prompts": {},
+  "sessions": {
+    "s_f8aaaf4fdfe4d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5183-a45e-7111-a46c-bc5f0a5c3e6e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Tjalve Aarflot <tjalve.github@proton.me>"
+    }
+  }
+}
